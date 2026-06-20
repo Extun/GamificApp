@@ -34,6 +34,8 @@ export function FileUpload({ onUpload, accept }) {
 
     const handleUploadClick = () => {
         if (file && onUpload) onUpload(file);
+        setFile(null);
+        if (inputRef.current) inputRef.current.value = "";
     };
 
     return (

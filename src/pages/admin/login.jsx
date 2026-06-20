@@ -1,15 +1,10 @@
 import { useState, useId } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Box from '@mui/material/Box';
-import TextField from '@mui/material/TextField';
-import FormControl from '@mui/material/FormControl';
-import OutlinedInput from '@mui/material/OutlinedInput';
-import InputLabel from '@mui/material/InputLabel';
-import InputAdornment from '@mui/material/InputAdornment';
-import IconButton from '@mui/material/IconButton';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import Button from '@mui/material/Button';
+import SchoolRoundedIcon from '@mui/icons-material/SchoolRounded';
+import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
+import './login.css';
 
 export function Login(){
     const [username, setUsername] = useState("");
@@ -29,55 +24,67 @@ export function Login(){
             console.log("Nombre de usuario o contraseña incorrectos.");
         }
     }
-      const handleClickShowPassword = () => setShowPassword((show) => !show);
-
-  const handleMouseDownPassword = (event) => {
-    event.preventDefault();
-  };
-
-  const handleMouseUpPassword = (event) => {
-    event.preventDefault();
-  };
+    const handleClickShowPassword = () => setShowPassword((show) => !show);
 
     return(
-        <div>
-            <h1>Inicio de Sesión</h1>
-                <Box
-      component="form"
-      sx={{ '& > :not(style)': { m: 1, width: '25ch' } }}
-      noValidate
-      autoComplete="off"
-    >
-      <TextField id="filled-basic" label="Usuario" variant="filled" value={username} onChange={(e)=>{setUsername(e.target.value)}} />
-      <br/>
-      <FormControl sx={{ m: 1, width: '25ch' }} variant="outlined">
-          <InputLabel htmlFor={`${outlinedPasswordId}-input`}>Contraseña</InputLabel>
-          <OutlinedInput
-            id={`${outlinedPasswordId}-input`}
-            type={showPassword ? 'text' : 'password'}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            endAdornment={
-              <InputAdornment position="end">
-                <IconButton
-                  aria-label={
-                    showPassword ? 'hide the password' : 'display the password'
-                  }
-                  onClick={handleClickShowPassword}
-                  onMouseDown={handleMouseDownPassword}
-                  onMouseUp={handleMouseUpPassword}
-                  edge="end"
-                >
-                  {showPassword ? <VisibilityOff /> : <Visibility />}
-                </IconButton>
-              </InputAdornment>
-            }
-            label="Password"
-          />
-        </FormControl>
-      </Box>
-        <Button variant="contained" onClick={handleSubmit}>
-  Iniciar Sesión</Button>
+        <div className="login-page">
+            <aside className="login-aside">
+                <div className="login-brand">
+                    <SchoolRoundedIcon className="login-brand-icon" />
+                    <span>EduGamifica</span>
+                </div>
+                <div className="login-aside-body">
+                    <h2>Aprender también<br/>se siente como ganar.</h2>
+                    <p>Plataforma de gamificación educativa para la Unidad Educativa Benemérita Sociedad Filantrópica del Guayas.</p>
+                    <div className="login-badge">
+                        <EmojiEventsRoundedIcon />
+                        <span>Logros, misiones y rankings para motivar a cada estudiante.</span>
+                    </div>
+                </div>
+                <span className="login-aside-foot">Unidad Educativa · Plataforma docente</span>
+            </aside>
+
+            <section className="login-form-wrap">
+                <form className="login-card" onSubmit={handleSubmit} noValidate autoComplete="off">
+                    <h1>Inicio de Sesión</h1>
+                    <p className="login-card-sub">Ingresa tus credenciales para continuar.</p>
+
+                    <label className="login-field">
+                        <span>Usuario</span>
+                        <input
+                            type="text"
+                            value={username}
+                            onChange={(e)=>{setUsername(e.target.value)}}
+                            placeholder="admin"
+                        />
+                    </label>
+
+                    <label className="login-field">
+                        <span>Contraseña</span>
+                        <div className="login-password">
+                            <input
+                                id={`${outlinedPasswordId}-input`}
+                                type={showPassword ? 'text' : 'password'}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="••••••••"
+                            />
+                            <button
+                                type="button"
+                                className="login-eye"
+                                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                                onClick={handleClickShowPassword}
+                            >
+                                {showPassword ? <VisibilityOff /> : <Visibility />}
+                            </button>
+                        </div>
+                    </label>
+
+                    <button type="submit" className="login-submit">
+                        Iniciar Sesión
+                    </button>
+                </form>
+            </section>
         </div>
     )
 }

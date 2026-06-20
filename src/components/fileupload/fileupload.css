@@ -2,32 +2,34 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 15px;
+    gap: 18px;
     width: 100%;
+    max-width: 560px;
+    margin-top: 24px;
 }
 
 .fileupload-dropzone{
     width: 100%;
-    min-height: 180px;
-    border: 2px dashed #4CAF50;
-    border-radius: 12px;
-    background-color: #f9fafb;
+    min-height: 200px;
+    border: 2px dashed var(--color-primary-light);
+    border-radius: var(--radius-md);
+    background-color: var(--color-surface);
     display: flex;
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: 20px;
+    padding: 24px;
     cursor: pointer;
-    transition: 0.3s;
+    transition: background 0.25s ease, border-color 0.25s ease;
 }
 
 .fileupload-dropzone:hover{
-    background-color: #f0fdf4;
+    background-color: var(--color-primary-soft);
 }
 
 .fileupload-dropzone.dragging{
-    background-color: #e0f2e9;
-    border-color: #2e7d32;
+    background-color: var(--color-primary-soft);
+    border-color: var(--color-primary);
 }
 
 .fileupload-input{
@@ -35,29 +37,40 @@
 }
 
 .fileupload-placeholder{
-    color: #6b7280;
-    font-size: 14px;
+    color: var(--color-text-muted);
+    font-size: 0.95rem;
     pointer-events: none;
 }
 
 .fileupload-filename{
-    color: #1f2937;
-    font-weight: bold;
-    font-size: 14px;
+    color: var(--color-text);
+    font-weight: 600;
+    font-size: 0.95rem;
     pointer-events: none;
 }
 
 .fileupload-btn{
-    font-size: 16px;
-    padding: 10px 20px;
-    background-color: #4CAF50;
+    font-family: var(--font-head);
+    font-size: 1rem;
+    font-weight: 600;
+    padding: 12px 26px;
+    background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
+    box-shadow: 0 6px 16px rgba(15, 118, 110, 0.28);
+    transition: transform 0.15s ease, filter 0.2s ease;
+}
+
+.fileupload-btn:hover:not(:disabled){
+    transform: translateY(-2px);
+    filter: brightness(1.05);
 }
 
 .fileupload-btn:disabled{
-    background-color: #a5d6a7;
+    background: var(--color-border);
+    color: var(--color-text-muted);
+    box-shadow: none;
     cursor: not-allowed;
 }
