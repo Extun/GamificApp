@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../admin/dashboard.css';
 import './dashboardEstudiante.css';
@@ -99,15 +99,12 @@ export function DashboardEstudiante() {
     const [archivoPreview, setArchivoPreview] = useState(null);
     const [quizActivo, setQuizActivo] = useState(null);
 
-    const archivosPorMateria = useMemo(leerArchivos, []);
-    const quizzesPorMateria = useMemo(leerQuizzes, []);
+    const archivosPorMateria = useMemo(() => leerArchivos(), []);
+    const quizzesPorMateria = useMemo(() => leerQuizzes(), []);
 
-    // Datos reales de gamificación. Se refrescan al cambiar de página o al salir
-    // de un quiz (momento en que el XP/los logros pueden haber cambiado).
-    const [gami, setGami] = useState(() => gamificationService.getResumen());
-    useEffect(() => {
-        setGami(gamificationService.getResumen());
-    }, [pagina, quizActivo]);
+    // Datos reales de gamificación: se leen en cada render, así que reflejan el
+    // XP/los logros más recientes al cambiar de página o al salir de un quiz.
+    const gami = gamificationService.getResumen();
 
     // RBAC: el estudiante solo accede a los recursos públicos. Los archivos
     // marcados como privados por el docente (isPrivate === true) se filtran aquí.
