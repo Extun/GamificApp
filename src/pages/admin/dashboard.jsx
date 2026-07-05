@@ -21,10 +21,10 @@ import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import { FileChip, FilePreviewModal, getKind, formatSize, descargarArchivo } from '../../components/archivos/ArchivoChip';
 import { procesarPdf } from '../../services/pdfService';
 import MATERIAS from '../../constants/materias';
-import { migrarMateriasAntiguas } from '../../services/migracionMaterias';
 import { obtenerMaterial, subirMaterial, eliminarMaterial } from '../../services/materialesService';
 import authService from '../../services/authService';
 import docenteService from '../../services/docenteService';
+import { obtenerRanking } from '../../services/gamificationService';
 
 const materiaIdPorNombre = (nombre) => MATERIAS.find((m) => m.nombre === nombre)?.id;
 
@@ -182,11 +182,6 @@ export function Dashboard() {
     const [pagina, setPagina] = useState("");
     const [materiaSeleccionada, setMateriaSeleccionada] = useState(null);
     const [subVistaMateria, setSubVistaMateria] = useState('');
-    // Migra el contenido guardado bajo nombres de materias antiguos antes de
-    // leerlo; si algo no tiene equivalente en las 5 oficiales, se avisa aquí.
-    const [materiasSinEquivalente, setMateriasSinEquivalente] = useState(
-        () => migrarMateriasAntiguas().sinEquivalente
-    );
     // Material de estudio: la fuente de verdad es MySQL (vía API). Este mapa
     // { nombreMateria: Archivo[] } es solo el reflejo de la última consulta.
     const [archivosPorMateria, setArchivosPorMateria] = useState({});
@@ -275,11 +270,13 @@ export function Dashboard() {
         { titulo: "Publicar logros de la semana", progreso: 20 }
     ];
 
-    const ranking = [
-        { nombre: "Ana Pérez", puntos: 1280 },
-        { nombre: "Luis Mora", puntos: 1150 },
-        { nombre: "Sofía Díaz", puntos: 1090 }
-    ];
+    // Top 3 real de estudiantes por XP (GET /api/ranking).
+    const [ranking, setRanking] = useState([]);
+    useEffect(() => {
+        obtenerRanking(3).then((filas) =>
+            setRanking(filas.map((f) => ({ nombre: f.nombre, puntos: f.xp_total })))
+        );
+    }, []);
 
     const handleUploadMateria = async (materia, file, { isPrivate = false } = {}) => {
         const kind = getKind(file.name);
@@ -388,19 +385,6 @@ export function Dashboard() {
             </aside>
 
             <main className="contenido">
-
-                {/* Aviso de migración: material de materias que ya no existen
-                    en el catálogo oficial (se conserva, pero no se muestra). */}
-                {materiasSinEquivalente.length > 0 && (
-                    <div className="aviso-migracion" role="alert">
-                        <p>
-                            Hay material guardado de materias que ya no están en el catálogo
-                            ({materiasSinEquivalente.join(', ')}). No se ha borrado, pero no se
-                            mostrará: vuelve a subirlo en una de las 5 materias oficiales.
-                        </p>
-                        <button onClick={() => setMateriasSinEquivalente([])}>Entendido</button>
-                    </div>
-                )}
 
                 {/* HOME */}
                 {pagina === "" && (

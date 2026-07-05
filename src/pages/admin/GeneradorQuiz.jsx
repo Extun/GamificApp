@@ -5,6 +5,8 @@ import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import { EditorQuiz } from '../../components/quiz/EditorQuiz';
+import { publicarReto } from '../../services/retosService';
+import MATERIAS from '../../constants/materias';
 
 const MAX_INTENTOS = 3;
 const ESPERA_MS = 2000;
@@ -186,13 +188,32 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
         actualizarEnHistorial(actualizado);
     };
 
-    // Publica el quiz: cambia su estado a 'publicado' para que el alumno lo vea.
-    const publicarQuiz = () => {
-        const publicado = { ...quizEdit, estado: 'publicado' };
-        setQuizEdit(publicado);
-        actualizarEnHistorial(publicado);
-        setAviso('¡Quiz publicado! Ya es visible para los estudiantes.');
-        setTimeout(() => setAviso(''), 4000);
+    // Publica el quiz EN LA BASE DE DATOS (tabla `retos`, tipo 'quiz'): así lo
+    // ven los estudiantes desde cualquier navegador/dispositivo. El historial
+    // local queda solo como espacio de trabajo/borradores del docente.
+    const publicarQuiz = async () => {
+        const materiaId = MATERIAS.find((m) => m.nombre === materia)?.id;
+        if (!materiaId) {
+            setError('No se reconoce la materia actual; no se puede publicar.');
+            return;
+        }
+        try {
+            setError('');
+            await publicarReto({
+                materiaId,
+                titulo: quizEdit.tema,
+                tipo: 'quiz',
+                configuracion: { preguntas: quizEdit.preguntas },
+                xpRecompensa: quizEdit.preguntas.length * 100
+            });
+            const publicado = { ...quizEdit, estado: 'publicado' };
+            setQuizEdit(publicado);
+            actualizarEnHistorial(publicado);
+            setAviso('¡Quiz publicado! Ya es visible para los estudiantes.');
+            setTimeout(() => setAviso(''), 4000);
+        } catch (err) {
+            setError(`No se pudo publicar el quiz: ${err.message}`);
+        }
     };
 
     // Pide N preguntas a la IA sobre un tema y devuelve el array ya parseado.

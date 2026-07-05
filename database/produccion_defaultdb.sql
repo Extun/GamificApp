@@ -1,31 +1,24 @@
 -- ============================================================
--- GamificApp — Esquema COMPLETO de la base de datos (desarrollo local)
--- Unidad Educativa Fiscal Clemencia Coronel De Pincay
+-- GamificApp — Script único para la base de datos de PRODUCCIÓN
+-- (Render/MySQL gestionado, base ya existente llamada `defaultdb`)
 --
--- Crea la base `gamificapp` con todas las tablas en su forma final
--- (incluye lo que antes vivía en las migraciones) y los datos semilla.
--- Es idempotente: puede ejecutarse las veces que haga falta.
+-- A diferencia de database/gamificapp.sql, este script NO ejecuta
+-- CREATE DATABASE ni USE: se aplica sobre la base a la que ya
+-- estás conectado (defaultdb). Reúne, en su forma FINAL, el
+-- esquema base + todas las migraciones. Es idempotente.
 --
--- Para PRODUCCIÓN (Aiven, base ya existente `defaultdb`) usa en su
--- lugar database/produccion_defaultdb.sql (mismo esquema, sin
--- CREATE DATABASE/USE).
+-- Cómo ejecutarlo (desde tu PC, con las credenciales de Render):
+--   mysql -h <DB_HOST> -P <DB_PORT> -u <DB_USER> -p <DB_NAME> \
+--         < database/produccion_defaultdb.sql
 --
--- Ejecución:  mysql -u root -p < database/gamificapp.sql
---
--- Usuarios semilla (CAMBIA estas claves al entrar):
+-- Usuarios semilla creados (CAMBIA estas claves al entrar):
 --   admin      / admin123        (rol admin)
 --   docente    / docente123      (rol docente)
 --   estudiante / estudiante123   (rol estudiante, vinculado al demo id 1)
 -- ============================================================
 
-CREATE DATABASE IF NOT EXISTS gamificapp
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_spanish_ci;
-
-USE gamificapp;
-
 -- ------------------------------------------------------------
--- 1. TABLAS
+-- 1. TABLAS (forma final, con todas las columnas de las migraciones)
 -- ------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS materias (
@@ -38,21 +31,14 @@ CREATE TABLE IF NOT EXISTS estudiantes (
     id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
     nombres          VARCHAR(80)  NOT NULL,
     apellidos        VARCHAR(80)  NOT NULL,
-    curso            VARCHAR(20)  NOT NULL,          -- p. ej. "2do A"
-    -- Origen del PIN por defecto del estudiante (DDMMAA).
+    curso            VARCHAR(20)  NOT NULL,
     fecha_nacimiento DATE         NULL,
     xp_total         INT UNSIGNED NOT NULL DEFAULT 0,
     creado_en        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    -- El ranking Top N ordena por XP acumulado; este índice lo vuelve
-    -- una lectura directa sin escaneo completo de la tabla.
     INDEX idx_estudiantes_xp (xp_total DESC)
 ) ENGINE = InnoDB;
 
--- Un reto pertenece SIEMPRE a una de las 5 materias oficiales.
--- `tipo` es un slug libre ('quiz', 'clasificador', ...): registrar un juego
--- nuevo NO requiere migrar la BD. `configuracion_json` guarda la mecánica
--- creada por el docente en el editor no-code.
 CREATE TABLE IF NOT EXISTS retos (
     id                 INT UNSIGNED     NOT NULL AUTO_INCREMENT,
     materia_id         TINYINT UNSIGNED NOT NULL,
@@ -70,13 +56,11 @@ CREATE TABLE IF NOT EXISTS retos (
     INDEX idx_retos_materia (materia_id)
 ) ENGINE = InnoDB;
 
--- Progreso de cada estudiante en cada reto. La pareja
--- (estudiante_id, reto_id) es única: un registro por intento vigente.
 CREATE TABLE IF NOT EXISTS progreso_estudiante (
     id             INT UNSIGNED     NOT NULL AUTO_INCREMENT,
     estudiante_id  INT UNSIGNED     NOT NULL,
     reto_id        INT UNSIGNED     NOT NULL,
-    porcentaje     TINYINT UNSIGNED NOT NULL DEFAULT 0,   -- 0 a 100
+    porcentaje     TINYINT UNSIGNED NOT NULL DEFAULT 0,
     xp_obtenido    INT UNSIGNED     NOT NULL DEFAULT 0,
     completado     BOOLEAN          NOT NULL DEFAULT FALSE,
     actualizado_en TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -92,7 +76,6 @@ CREATE TABLE IF NOT EXISTS progreso_estudiante (
     CONSTRAINT chk_porcentaje CHECK (porcentaje <= 100)
 ) ENGINE = InnoDB;
 
--- Credenciales (contraseñas/PIN SIEMPRE como hash bcrypt, nunca en claro).
 CREATE TABLE IF NOT EXISTS usuarios (
     id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
     username          VARCHAR(50)  NOT NULL UNIQUE,
@@ -102,7 +85,6 @@ CREATE TABLE IF NOT EXISTS usuarios (
     codigo_emergencia VARCHAR(8)   NULL UNIQUE,
     rol               ENUM('admin','docente','estudiante') NOT NULL DEFAULT 'estudiante',
     estudiante_id     INT UNSIGNED NULL,
-    -- Rate limiting: 5 fallos seguidos => bloqueo de 15 minutos.
     intentos_fallidos TINYINT UNSIGNED NOT NULL DEFAULT 0,
     bloqueado_hasta   TIMESTAMP    NULL,
     creado_en         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -112,8 +94,6 @@ CREATE TABLE IF NOT EXISTS usuarios (
         ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE = InnoDB;
 
--- Material de estudio: fuente única de verdad. `data_url` guarda el archivo
--- en base64; `is_private` separa el material público del privado del docente.
 CREATE TABLE IF NOT EXISTS materiales (
     id          INT UNSIGNED     NOT NULL AUTO_INCREMENT,
     materia_id  TINYINT UNSIGNED NOT NULL,
@@ -132,7 +112,6 @@ CREATE TABLE IF NOT EXISTS materiales (
     INDEX idx_materiales_materia (materia_id)
 ) ENGINE = InnoDB;
 
--- Cada docente solo gestiona las materias que el admin le asignó.
 CREATE TABLE IF NOT EXISTS docente_materia (
     id         INT UNSIGNED     NOT NULL AUTO_INCREMENT,
     docente_id INT UNSIGNED     NOT NULL,
@@ -146,15 +125,13 @@ CREATE TABLE IF NOT EXISTS docente_materia (
         ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE = InnoDB;
 
--- Códigos de un solo uso (6 caracteres, 7 días) que el docente reparte en
--- clase para que sus estudiantes se registren solos.
 CREATE TABLE IF NOT EXISTS invitaciones_estudiante (
     id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
     codigo     VARCHAR(6)   NOT NULL UNIQUE,
     docente_id INT UNSIGNED NOT NULL,
-    curso      VARCHAR(20)  NOT NULL,                 -- p. ej. "2do A"
+    curso      VARCHAR(20)  NOT NULL,
     estado     ENUM('pendiente','usado','expirado') NOT NULL DEFAULT 'pendiente',
-    usuario_id INT UNSIGNED NULL,                     -- quién lo consumió
+    usuario_id INT UNSIGNED NULL,
     creado_en  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expira_en  TIMESTAMP    NOT NULL,
     PRIMARY KEY (id),
@@ -183,7 +160,8 @@ INSERT INTO estudiantes (id, nombres, apellidos, curso)
 VALUES (1, 'Estudiante', 'Demo', '2do A')
 ON DUPLICATE KEY UPDATE curso = VALUES(curso);
 
--- Usuarios iniciales. Cambia las claves con: node server/scripts/crearUsuario.js
+-- Usuarios iniciales (contraseñas hasheadas con bcrypt). CÁMBIALAS al entrar.
+--   admin / admin123 · docente / docente123 · estudiante / estudiante123
 INSERT INTO usuarios (username, password_hash, rol, estudiante_id) VALUES
     ('admin',      '$2b$10$i.zRZVABI1pk8Pd5d4UL9uPmybN2bAP4KeGYq0qKAAHwOQrVDenYC', 'admin',      NULL),
     ('docente',    '$2b$10$TrnHcucqGS53KEM5qrv/W.eLG/IGOh7T0aOwRHfY28wZ6NYgg8qGG', 'docente',    NULL),
@@ -196,8 +174,6 @@ SELECT u.id, m.id FROM usuarios u JOIN materias m
 WHERE u.username = 'docente';
 
 -- ------------------------------------------------------------
--- 3. VERIFICACIÓN RÁPIDA
+-- 3. VERIFICACIÓN
 -- ------------------------------------------------------------
-
-SELECT id, nombre FROM materias ORDER BY id;
 SELECT id, username, rol FROM usuarios ORDER BY id;

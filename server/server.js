@@ -16,8 +16,13 @@ import rankingRouter from './routes/ranking.js';
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
 
-// Solo el frontend autorizado puede consumir la API.
-app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173' }));
+// Solo los frontends autorizados pueden consumir la API.
+// CORS_ORIGIN acepta varios orígenes separados por coma, sin barra final.
+const origenesPermitidos = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+app.use(cors({ origin: origenesPermitidos }));
 // Límite amplio: el material de estudio viaja como dataURL (base64).
 app.use(express.json({ limit: '25mb' }));
 

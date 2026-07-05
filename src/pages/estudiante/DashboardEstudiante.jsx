@@ -28,29 +28,9 @@ import ExtensionRoundedIcon from '@mui/icons-material/ExtensionRounded';
 import gamificationService, { CATALOGO_LOGROS } from '../../services/gamificationService';
 import authService from '../../services/authService';
 import { obtenerMaterial } from '../../services/materialesService';
-import { migrarMateriasAntiguas } from '../../services/migracionMaterias';
 import MATERIAS, { NOMBRES_MATERIAS } from '../../constants/materias';
 
-// El estudiante consume el material desde la API (misma BD que el docente y
-// que la app móvil); los quizzes generados aún se leen de localStorage.
-const leerQuizzes = () => {
-    try {
-        const data = localStorage.getItem('edu_historialQuizzes');
-        const parsed = data ? JSON.parse(data) : {};
-        return Array.isArray(parsed) ? {} : parsed;
-    } catch {
-        return {};
-    }
-};
-
 const materias = NOMBRES_MATERIAS;
-
-// Compañeros de aula (mock). El propio estudiante se añade en runtime con su XP real.
-const ranking = [
-    { nombre: "Ana Pérez", puntos: 1280 },
-    { nombre: "Luis Mora", puntos: 1150 },
-    { nombre: "Sofía Díaz", puntos: 1090 }
-];
 
 const misiones = [
     { titulo: "Completar el quiz de Fracciones", progreso: 60 },
@@ -88,44 +68,41 @@ export function DashboardEstudiante() {
     const [subVista, setSubVista] = useState('material');
     const [archivoPreview, setArchivoPreview] = useState(null);
     const [quizActivo, setQuizActivo] = useState(null);
-    // Juegos (retos con configuración) publicados por el docente en la BD.
+    // Retos publicados por el docente en la BD: quizzes y juegos.
+    const [quizzes, setQuizzes] = useState([]);
     const [juegos, setJuegos] = useState([]);
     const [juegoActivo, setJuegoActivo] = useState(null);
-
-    // Reubica el contenido guardado bajo nombres de materias antiguos ANTES
-    // de leerlo, para que nada quede invisible tras el cambio de catálogo.
-    const quizzesPorMateria = useMemo(() => { migrarMateriasAntiguas(); return leerQuizzes(); }, []);
     // Material de estudio de la materia abierta, consultado a la API (la BD
     // central): es el mismo que ve el docente y cualquier otro dispositivo.
     const [archivos, setArchivos] = useState([]);
+    // Top 3 real del aula (GET /api/ranking).
+    const [ranking, setRanking] = useState([]);
 
     // Identidad del estudiante en sesión: habilita la persistencia en MySQL.
     const estudianteId = gamificationService.getEstudianteId();
+
+    // Fuerza un re-render cuando llega la sincronización con el servidor.
+    const [, setSync] = useState(0);
 
     // Datos reales de gamificación: se leen en cada render, así que reflejan el
     // XP/los logros más recientes al cambiar de página o al salir de un quiz.
     const gami = gamificationService.getResumen();
 
-    // RBAC: el alumno solo ve los quizzes que el docente ya PUBLICÓ; los borradores
-    // en edición permanecen ocultos.
-    const quizzes = materiaSeleccionada
-        ? (quizzesPorMateria[materiaSeleccionada] || []).filter((q) => q.estado === 'publicado')
-        : [];
+    // Al entrar: trae de la BD el XP oficial del estudiante y el ranking del
+    // aula, y refresca la vista cuando llegan.
+    useEffect(() => {
+        let vigente = true;
+        const tareas = [gamificationService.obtenerRanking(3).then((filas) => {
+            if (vigente) setRanking(filas);
+        })];
+        if (estudianteId) {
+            tareas.push(gamificationService.obtenerProgreso(estudianteId));
+        }
+        Promise.allSettled(tareas).then(() => { if (vigente) setSync((s) => s + 1); });
+        return () => { vigente = false; };
+    }, [estudianteId]);
 
-    // Reto asociado al quiz activo: se identifica por (materia, título) y el
-    // backend lo crea en `retos` la primera vez que alguien lo completa.
-    const retoActivo = useMemo(() => {
-        if (!quizActivo || !materiaSeleccionada) return null;
-        const materia = MATERIAS.find((m) => m.nombre === materiaSeleccionada);
-        if (!materia) return null;
-        return {
-            materiaId: materia.id,
-            titulo: quizActivo.tema,
-            xpRecompensa: (quizActivo.preguntas?.length || 0) * 100
-        };
-    }, [quizActivo, materiaSeleccionada]);
-
-    // Carga desde la BD los juegos publicados y el material de estudio de la
+    // Carga desde la BD los quizzes y juegos publicados y el material de la
     // materia abierta. Si la red falla, los servicios devuelven [] y las
     // pestañas muestran su estado vacío. El servidor ya filtra el material
     // privado del docente para el rol estudiante.
@@ -134,6 +111,8 @@ export function DashboardEstudiante() {
         const materia = MATERIAS.find((m) => m.nombre === materiaSeleccionada);
         if (!materia) return;
         let vigente = true;
+        obtenerRetosPublicados({ materiaId: materia.id, tipo: 'quiz' })
+            .then((retos) => { if (vigente) setQuizzes(retos.filter((r) => r.configuracion?.preguntas?.length)); });
         obtenerRetosPublicados({ materiaId: materia.id, tipo: 'clasificador' })
             .then((retos) => { if (vigente) setJuegos(retos); });
         obtenerMaterial(materia.id)
@@ -141,18 +120,21 @@ export function DashboardEstudiante() {
         return () => { vigente = false; };
     }, [materiaSeleccionada]);
 
-    // El estudiante entra al ranking con su XP real y se reordena por puntos.
+    // Ranking real del aula; el propio estudiante se resalta por su id.
     const rankingDinamico = useMemo(() => (
-        [...ranking, { nombre: "Tú", puntos: gami.xp }]
-            .sort((a, b) => b.puntos - a.puntos)
-            .slice(0, 3)
-    ), [gami.xp]);
+        ranking.map((r) => ({
+            esYo: r.id === estudianteId,
+            nombre: r.id === estudianteId ? 'Tú' : r.nombre,
+            puntos: r.xp_total
+        }))
+    ), [ranking, estudianteId]);
 
     const abrirMateria = (mat) => {
         setMateriaSeleccionada(mat);
         setSubVista('material');
         setQuizActivo(null);
         setJuegoActivo(null);
+        setQuizzes([]);
         setJuegos([]);
         setArchivos([]);
     };
@@ -307,7 +289,7 @@ export function DashboardEstudiante() {
                                         </div>
                                         <ol className="rank-list">
                                             {rankingDinamico.map((r, i) => (
-                                                <li key={i} className={`rank-item ${r.nombre === "Tú" ? "rank-item-yo" : ""}`}>
+                                                <li key={i} className={`rank-item ${r.esYo ? "rank-item-yo" : ""}`}>
                                                     <span className={`rank-pos rank-pos-${i + 1}`}>{i + 1}</span>
                                                     <span className="rank-name">{r.nombre}</span>
                                                     <span className="rank-points">{r.puntos} pts</span>
@@ -394,8 +376,10 @@ export function DashboardEstudiante() {
                                                     <button className="quiz-disponible-item" onClick={() => setQuizActivo(q)}>
                                                         <span className="quiz-disponible-icon"><QuizRoundedIcon /></span>
                                                         <span className="quiz-disponible-meta">
-                                                            <span className="quiz-disponible-tema">{q.tema}</span>
-                                                            <span className="quiz-disponible-sub">{q.cantidad} preguntas · {q.fecha}</span>
+                                                            <span className="quiz-disponible-tema">{q.titulo}</span>
+                                                            <span className="quiz-disponible-sub">
+                                                                {q.configuracion.preguntas.length} preguntas · {q.xp_recompensa} XP
+                                                            </span>
                                                         </span>
                                                         <span className="quiz-disponible-cta">
                                                             Empezar <ArrowForwardRoundedIcon sx={{ fontSize: "1rem" }} />
@@ -413,14 +397,14 @@ export function DashboardEstudiante() {
                             {subVista === 'quizzes' && quizActivo && (
                                 <section className="card materia-subvista">
                                     <div className="card-head">
-                                        <h3>{quizActivo.tema}</h3>
+                                        <h3>{quizActivo.titulo}</h3>
                                         <button className="back-btn back-btn-inline" onClick={() => setQuizActivo(null)}>← Otros quizzes</button>
                                     </div>
                                     <QuizInteractivo
-                                        preguntas={quizActivo.preguntas}
+                                        preguntas={quizActivo.configuracion.preguntas}
                                         mostrarPuntaje
                                         estudianteId={estudianteId}
-                                        reto={retoActivo}
+                                        reto={quizActivo}
                                     />
                                 </section>
                             )}
