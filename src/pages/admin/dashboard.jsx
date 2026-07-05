@@ -15,6 +15,8 @@ import TrendingUpRoundedIcon from '@mui/icons-material/TrendingUpRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import { FileChip, FilePreviewModal, getKind, formatSize, descargarArchivo } from '../../components/archivos/ArchivoChip';
 import { procesarPdf } from '../../services/pdfService';
+import { NOMBRES_MATERIAS } from '../../constants/materias';
+import { migrarMateriasAntiguas } from '../../services/migracionMaterias';
 
 // Lee un File como dataURL (base64) para persistirlo y poder descargarlo luego.
 const leerComoDataUrl = (file) => new Promise((resolve, reject) => {
@@ -35,6 +37,7 @@ const persistirArchivos = (mapa) => {
 };
 import { AsistenteIA } from './asistenteIA';
 import { GeneradorQuiz } from './GeneradorQuiz';
+import { EditorClasificador } from '../../components/clasificador/EditorClasificador';
 import {
   List,
   ListItem,
@@ -177,6 +180,11 @@ export function Dashboard() {
     const [pagina, setPagina] = useState("");
     const [materiaSeleccionada, setMateriaSeleccionada] = useState(null);
     const [subVistaMateria, setSubVistaMateria] = useState('');
+    // Migra el contenido guardado bajo nombres de materias antiguos antes de
+    // leerlo; si algo no tiene equivalente en las 5 oficiales, se avisa aquí.
+    const [materiasSinEquivalente, setMateriasSinEquivalente] = useState(
+        () => migrarMateriasAntiguas().sinEquivalente
+    );
     const [archivosPorMateria, setArchivosPorMateria] = useState(() => {
         try {
             const guardado = localStorage.getItem('edu_archivosMateria');
@@ -187,15 +195,7 @@ export function Dashboard() {
     });
     const [archivoPreview, setArchivoPreview] = useState(null);
 
-    const materias = [
-        "Lengua y Literatura",
-        "Matemáticas",
-        "Ciencias Naturales y Sociales",
-        "Educación Física",
-        "Educación Socioemocional",
-        "Lengua Extranjera",
-        "Educación Cultural y Artística"
-    ];
+    const materias = NOMBRES_MATERIAS;
 
     const misiones = [
         { titulo: "Revisar entregas de Matemáticas", progreso: 80 },
@@ -296,6 +296,19 @@ export function Dashboard() {
             </aside>
 
             <main className="contenido">
+
+                {/* Aviso de migración: material de materias que ya no existen
+                    en el catálogo oficial (se conserva, pero no se muestra). */}
+                {materiasSinEquivalente.length > 0 && (
+                    <div className="aviso-migracion" role="alert">
+                        <p>
+                            Hay material guardado de materias que ya no están en el catálogo
+                            ({materiasSinEquivalente.join(', ')}). No se ha borrado, pero no se
+                            mostrará: vuelve a subirlo en una de las 5 materias oficiales.
+                        </p>
+                        <button onClick={() => setMateriasSinEquivalente([])}>Entendido</button>
+                    </div>
+                )}
 
                 {/* HOME */}
                 {pagina === "" && (
@@ -458,6 +471,12 @@ export function Dashboard() {
                                 Generar Quiz
                             </button>
                             <button
+                                className={`opcion ${subVistaMateria === 'clasificador' ? 'opcion-activa' : ''}`}
+                                onClick={() => setSubVistaMateria('clasificador')}
+                            >
+                                Juego Clasificador
+                            </button>
+                            <button
                                 className={`opcion ${subVistaMateria === 'calificaciones' ? 'opcion-activa' : ''}`}
                                 onClick={() => setSubVistaMateria('calificaciones')}
                             >
@@ -467,6 +486,10 @@ export function Dashboard() {
 
                         {subVistaMateria === 'quiz' && (
                             <GeneradorQuiz materia={materiaSeleccionada} />
+                        )}
+
+                        {subVistaMateria === 'clasificador' && (
+                            <EditorClasificador materia={materiaSeleccionada} />
                         )}
 
                         {subVistaMateria === 'calificaciones' && (

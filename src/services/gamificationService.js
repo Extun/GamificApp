@@ -1,8 +1,10 @@
 // Servicio central de gamificación (XP y Logros).
 //
-// Por ahora la persistencia es local (localStorage) pero toda la app consume
-// SOLO esta interfaz, de modo que migrar a un backend real implique reescribir
-// únicamente este archivo, sin tocar componentes.
+// La fuente de verdad del progreso es el backend (MySQL); localStorage se
+// mantiene como caché local para que la UI responda al instante y siga
+// funcionando si la red falla (se resincroniza en la próxima lectura).
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const KEY_XP = 'edu_xpTotal';
 const KEY_LOGROS = 'edu_logrosObtenidos';
@@ -100,21 +102,133 @@ const registrarActividad = (tipo) => {
 
 // Evalúa qué logros desbloquea una actividad completada, los persiste y
 // devuelve SOLO los nuevos (para mostrarlos en pantalla).
-// actividad: { tipo: 'quiz', aciertos: number, total: number }
+// Es genérico: funciona para CUALQUIER tipo de reto, presente o futuro.
+// actividad: { tipo: string, aciertos: number, total: number }
 export const verificarLogros = (actividad = {}) => {
+    const { tipo, aciertos, total } = actividad;
+    if (!tipo) return [];
+
     const obtenidos = getLogros();
     const nuevos = [];
 
-    if (actividad.tipo === 'quiz') {
-        const quizzesResueltos = registrarActividad('quiz');
-        if (quizzesResueltos === 1) otorgarLogro(obtenidos, nuevos, 'primer-quiz');
-        if (actividad.total > 0 && actividad.aciertos === actividad.total) {
-            otorgarLogro(obtenidos, nuevos, 'maestro-materia');
-        }
+    const completadosDelTipo = registrarActividad(tipo);
+
+    // Primer quiz completado (logro histórico del catálogo).
+    if (tipo === 'quiz' && completadosDelTipo === 1) {
+        otorgarLogro(obtenidos, nuevos, 'primer-quiz');
+    }
+
+    // Un resultado perfecto acredita 'maestro-materia' en cualquier mecánica.
+    if (total > 0 && aciertos === total) {
+        otorgarLogro(obtenidos, nuevos, 'maestro-materia');
     }
 
     if (nuevos.length) escribir(KEY_LOGROS, obtenidos);
     return nuevos;
+};
+
+// ---- Sincronización con el backend ----
+
+// Identidad del estudiante en sesión (la fija el login al entrar como
+// estudiante). Devuelve null si no hay sesión de estudiante activa.
+export const getEstudianteId = () => {
+    const id = Number(localStorage.getItem('edu_estudianteId'));
+    return Number.isInteger(id) && id > 0 ? id : null;
+};
+
+// POST /api/progreso — guarda en la BD central el resultado de un reto.
+// El reto se identifica por `retoId`, o por `materiaId` + `retoTitulo` si
+// nació como quiz en el panel del docente (el backend lo crea si no existe).
+// Devuelve la respuesta del servidor (incluye xp_total oficial) o null si
+// la red falló; en ese caso la UI sigue con el valor local en caché.
+export const guardarProgreso = async ({ estudianteId, retoId, materiaId, retoTitulo, xpRecompensa, puntosObtenidos }) => {
+    try {
+        const res = await fetch(`${API_URL}/api/progreso`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                estudiante_id: estudianteId,
+                reto_id: retoId,
+                materia_id: materiaId,
+                reto_titulo: retoTitulo,
+                xp_recompensa: xpRecompensa,
+                puntos_obtenidos: puntosObtenidos
+            })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        // El servidor es la fuente de verdad: alinea la caché local.
+        if (Number.isFinite(data?.xp_total)) escribir(KEY_XP, data.xp_total);
+        return data;
+    } catch (err) {
+        console.warn('No se pudo guardar el progreso en el servidor:', err.message);
+        return null;
+    }
+};
+
+// GET /api/progreso/:id — trae el avance completo desde la BD y actualiza
+// la caché local de XP. Devuelve { estudiante, progreso } o null si falla.
+export const obtenerProgreso = async (estudianteId) => {
+    try {
+        const res = await fetch(`${API_URL}/api/progreso/${estudianteId}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        if (Number.isFinite(data?.estudiante?.xp_total)) {
+            escribir(KEY_XP, data.estudiante.xp_total);
+        }
+        return data;
+    } catch (err) {
+        console.warn('No se pudo obtener el progreso del servidor:', err.message);
+        return null;
+    }
+};
+
+// Puente ÚNICO para reportar un reto completado, sea cual sea su mecánica
+// (quiz, clasificador, lectura o cualquier juego futuro). Ningún componente
+// necesita hablar con XP, logros o el backend por separado.
+//
+// Parámetros: { estudianteId, reto, tipo?, aciertos, total, puntosObtenidos? }
+//   · reto: objeto de la BD ({ id, tipo, xp_recompensa, ... }) o al menos
+//     { materiaId, titulo } para retos que aún no existen en la BD.
+//   · puntosObtenidos: si se omite, se calculan como aciertos * PUNTOS_POR_ACIERTO.
+// Devuelve { puntos, nuevosLogros, servidor } — `servidor` es la promesa de
+// guardarProgreso (resuelve null si no hay sesión o la red falla).
+export const completarReto = ({ estudianteId, reto, tipo, aciertos = 0, total = 0, puntosObtenidos }) => {
+    const puntos = Number.isFinite(puntosObtenidos)
+        ? puntosObtenidos
+        : aciertos * PUNTOS_POR_ACIERTO;
+
+    sumarXP(puntos);
+    const nuevosLogros = verificarLogros({ tipo: tipo || reto?.tipo || 'quiz', aciertos, total });
+
+    const retoIdentificable = reto && (reto.id || ((reto.materiaId || reto.materia_id) && reto.titulo));
+    const servidor = estudianteId && retoIdentificable
+        ? guardarProgreso({
+            estudianteId,
+            retoId: reto.id,
+            materiaId: reto.materiaId ?? reto.materia_id,
+            retoTitulo: reto.titulo,
+            xpRecompensa: reto.xpRecompensa ?? reto.xp_recompensa,
+            puntosObtenidos: puntos
+        })
+        : Promise.resolve(null);
+
+    return { puntos, nuevosLogros, servidor };
+};
+
+// GET /api/ranking — Top N de estudiantes por XP acumulado (por defecto 10).
+// Devuelve [] si la red falla, para que las vistas muestren su estado vacío.
+export const obtenerRanking = async (limite = 10) => {
+    try {
+        const res = await fetch(`${API_URL}/api/ranking?limite=${limite}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
+    } catch (err) {
+        console.warn('No se pudo obtener el ranking del servidor:', err.message);
+        return [];
+    }
 };
 
 // Snapshot completo para los dashboards.
@@ -135,6 +249,11 @@ const gamificationService = {
     getLogros,
     tieneLogro,
     verificarLogros,
+    getEstudianteId,
+    guardarProgreso,
+    completarReto,
+    obtenerRanking,
+    obtenerProgreso,
     getResumen
 };
 

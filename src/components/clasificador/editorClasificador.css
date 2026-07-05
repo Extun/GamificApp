@@ -1,0 +1,195 @@
+/* Editor no-code del Clasificador de Objetos (panel docente).
+   Reutiliza clases globales de dashboard.css (.card, .quiz-field, .quiz-error…)
+   y define aquí solo lo propio del editor. */
+
+.clasificador-intro {
+    margin: 0 0 18px;
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+    line-height: 1.55;
+}
+
+.clasificador-titulo-field { max-width: 480px; margin-bottom: 20px; }
+
+.clasificador-categorias {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+.clasificador-cat {
+    border: 1.5px solid var(--color-border);
+    border-top-width: 4px;
+    border-radius: var(--radius-md);
+    background: var(--color-surface-alt);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Acento superior por categoría: mismo orden de colores que en el juego. */
+.clasificador-cat-teal   { border-top-color: var(--color-primary-light); }
+.clasificador-cat-amber  { border-top-color: var(--color-accent); }
+.clasificador-cat-violet { border-top-color: #8b5cf6; }
+.clasificador-cat-rose   { border-top-color: #fb7185; }
+
+.clasificador-cat-head { display: flex; align-items: center; gap: 8px; }
+
+.clasificador-cat-icon {
+    display: flex;
+    color: var(--color-text-muted);
+}
+.clasificador-cat-icon svg { font-size: 1.2rem; }
+
+.clasificador-cat-nombre {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    font-family: var(--font-head);
+    font-size: 0.95rem;
+    color: var(--color-text);
+    background: var(--color-surface);
+}
+.clasificador-cat-nombre:focus { outline: 2px solid var(--color-primary-light); border-color: transparent; }
+
+.clasificador-cat-eliminar {
+    border: none;
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    display: flex;
+    padding: 6px;
+    border-radius: 8px;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+.clasificador-cat-eliminar:hover { background: #fee2e2; color: #dc2626; }
+
+.clasificador-elementos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 34px;
+}
+
+.clasificador-elemento-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px 6px 12px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    font-size: 0.88rem;
+    color: var(--color-text);
+    box-shadow: var(--shadow-sm);
+    animation: chip-pop 0.2s ease;
+}
+.clasificador-elemento-chip button {
+    border: none;
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    display: flex;
+    padding: 2px;
+    border-radius: 50%;
+}
+.clasificador-elemento-chip button:hover { color: #dc2626; background: #fee2e2; }
+
+@keyframes chip-pop {
+    from { opacity: 0; transform: scale(0.8); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.clasificador-elementos-vacio {
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+    align-self: center;
+}
+
+.clasificador-agregar-elemento { display: flex; gap: 8px; }
+.clasificador-agregar-elemento input {
+    flex: 1;
+    min-width: 0;
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    font-size: 0.88rem;
+    background: var(--color-surface);
+}
+.clasificador-agregar-elemento input:focus { outline: 2px solid var(--color-primary-light); border-color: transparent; }
+.clasificador-agregar-elemento button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    background: var(--color-primary-soft);
+    color: var(--color-primary-dark);
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+.clasificador-agregar-elemento button:hover { background: var(--color-primary-light); color: #fff; }
+
+.clasificador-btn-cat {
+    margin-top: 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1.5px dashed var(--color-primary-light);
+    border-radius: var(--radius-sm);
+    padding: 10px 16px;
+    background: transparent;
+    color: var(--color-primary-dark);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+.clasificador-btn-cat:hover { background: var(--color-primary-soft); }
+
+.clasificador-aviso { display: inline-flex; align-items: center; gap: 6px; }
+
+.clasificador-publicar-barra {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.clasificador-publicar-hint {
+    margin: 0;
+    font-size: 0.86rem;
+    color: var(--color-text-muted);
+    flex: 1;
+    min-width: 220px;
+}
+
+.clasificador-btn-publicar {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 12px 20px;
+    background: var(--color-primary);
+    color: #fff;
+    font-family: var(--font-head);
+    font-weight: 600;
+    font-size: 0.92rem;
+    cursor: pointer;
+    box-shadow: var(--shadow-md);
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+.clasificador-btn-publicar:hover:not(:disabled) { background: var(--color-primary-dark); transform: translateY(-1px); }
+.clasificador-btn-publicar:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }

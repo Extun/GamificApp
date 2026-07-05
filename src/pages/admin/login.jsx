@@ -20,6 +20,13 @@ export function Login(){
             setError("");
             localStorage.setItem("isAuthenticated", "true");
             localStorage.setItem("userRole", rol);
+            // Vincula la sesión de estudiante con su fila en la BD central
+            // (estudiante demo id 1 mientras no exista login por alumno).
+            if (rol === "estudiante") {
+                localStorage.setItem("edu_estudianteId", "1");
+            } else {
+                localStorage.removeItem("edu_estudianteId");
+            }
             navigate("/dashboard");
         } else {
             setError("Usuario o contraseña incorrectos.");
@@ -32,7 +39,7 @@ export function Login(){
             <aside className="login-aside">
                 <div className="login-brand">
                     <SchoolRoundedIcon className="login-brand-icon" />
-                    <span>EduGamifica</span>
+                    <span>GamificApp</span>
                 </div>
                 <div className="login-aside-body">
                     <h2>Aprender también<br/>se siente como ganar.</h2>

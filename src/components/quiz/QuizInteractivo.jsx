@@ -5,7 +5,8 @@ import LightbulbRoundedIcon from '@mui/icons-material/LightbulbRounded';
 import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
-import gamificationService, { PUNTOS_POR_ACIERTO } from '../../services/gamificationService';
+import CloudDoneRoundedIcon from '@mui/icons-material/CloudDoneRounded';
+import gamificationService from '../../services/gamificationService';
 import './quizInteractivo.css';
 
 const LETRAS = ['A', 'B', 'C', 'D'];
@@ -78,9 +79,10 @@ export function PreguntaCard({ pregunta, indice, onResponder }) {
     );
 }
 
-// Toast minimalista para anunciar logros desbloqueados. Se auto-cierra y respeta
-// la paleta (acento dorado de logros + superficie de la marca).
-function LogroToast({ mensaje, onClose }) {
+// Toast minimalista para anunciar logros o confirmaciones. Se auto-cierra y
+// respeta la paleta (acento dorado de logros + superficie de la marca).
+// Exportado: también lo usan los juegos (p. ej. JuegoDragAndDrop).
+export function LogroToast({ titulo = '¡Logro desbloqueado!', mensaje, icono, onClose }) {
     useEffect(() => {
         const t = setTimeout(onClose, 5000);
         return () => clearTimeout(t);
@@ -88,9 +90,9 @@ function LogroToast({ mensaje, onClose }) {
 
     return (
         <div className="logro-toast" role="status">
-            <span className="logro-toast-icon"><AutoAwesomeRoundedIcon /></span>
+            <span className="logro-toast-icon">{icono ?? <AutoAwesomeRoundedIcon />}</span>
             <div className="logro-toast-text">
-                <strong>¡Logro desbloqueado!</strong>
+                <strong>{titulo}</strong>
                 <p>{mensaje}</p>
             </div>
             <button className="logro-toast-close" aria-label="Cerrar" onClick={onClose}>
@@ -102,7 +104,10 @@ function LogroToast({ mensaje, onClose }) {
 
 // Reproductor de un quiz completo. Con `mostrarPuntaje` (modo estudiante) lleva la
 // cuenta de aciertos, muestra un marcador final y otorga XP/logros al terminar.
-export function QuizInteractivo({ preguntas, mostrarPuntaje = false }) {
+// Si recibe `estudianteId` y `reto` ({ id } o { materiaId, titulo }), además
+// persiste el resultado en la BD central vía la API y confirma el guardado
+// con un toast.
+export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteId, reto }) {
     const [aciertos, setAciertos] = useState(0);
     const [respondidas, setRespondidas] = useState(0);
     const [puntosGanados, setPuntosGanados] = useState(0);
@@ -133,18 +138,31 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false }) {
         if (!completado || recompensado.current) return;
         recompensado.current = true;
 
-        const puntos = aciertos * PUNTOS_POR_ACIERTO;
-        gamificationService.sumarXP(puntos);
+        const { puntos, nuevosLogros, servidor } = gamificationService.completarReto({
+            estudianteId,
+            reto,
+            tipo: 'quiz',
+            aciertos,
+            total
+        });
         setPuntosGanados(puntos);
 
-        const nuevos = gamificationService.verificarLogros({ tipo: 'quiz', aciertos, total });
-
         if (aciertos === total) {
-            setToast('Maestro de la Materia');
-        } else if (nuevos.length) {
-            setToast(nuevos[0].titulo);
+            setToast({ mensaje: 'Maestro de la Materia' });
+        } else if (nuevosLogros.length) {
+            setToast({ mensaje: nuevosLogros[0].titulo });
         }
-    }, [completado, aciertos, total]);
+
+        servidor.then((data) => {
+            if (data) {
+                setToast({
+                    titulo: 'Progreso guardado',
+                    mensaje: `+${data.xp_abonado} XP registrados en tu cuenta`,
+                    icono: <CloudDoneRoundedIcon />
+                });
+            }
+        });
+    }, [completado, aciertos, total, estudianteId, reto]);
 
     return (
         <div className="quiz-interactivo" key={claveQuiz}>
@@ -167,7 +185,7 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false }) {
                 />
             ))}
 
-            {toast && <LogroToast mensaje={toast} onClose={() => setToast(null)} />}
+            {toast && <LogroToast {...toast} onClose={() => setToast(null)} />}
         </div>
     );
 }

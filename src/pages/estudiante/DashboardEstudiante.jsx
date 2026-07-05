@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../admin/dashboard.css';
 import './dashboardEstudiante.css';
@@ -22,7 +22,12 @@ import {
 } from '@mui/material';
 import { FileChip, FilePreviewModal, descargarArchivo } from '../../components/archivos/ArchivoChip';
 import { QuizInteractivo } from '../../components/quiz/QuizInteractivo';
+import { JuegoDragAndDrop } from '../../components/clasificador/JuegoDragAndDrop';
+import { obtenerRetosPublicados } from '../../services/retosService';
+import ExtensionRoundedIcon from '@mui/icons-material/ExtensionRounded';
 import gamificationService, { CATALOGO_LOGROS } from '../../services/gamificationService';
+import { migrarMateriasAntiguas } from '../../services/migracionMaterias';
+import MATERIAS, { NOMBRES_MATERIAS } from '../../constants/materias';
 
 // El estudiante consume el material y los quizzes que el docente ya publicó. Se
 // leen de las mismas claves de localStorage que escribe el panel del docente.
@@ -45,15 +50,7 @@ const leerQuizzes = () => {
     }
 };
 
-const materias = [
-    "Lengua y Literatura",
-    "Matemáticas",
-    "Ciencias Naturales y Sociales",
-    "Educación Física",
-    "Educación Socioemocional",
-    "Lengua Extranjera",
-    "Educación Cultural y Artística"
-];
+const materias = NOMBRES_MATERIAS;
 
 // Compañeros de aula (mock). El propio estudiante se añade en runtime con su XP real.
 const ranking = [
@@ -65,7 +62,7 @@ const ranking = [
 const misiones = [
     { titulo: "Completar el quiz de Fracciones", progreso: 60 },
     { titulo: "Leer el material de Ciencias Naturales", progreso: 30 },
-    { titulo: "Repasar vocabulario de Lengua Extranjera", progreso: 0 }
+    { titulo: "Repasar la lectura de Lenguaje", progreso: 0 }
 ];
 
 // Presentación (icono + color) por cada logro del catálogo del servicio.
@@ -98,9 +95,17 @@ export function DashboardEstudiante() {
     const [subVista, setSubVista] = useState('material');
     const [archivoPreview, setArchivoPreview] = useState(null);
     const [quizActivo, setQuizActivo] = useState(null);
+    // Juegos (retos con configuración) publicados por el docente en la BD.
+    const [juegos, setJuegos] = useState([]);
+    const [juegoActivo, setJuegoActivo] = useState(null);
 
-    const archivosPorMateria = useMemo(() => leerArchivos(), []);
+    // Reubica el contenido guardado bajo nombres de materias antiguos ANTES
+    // de leerlo, para que nada quede invisible tras el cambio de catálogo.
+    const archivosPorMateria = useMemo(() => { migrarMateriasAntiguas(); return leerArchivos(); }, []);
     const quizzesPorMateria = useMemo(() => leerQuizzes(), []);
+
+    // Identidad del estudiante en sesión: habilita la persistencia en MySQL.
+    const estudianteId = gamificationService.getEstudianteId();
 
     // Datos reales de gamificación: se leen en cada render, así que reflejan el
     // XP/los logros más recientes al cambiar de página o al salir de un quiz.
@@ -117,6 +122,31 @@ export function DashboardEstudiante() {
         ? (quizzesPorMateria[materiaSeleccionada] || []).filter((q) => q.estado === 'publicado')
         : [];
 
+    // Reto asociado al quiz activo: se identifica por (materia, título) y el
+    // backend lo crea en `retos` la primera vez que alguien lo completa.
+    const retoActivo = useMemo(() => {
+        if (!quizActivo || !materiaSeleccionada) return null;
+        const materia = MATERIAS.find((m) => m.nombre === materiaSeleccionada);
+        if (!materia) return null;
+        return {
+            materiaId: materia.id,
+            titulo: quizActivo.tema,
+            xpRecompensa: (quizActivo.preguntas?.length || 0) * 100
+        };
+    }, [quizActivo, materiaSeleccionada]);
+
+    // Carga desde la BD los juegos publicados de la materia abierta. Si la red
+    // falla, el servicio devuelve [] y la pestaña muestra su estado vacío.
+    useEffect(() => {
+        if (!materiaSeleccionada) return;
+        const materia = MATERIAS.find((m) => m.nombre === materiaSeleccionada);
+        if (!materia) return;
+        let vigente = true;
+        obtenerRetosPublicados({ materiaId: materia.id, tipo: 'clasificador' })
+            .then((retos) => { if (vigente) setJuegos(retos); });
+        return () => { vigente = false; };
+    }, [materiaSeleccionada]);
+
     // El estudiante entra al ranking con su XP real y se reordena por puntos.
     const rankingDinamico = useMemo(() => (
         [...ranking, { nombre: "Tú", puntos: gami.xp }]
@@ -128,12 +158,15 @@ export function DashboardEstudiante() {
         setMateriaSeleccionada(mat);
         setSubVista('material');
         setQuizActivo(null);
+        setJuegoActivo(null);
+        setJuegos([]);
     };
 
     const volver = () => {
         setMateriaSeleccionada(null);
         setArchivoPreview(null);
         setQuizActivo(null);
+        setJuegoActivo(null);
         setSubVista('material');
     };
 
@@ -303,9 +336,15 @@ export function DashboardEstudiante() {
                                 </button>
                                 <button
                                     className={`opcion ${subVista === 'quizzes' ? 'opcion-activa' : ''}`}
-                                    onClick={() => setSubVista('quizzes')}
+                                    onClick={() => { setSubVista('quizzes'); setJuegoActivo(null); }}
                                 >
                                     Quizzes disponibles
+                                </button>
+                                <button
+                                    className={`opcion ${subVista === 'juegos' ? 'opcion-activa' : ''}`}
+                                    onClick={() => { setSubVista('juegos'); setQuizActivo(null); }}
+                                >
+                                    Juegos
                                 </button>
                             </div>
 
@@ -362,7 +401,56 @@ export function DashboardEstudiante() {
                                         <h3>{quizActivo.tema}</h3>
                                         <button className="back-btn back-btn-inline" onClick={() => setQuizActivo(null)}>← Otros quizzes</button>
                                     </div>
-                                    <QuizInteractivo preguntas={quizActivo.preguntas} mostrarPuntaje />
+                                    <QuizInteractivo
+                                        preguntas={quizActivo.preguntas}
+                                        mostrarPuntaje
+                                        estudianteId={estudianteId}
+                                        reto={retoActivo}
+                                    />
+                                </section>
+                            )}
+                            {subVista === 'juegos' && !juegoActivo && (
+                                <section className="card materia-cards">
+                                    <div className="card-head">
+                                        <h3>Juegos disponibles</h3>
+                                        <span className="card-tag">{juegos.length} juegos</span>
+                                    </div>
+                                    {juegos.length > 0 ? (
+                                        <ul className="quiz-disponible-lista">
+                                            {juegos.map((j) => (
+                                                <li key={j.id}>
+                                                    <button className="quiz-disponible-item" onClick={() => setJuegoActivo(j)}>
+                                                        <span className="quiz-disponible-icon"><ExtensionRoundedIcon /></span>
+                                                        <span className="quiz-disponible-meta">
+                                                            <span className="quiz-disponible-tema">{j.titulo}</span>
+                                                            <span className="quiz-disponible-sub">
+                                                                Clasificador · {j.configuracion?.categorias?.length || 0} categorías · {j.xp_recompensa} XP
+                                                            </span>
+                                                        </span>
+                                                        <span className="quiz-disponible-cta">
+                                                            Jugar <ArrowForwardRoundedIcon sx={{ fontSize: "1rem" }} />
+                                                        </span>
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="vacio-msg">Aún no hay juegos publicados en esta materia. ¡Vuelve pronto!</p>
+                                    )}
+                                </section>
+                            )}
+
+                            {subVista === 'juegos' && juegoActivo && (
+                                <section className="card materia-subvista">
+                                    <div className="card-head">
+                                        <h3>{juegoActivo.titulo}</h3>
+                                        <button className="back-btn back-btn-inline" onClick={() => setJuegoActivo(null)}>← Otros juegos</button>
+                                    </div>
+                                    <JuegoDragAndDrop
+                                        reto={juegoActivo}
+                                        estudianteId={estudianteId}
+                                        onSalir={() => setJuegoActivo(null)}
+                                    />
                                 </section>
                             )}
                         </>
