@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './dashboard.css';
 import './adminDashboard.css';
@@ -7,9 +7,6 @@ import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import LockRoundedIcon from '@mui/icons-material/LockRounded';
 import HomeFilledIcon from '@mui/icons-material/HomeFilled';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
-import MilitaryTechRoundedIcon from '@mui/icons-material/MilitaryTechRounded';
-import LocalFireDepartmentRoundedIcon from '@mui/icons-material/LocalFireDepartmentRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import RestartAltRoundedIcon from '@mui/icons-material/RestartAltRounded';
 import VpnKeyRoundedIcon from '@mui/icons-material/VpnKeyRounded';
@@ -25,6 +22,18 @@ import { obtenerMaterial, subirMaterial, eliminarMaterial } from '../../services
 import authService from '../../services/authService';
 import docenteService from '../../services/docenteService';
 import { obtenerRanking } from '../../services/gamificationService';
+import { obtenerRetosPublicados } from '../../services/retosService';
+import {
+    DashboardHeader,
+    StatCard,
+    SectionCard,
+    EmptyState,
+    QuickActionCard,
+    formatearFecha
+} from '../../components/dashboard/DashboardWidgets';
+
+// Etiquetas legibles de los tipos de reto publicables.
+const TIPO_RETO_LABEL = { quiz: 'Quiz', clasificador: 'Juego', mision: 'Misión' };
 
 const materiaIdPorNombre = (nombre) => MATERIAS.find((m) => m.nombre === nombre)?.id;
 
@@ -47,11 +56,10 @@ import {
   ListItemButton,
   ListItemText,
   Grid,
-  Card,
-  CircularProgress
+  Card
 } from '@mui/material';
 
-function WidgetsRendimiento({ materia, topEstudiantes, progreso, siguientePaso, onAccion }) {
+function WidgetsRendimiento({ materia, topEstudiantes, retosPublicados, siguientePaso, onAccion }) {
     return (
         <Grid container spacing={2.5} className="widgets-rendimiento">
             {/* Widget 1 · Top estudiantes */}
@@ -73,31 +81,15 @@ function WidgetsRendimiento({ materia, topEstudiantes, progreso, siguientePaso, 
                 </Card>
             </Grid>
 
-            {/* Widget 2 · Progreso de la materia */}
+            {/* Widget 2 · Retos publicados (dato real de la BD) */}
             <Grid size={{ xs: 12, md: 4 }}>
                 <Card elevation={0} className="widget-card widget-card-center">
                     <div className="widget-head">
                         <span className="widget-icon widget-icon-primary"><TrendingUpRoundedIcon /></span>
-                        <h4>Progreso de la materia</h4>
+                        <h4>Retos publicados</h4>
                     </div>
-                    <div className="widget-progress">
-                        <CircularProgress
-                            variant="determinate"
-                            value={progreso}
-                            size={120}
-                            thickness={5}
-                            className="widget-progress-ring"
-                        />
-                        <CircularProgress
-                            variant="determinate"
-                            value={100}
-                            size={120}
-                            thickness={5}
-                            className="widget-progress-track"
-                        />
-                        <span className="widget-progress-label">{progreso}%</span>
-                    </div>
-                    <p className="widget-progress-sub">Completado en {materia}</p>
+                    <span className="widget-numero">{retosPublicados}</span>
+                    <p className="widget-progress-sub">Actividades disponibles en {materia}</p>
                 </Card>
             </Grid>
 
@@ -233,9 +225,71 @@ export function Dashboard() {
         }
     };
 
+    // El Home necesita los datos del aula desde el arranque; al entrar a la
+    // sección "Mis Estudiantes" se refrescan por si cambiaron.
+    useEffect(() => {
+        cargarEstudiantes();
+    }, []);
+
     useEffect(() => {
         if (pagina === 'estudiantes') cargarEstudiantes();
     }, [pagina]);
+
+    // Retos publicados por materia asignada: alimentan el Home ("Contenido",
+    // "Actividad reciente") y el widget real del detalle de materia.
+    const [retosPorMateria, setRetosPorMateria] = useState({});
+    useEffect(() => {
+        if (!materias.length) return;
+        let vigente = true;
+        Promise.all(materias.map(async (nombre) => {
+            const materiaId = materiaIdPorNombre(nombre);
+            const retos = materiaId ? await obtenerRetosPublicados({ materiaId }) : [];
+            return [nombre, retos];
+        })).then((pares) => {
+            if (vigente) setRetosPorMateria(Object.fromEntries(pares));
+        });
+        return () => { vigente = false; };
+    }, [materias]);
+
+    // Último borrador de quiz del historial local del generador: es la señal
+    // más directa de "trabajo a medio hacer" con la que cuenta el docente.
+    const borradorReciente = useMemo(() => {
+        try {
+            const data = JSON.parse(localStorage.getItem('edu_historialQuizzes')) || {};
+            const borradores = Object.values(data)
+                .flat()
+                .filter((q) => q?.estado === 'borrador' && materias.includes(q.materia));
+            borradores.sort((a, b) => (b.id || 0) - (a.id || 0));
+            return borradores[0] || null;
+        } catch {
+            return null;
+        }
+    }, [materias]);
+
+    // Materia con menos retos publicados: sugerencia de dónde crear contenido.
+    const materiaSugerida = useMemo(() => {
+        if (!materias.length) return null;
+        return [...materias].sort(
+            (a, b) => (retosPorMateria[a]?.length || 0) - (retosPorMateria[b]?.length || 0)
+        )[0];
+    }, [materias, retosPorMateria]);
+
+    // Últimos retos publicados en cualquiera de sus materias.
+    const retosRecientes = useMemo(() => (
+        Object.entries(retosPorMateria)
+            .flatMap(([nombre, retos]) => retos.map((r) => ({ ...r, materia: nombre })))
+            .sort((a, b) => new Date(b.creado_en) - new Date(a.creado_en))
+            .slice(0, 5)
+    ), [retosPorMateria]);
+
+    // Salto directo desde el Home a una materia (y opcionalmente a una
+    // sub-vista concreta, p. ej. el generador de quiz).
+    const irAMateria = (nombre, subvista = '') => {
+        if (!nombre) return;
+        setPagina('materias');
+        setMateriaSeleccionada(nombre);
+        setSubVistaMateria(subvista);
+    };
 
     const handleGenerarInvitaciones = async (e) => {
         e.preventDefault();
@@ -264,12 +318,6 @@ export function Dashboard() {
         authService.logout();
         navigate('/');
     };
-
-    const misiones = [
-        { titulo: "Revisar entregas de Matemáticas", progreso: 80 },
-        { titulo: "Crear quiz de Ciencias Naturales", progreso: 45 },
-        { titulo: "Publicar logros de la semana", progreso: 20 }
-    ];
 
     // Top 3 real de estudiantes por XP (GET /api/ranking).
     const [ranking, setRanking] = useState([]);
@@ -387,89 +435,150 @@ export function Dashboard() {
 
             <main className="contenido">
 
-                {/* HOME */}
+                {/* HOME — orden RFC-004: bienvenida → continuar trabajando →
+                    mi aula → contenido → actividad reciente. Solo datos reales. */}
                 {pagina === "" && (
-                    <>
-                        <h1 style={{pointerEvents:"none"}}>Panel de Administración</h1>
-                        <p className="contenido-sub" style={{pointerEvents:"none"}}>Bienvenido al sistema de gamificación educativa.</p>
+                    <div className="dash-secciones">
+                        <DashboardHeader
+                            titulo={`Hola, ${authService.getUsuario()?.username || 'docente'}`}
+                            subtitulo="Crea contenido para tus materias y acompaña el avance de tu aula."
+                            chips={[
+                                `${materias.length} ${materias.length === 1 ? 'materia asignada' : 'materias asignadas'}`,
+                                `${misEstudiantes.length} ${misEstudiantes.length === 1 ? 'estudiante' : 'estudiantes'}`
+                            ]}
+                        />
 
-                        <div className="stats-row">
-                            <div className="stat-card">
-                                <div className="stat-icon stat-icon-primary"><TaskAltRoundedIcon /></div>
-                                <div>
-                                    <span className="stat-value">12</span>
-                                    <span className="stat-label">Tareas activas</span>
-                                </div>
-                            </div>
-                            <div className="stat-card">
-                                <div className="stat-icon stat-icon-accent"><EmojiEventsRoundedIcon /></div>
-                                <div>
-                                    <span className="stat-value">48</span>
-                                    <span className="stat-label">Logros otorgados</span>
-                                </div>
-                            </div>
-                            <div className="stat-card">
-                                <div className="stat-icon stat-icon-fire"><LocalFireDepartmentRoundedIcon /></div>
-                                <div>
-                                    <span className="stat-value">7</span>
-                                    <span className="stat-label">Días de racha</span>
-                                </div>
-                            </div>
-                        </div>
+                        <SectionCard titulo="Continuar trabajando" Icon={AutoAwesomeRoundedIcon}>
+                            {borradorReciente ? (
+                                <QuickActionCard
+                                    Icon={AutoAwesomeRoundedIcon}
+                                    titulo="Retoma tu borrador de quiz"
+                                    descripcion={`"${borradorReciente.tema}" en ${borradorReciente.materia} · ${borradorReciente.cantidad} preguntas sin publicar.`}
+                                    cta="Continuar editando"
+                                    onClick={() => irAMateria(borradorReciente.materia, 'quiz')}
+                                />
+                            ) : materiaSugerida ? (
+                                <QuickActionCard
+                                    Icon={MenuBookIcon}
+                                    titulo={`Crea contenido en ${materiaSugerida}`}
+                                    descripcion={`Tiene ${(retosPorMateria[materiaSugerida] || []).length} retos publicados. Genera un quiz, un juego o una misión.`}
+                                    cta={`Ir a ${materiaSugerida}`}
+                                    onClick={() => irAMateria(materiaSugerida)}
+                                />
+                            ) : (
+                                <EmptyState
+                                    Icon={MenuBookIcon}
+                                    titulo="Aún no tienes materias asignadas"
+                                    mensaje="Pide al administrador que te asigne materias para empezar a crear contenido."
+                                />
+                            )}
+                        </SectionCard>
 
-                        <div className="home-grid">
-                            <section className="card">
-                                <div className="card-head">
-                                    <h3>Misiones de hoy</h3>
-                                    <span className="card-tag">{misiones.length} pendientes</span>
+                        <SectionCard
+                            titulo="Mi Aula"
+                            Icon={GroupsRoundedIcon}
+                            accion={{ label: 'Gestionar', onClick: () => setPagina('estudiantes') }}
+                        >
+                            {(misEstudiantes.length || invitaciones.length) ? (
+                                <div className="stats-row">
+                                    <StatCard
+                                        Icon={GroupsRoundedIcon}
+                                        valor={misEstudiantes.length}
+                                        etiqueta="Estudiantes registrados"
+                                        tono="primary"
+                                    />
+                                    <StatCard
+                                        Icon={VpnKeyRoundedIcon}
+                                        valor={invitaciones.filter((i) => i.estado === 'pendiente').length}
+                                        etiqueta="Invitaciones pendientes"
+                                        tono="accent"
+                                    />
+                                    <StatCard
+                                        Icon={TaskAltRoundedIcon}
+                                        valor={invitaciones.filter((i) => i.estado === 'usado').length}
+                                        etiqueta="Códigos usados"
+                                        tono="primary"
+                                    />
                                 </div>
-                                <ul className="mission-list">
-                                    {misiones.map((m, i) => (
-                                        <li key={i} className="mission-item">
-                                            <div className="mission-top">
-                                                <span>{m.titulo}</span>
-                                                <span className="mission-pct">{m.progreso}%</span>
+                            ) : (
+                                <EmptyState
+                                    Icon={VpnKeyRoundedIcon}
+                                    titulo="Tu aula está vacía"
+                                    mensaje="Genera códigos de invitación para que tus estudiantes se registren solos."
+                                    accion={{ label: 'Generar invitaciones', onClick: () => setPagina('estudiantes') }}
+                                />
+                            )}
+                        </SectionCard>
+
+                        <SectionCard
+                            titulo="Contenido"
+                            Icon={MenuBookIcon}
+                            tag={materias.length ? `${materias.length} materias` : undefined}
+                        >
+                            {materias.length ? (
+                                <ul className="contenido-materias">
+                                    {materias.map((mat) => {
+                                        const retos = retosPorMateria[mat] || [];
+                                        const cuenta = (tipo) => retos.filter((r) => r.tipo === tipo).length;
+                                        return (
+                                            <li key={mat}>
+                                                <button
+                                                    type="button"
+                                                    className="contenido-materia-btn"
+                                                    onClick={() => irAMateria(mat)}
+                                                >
+                                                    <MenuBookIcon className="contenido-materia-icono" />
+                                                    <span className="contenido-materia-nombre">{mat}</span>
+                                                    <span className="contenido-materia-detalle">
+                                                        {cuenta('quiz')} quizzes · {cuenta('clasificador')} juegos · {cuenta('mision')} misiones
+                                                    </span>
+                                                    <ArrowForwardRoundedIcon sx={{ fontSize: '1rem' }} />
+                                                </button>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            ) : (
+                                <EmptyState
+                                    Icon={MenuBookIcon}
+                                    titulo="Sin materias asignadas"
+                                    mensaje="Cuando el administrador te asigne materias, aparecerán aquí con su contenido."
+                                />
+                            )}
+                        </SectionCard>
+
+                        <SectionCard
+                            titulo="Actividad reciente"
+                            Icon={TaskAltRoundedIcon}
+                            tag={retosRecientes.length ? `${retosRecientes.length} retos` : undefined}
+                        >
+                            {retosRecientes.length ? (
+                                <ul className="actividad-lista">
+                                    {retosRecientes.map((r) => (
+                                        <li key={r.id} className="actividad-item">
+                                            <span className="actividad-icono"><TaskAltRoundedIcon /></span>
+                                            <div className="actividad-meta">
+                                                <strong>{r.titulo}</strong>
+                                                <span>
+                                                    {TIPO_RETO_LABEL[r.tipo] || r.tipo} · {r.materia} · {r.xp_recompensa} XP
+                                                </span>
                                             </div>
-                                            <div className="progress-track">
-                                                <div className="progress-fill" style={{ width: `${m.progreso}%` }} />
-                                            </div>
+                                            <span className="actividad-fecha">{formatearFecha(r.creado_en)}</span>
                                         </li>
                                     ))}
                                 </ul>
-                            </section>
-
-                            <aside className="card-stack">
-                                <section className="card profile-card">
-                                    <div className="profile-avatar">D</div>
-                                    <h3>Docente</h3>
-                                    <p className="profile-role">Administrador de aula</p>
-                                    <div className="profile-level">
-                                        <span>Nivel 5</span>
-                                        <div className="progress-track">
-                                            <div className="progress-fill progress-fill-accent" style={{ width: "65%" }} />
-                                        </div>
-                                        <span className="profile-xp">650 / 1000 XP</span>
-                                    </div>
-                                </section>
-
-                                <section className="card">
-                                    <div className="card-head">
-                                        <h3>Ranking</h3>
-                                        <MilitaryTechRoundedIcon className="rank-head-icon" />
-                                    </div>
-                                    <ol className="rank-list">
-                                        {ranking.map((r, i) => (
-                                            <li key={i} className="rank-item">
-                                                <span className={`rank-pos rank-pos-${i + 1}`}>{i + 1}</span>
-                                                <span className="rank-name">{r.nombre}</span>
-                                                <span className="rank-points">{r.puntos} pts</span>
-                                            </li>
-                                        ))}
-                                    </ol>
-                                </section>
-                            </aside>
-                        </div>
-                    </>
+                            ) : (
+                                <EmptyState
+                                    Icon={TaskAltRoundedIcon}
+                                    titulo="Aún no has publicado retos"
+                                    mensaje="Publica tu primer quiz, juego o misión para que aparezca aquí."
+                                    accion={materiaSugerida
+                                        ? { label: 'Crear mi primer reto', onClick: () => irAMateria(materiaSugerida, 'quiz') }
+                                        : undefined}
+                                />
+                            )}
+                        </SectionCard>
+                    </div>
                 )}
 
                 {/* MATERIAS GRID */}
@@ -507,7 +616,7 @@ export function Dashboard() {
                         <WidgetsRendimiento
                             materia={materiaSeleccionada}
                             topEstudiantes={ranking}
-                            progreso={68}
+                            retosPublicados={(retosPorMateria[materiaSeleccionada] || []).length}
                             siguientePaso={
                                 (archivosPorMateria[materiaSeleccionada] || []).length > 0
                                     ? { descripcion: "Ya tienes material cargado. Pon a prueba a tus estudiantes generando un quiz.", label: "Ir al Quiz", destino: "quiz" }

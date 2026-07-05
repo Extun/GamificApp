@@ -1,0 +1,334 @@
+/* Estilos de los componentes compartidos del dashboard (RFC-004).
+   Reutiliza los tokens globales (--color-*, --radius-*, --shadow-*)
+   definidos por el tema de la app. */
+
+/* ===== Encabezado de bienvenida ===== */
+.dash-header { margin-bottom: 26px; }
+
+.dash-header h1 {
+    margin: 0 0 4px;
+    font-size: 1.9rem;
+    pointer-events: none;
+}
+
+.dash-header-sub {
+    margin: 0;
+    color: var(--color-text-muted);
+    pointer-events: none;
+}
+
+.dash-header-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.dash-chip {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--color-primary-dark);
+    background: var(--color-primary-soft);
+    padding: 4px 12px;
+    border-radius: 999px;
+}
+
+/* ===== Pila vertical de secciones del home ===== */
+.dash-secciones {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+/* Los stats dentro de una SectionCard no necesitan su margen inferior. */
+.card .stats-row { margin-bottom: 0; }
+
+/* ===== SectionCard ===== */
+.section-titulo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.section-titulo-icono {
+    color: var(--color-primary);
+    font-size: 1.35rem !important;
+}
+
+.section-head-extra {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.section-accion {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-head);
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 7px 14px;
+    color: var(--color-primary-dark);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.section-accion:hover {
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary-light);
+}
+
+/* ===== EmptyState ===== */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 8px;
+    padding: 30px 20px;
+}
+
+.empty-state-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-surface-alt);
+    color: var(--color-text-muted);
+}
+
+.empty-state-icon svg { font-size: 1.8rem; }
+
+.empty-state h4 {
+    margin: 4px 0 0;
+    font-size: 1.02rem;
+    color: var(--color-text);
+}
+
+.empty-state p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--color-text-muted);
+    max-width: 420px;
+    line-height: 1.6;
+}
+
+.empty-state-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    font-family: var(--font-head);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 9px 18px;
+    color: var(--color-primary-dark);
+    background: var(--color-primary-soft);
+    border: 1px solid var(--color-primary-light);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: transform 0.15s ease, filter 0.18s ease;
+}
+
+.empty-state-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(0.97);
+}
+
+/* ===== QuickActionCard ===== */
+.quick-action-card {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 20px;
+    background: var(--color-surface-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+
+.quick-action-icon {
+    width: 46px;
+    height: 46px;
+    flex-shrink: 0;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+}
+
+.quick-action-icon svg { font-size: 1.4rem; }
+
+.quick-action-meta { flex: 1; min-width: 180px; }
+
+.quick-action-meta h4 {
+    margin: 0 0 2px;
+    font-size: 1rem;
+    color: var(--color-text);
+}
+
+.quick-action-meta p {
+    margin: 0;
+    font-size: 0.86rem;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+}
+
+.quick-action-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 18px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
+    color: #fff;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.quick-action-btn:hover { transform: translateY(-1px); opacity: 0.95; }
+
+/* Rejilla de accesos rápidos (Home del admin). */
+.quick-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 18px;
+}
+
+/* ===== Lista de actividad reciente ===== */
+.actividad-lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.actividad-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.9rem;
+}
+
+.actividad-icono {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+}
+
+.actividad-icono svg { font-size: 1.1rem; }
+
+.actividad-meta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.actividad-meta strong {
+    font-size: 0.92rem;
+    color: var(--color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.actividad-meta span {
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+}
+
+.actividad-fecha {
+    flex-shrink: 0;
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+}
+
+/* ===== Lista de materias con conteo de retos (Home del docente) ===== */
+.contenido-materias {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.contenido-materia-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-family: inherit;
+    font-size: 0.92rem;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.contenido-materia-btn:hover {
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary-light);
+}
+
+.contenido-materia-icono {
+    flex-shrink: 0;
+    color: var(--color-primary);
+    font-size: 1.3rem !important;
+}
+
+.contenido-materia-nombre {
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.contenido-materia-detalle {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Número grande del widget "Retos publicados" (detalle de materia). */
+.widget-numero {
+    font-family: var(--font-head);
+    font-weight: 700;
+    font-size: 2.6rem;
+    line-height: 1;
+    margin-top: 10px;
+    color: var(--color-text);
+}
+
+@media (max-width: 640px) {
+    .quick-action-card { flex-direction: column; align-items: flex-start; }
+    .quick-action-btn { width: 100%; justify-content: center; }
+}

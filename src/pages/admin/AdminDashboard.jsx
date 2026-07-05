@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './dashboard.css';
 import './adminDashboard.css';
@@ -8,17 +8,27 @@ import VpnKeyRoundedIcon from '@mui/icons-material/VpnKeyRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import RestartAltRoundedIcon from '@mui/icons-material/RestartAltRounded';
+import HomeFilledIcon from '@mui/icons-material/HomeFilled';
+import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded';
 import { List, ListItem, ListItemIcon, ListItemButton, ListItemText } from '@mui/material';
 import MATERIAS from '../../constants/materias';
 import authService from '../../services/authService';
 import adminService from '../../services/adminService';
+import {
+    DashboardHeader,
+    StatCard,
+    SectionCard,
+    EmptyState,
+    QuickActionCard,
+    formatearFecha
+} from '../../components/dashboard/DashboardWidgets';
 
 // Panel exclusivo del rol 'admin': alta/baja de docentes con sus materias
 // asignadas, gestión de estudiantes (reset de PIN, bajas) y monitoreo de
 // los códigos de invitación de toda la institución.
 export function AdminDashboard() {
     const navigate = useNavigate();
-    const [pagina, setPagina] = useState('docentes');
+    const [pagina, setPagina] = useState('inicio');
     const [docentes, setDocentes] = useState([]);
     const [estudiantes, setEstudiantes] = useState([]);
     const [invitaciones, setInvitaciones] = useState([]);
@@ -82,6 +92,32 @@ export function AdminDashboard() {
         navigate('/');
     };
 
+    // Altas recientes de la institución (docentes y estudiantes traen su
+    // `creado_en` real desde la API). Sin datos inventados: si no hay
+    // registros, la sección muestra su estado vacío.
+    const actividadReciente = useMemo(() => {
+        const eventos = [
+            ...docentes.map((d) => ({
+                id: `docente-${d.id}`,
+                fecha: d.creado_en,
+                titulo: d.username,
+                detalle: 'Nuevo docente',
+                Icon: SchoolRoundedIcon
+            })),
+            ...estudiantes.map((e) => ({
+                id: `estudiante-${e.usuario_id}`,
+                fecha: e.creado_en,
+                titulo: e.nombre_completo,
+                detalle: `Nuevo estudiante · ${e.curso}`,
+                Icon: GroupsRoundedIcon
+            }))
+        ].filter((ev) => ev.fecha);
+        eventos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+        return eventos.slice(0, 8);
+    }, [docentes, estudiantes]);
+
+    const invitacionesPendientes = invitaciones.filter((i) => i.estado === 'pendiente').length;
+
     return (
         <div className="dashboard">
             <div className="sidebar-container">
@@ -89,6 +125,12 @@ export function AdminDashboard() {
                     <div className="aside-content-options">
                         <h2 style={{ pointerEvents: 'none' }}>GamificApp · Administración</h2>
                         <List>
+                            <ListItem disablePadding>
+                                <ListItemButton className="nav-item" onClick={() => setPagina('inicio')}>
+                                    <ListItemIcon className="nav-icon"><HomeFilledIcon sx={{ fontSize: '1.3rem' }} /></ListItemIcon>
+                                    <ListItemText primary="Inicio" />
+                                </ListItemButton>
+                            </ListItem>
                             <ListItem disablePadding>
                                 <ListItemButton className="nav-item" onClick={() => setPagina('docentes')}>
                                     <ListItemIcon className="nav-icon"><SchoolRoundedIcon sx={{ fontSize: '1.3rem' }} /></ListItemIcon>
@@ -135,6 +177,82 @@ export function AdminDashboard() {
                         <div className="admin-aviso-ok" role="status">
                             <p>{avisoOk}</p>
                             <button onClick={() => setAvisoOk('')}>OK</button>
+                        </div>
+                    )}
+
+                    {/* INICIO — resumen real de la institución (RFC-004). */}
+                    {pagina === 'inicio' && (
+                        <div className="dash-secciones">
+                            <DashboardHeader
+                                titulo="Panel de Administración"
+                                subtitulo="Resumen general de la institución."
+                            />
+
+                            <div className="stats-row">
+                                <StatCard
+                                    Icon={SchoolRoundedIcon}
+                                    valor={docentes.length}
+                                    etiqueta={docentes.length === 1 ? 'Docente registrado' : 'Docentes registrados'}
+                                    tono="primary"
+                                />
+                                <StatCard
+                                    Icon={GroupsRoundedIcon}
+                                    valor={estudiantes.length}
+                                    etiqueta={estudiantes.length === 1 ? 'Estudiante registrado' : 'Estudiantes registrados'}
+                                    tono="accent"
+                                />
+                                <StatCard
+                                    Icon={VpnKeyRoundedIcon}
+                                    valor={invitacionesPendientes}
+                                    etiqueta="Invitaciones pendientes"
+                                    tono="fire"
+                                />
+                            </div>
+
+                            <div className="quick-actions-grid">
+                                <QuickActionCard
+                                    Icon={SchoolRoundedIcon}
+                                    titulo="Crear un docente"
+                                    descripcion="Da de alta una cuenta y asígnale sus materias."
+                                    cta="Ir a Docentes"
+                                    onClick={() => setPagina('docentes')}
+                                />
+                                <QuickActionCard
+                                    Icon={GroupsRoundedIcon}
+                                    titulo="Gestionar estudiantes"
+                                    descripcion="Restablece PINs o da de baja cuentas de estudiantes."
+                                    cta="Ir a Estudiantes"
+                                    onClick={() => setPagina('estudiantes')}
+                                />
+                            </div>
+
+                            <SectionCard
+                                titulo="Actividad reciente"
+                                Icon={TaskAltRoundedIcon}
+                                tag={actividadReciente.length ? `${actividadReciente.length} registros` : undefined}
+                            >
+                                {actividadReciente.length ? (
+                                    <ul className="actividad-lista">
+                                        {actividadReciente.map((ev) => (
+                                            <li key={ev.id} className="actividad-item">
+                                                <span className="actividad-icono"><ev.Icon /></span>
+                                                <div className="actividad-meta">
+                                                    <strong>{ev.titulo}</strong>
+                                                    <span>{ev.detalle}</span>
+                                                </div>
+                                                <span className="actividad-fecha">{formatearFecha(ev.fecha)}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <EmptyState
+                                        Icon={TaskAltRoundedIcon}
+                                        titulo="Sin registros todavía"
+                                        mensaje="Cuando se creen docentes o se registren estudiantes, sus altas aparecerán aquí."
+                                        accion={{ label: 'Crear el primer docente', onClick: () => setPagina('docentes') }}
+                                    />
+                                )}
+                            </SectionCard>
                         </div>
                     )}
 

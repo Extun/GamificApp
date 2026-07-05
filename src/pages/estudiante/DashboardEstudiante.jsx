@@ -13,6 +13,9 @@ import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import WorkspacePremiumRoundedIcon from '@mui/icons-material/WorkspacePremiumRounded';
 import LockRoundedIcon from '@mui/icons-material/LockRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
+import RocketLaunchRoundedIcon from '@mui/icons-material/RocketLaunchRounded';
+import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded';
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import {
     List,
     ListItem,
@@ -31,14 +34,16 @@ import gamificationService, { CATALOGO_LOGROS } from '../../services/gamificatio
 import authService from '../../services/authService';
 import { obtenerMaterial } from '../../services/materialesService';
 import MATERIAS, { NOMBRES_MATERIAS } from '../../constants/materias';
+import {
+    DashboardHeader,
+    StatCard,
+    SectionCard,
+    EmptyState,
+    QuickActionCard,
+    formatearFecha
+} from '../../components/dashboard/DashboardWidgets';
 
 const materias = NOMBRES_MATERIAS;
-
-const misiones = [
-    { titulo: "Completar el quiz de Fracciones", progreso: 60 },
-    { titulo: "Leer el material de Ciencias Naturales", progreso: 30 },
-    { titulo: "Repasar la lectura de Lenguaje", progreso: 0 }
-];
 
 // Presentación (icono + color) por cada logro del catálogo del servicio.
 const LOGRO_UI = {
@@ -79,8 +84,15 @@ export function DashboardEstudiante() {
     // Material de estudio de la materia abierta, consultado a la API (la BD
     // central): es el mismo que ve el docente y cualquier otro dispositivo.
     const [archivos, setArchivos] = useState([]);
-    // Top 3 real del aula (GET /api/ranking).
+    // Ranking real del aula (GET /api/ranking). Se pide amplio (50) para
+    // poder mostrar la posición propia aunque no esté en el Top 3.
     const [ranking, setRanking] = useState([]);
+    // Detalle del avance por reto (GET /api/progreso/:id): alimenta
+    // "Continuar aprendiendo" y "Actividad reciente" con datos reales.
+    const [progresoDetalle, setProgresoDetalle] = useState([]);
+    // Todos los retos publicados: fallback de "Continuar aprendiendo"
+    // cuando el estudiante aún no tiene progreso registrado.
+    const [retosDisponibles, setRetosDisponibles] = useState([]);
 
     // Identidad del estudiante en sesión: habilita la persistencia en MySQL.
     const estudianteId = gamificationService.getEstudianteId();
@@ -92,15 +104,22 @@ export function DashboardEstudiante() {
     // XP/los logros más recientes al cambiar de página o al salir de un quiz.
     const gami = gamificationService.getResumen();
 
-    // Al entrar: trae de la BD el XP oficial del estudiante y el ranking del
-    // aula, y refresca la vista cuando llegan.
+    // Al entrar: trae de la BD el XP oficial del estudiante, el ranking del
+    // aula, su avance por reto y los retos publicados; refresca al llegar.
     useEffect(() => {
         let vigente = true;
-        const tareas = [gamificationService.obtenerRanking(3).then((filas) => {
-            if (vigente) setRanking(filas);
-        })];
+        const tareas = [
+            gamificationService.obtenerRanking(50).then((filas) => {
+                if (vigente) setRanking(filas);
+            }),
+            obtenerRetosPublicados().then((retos) => {
+                if (vigente) setRetosDisponibles(retos);
+            })
+        ];
         if (estudianteId) {
-            tareas.push(gamificationService.obtenerProgreso(estudianteId));
+            tareas.push(gamificationService.obtenerProgreso(estudianteId).then((data) => {
+                if (vigente && Array.isArray(data?.progreso)) setProgresoDetalle(data.progreso);
+            }));
         }
         Promise.allSettled(tareas).then(() => { if (vigente) setSync((s) => s + 1); });
         return () => { vigente = false; };
@@ -135,6 +154,30 @@ export function DashboardEstudiante() {
         }))
     ), [ranking, estudianteId]);
 
+    // Posición real del estudiante dentro del ranking consultado (o null).
+    const posicionPropia = useMemo(
+        () => ranking.find((r) => r.id === estudianteId)?.posicion ?? null,
+        [ranking, estudianteId]
+    );
+
+    // Avance por reto ordenado del más reciente al más antiguo.
+    const actividadReciente = useMemo(
+        () => [...progresoDetalle].sort(
+            (a, b) => new Date(b.actualizado_en) - new Date(a.actualizado_en)
+        ),
+        [progresoDetalle]
+    );
+    const ultimaActividad = actividadReciente[0] || null;
+
+    // Fallback sin progreso: la actividad publicada más antigua es la
+    // "primera" disponible (la API las devuelve de más nueva a más vieja).
+    const primerRetoDisponible = retosDisponibles.length
+        ? retosDisponibles[retosDisponibles.length - 1]
+        : null;
+    const materiaPrimerReto = primerRetoDisponible
+        ? MATERIAS.find((m) => m.id === primerRetoDisponible.materia_id)?.nombre
+        : null;
+
     const abrirMateria = (mat) => {
         setMateriaSeleccionada(mat);
         setSubVista('material');
@@ -145,6 +188,13 @@ export function DashboardEstudiante() {
         setJuegos([]);
         setMisionesRetos([]);
         setArchivos([]);
+    };
+
+    // Salto directo desde el Home a una materia (sugerencias del dashboard).
+    const irAMateria = (nombre) => {
+        if (!nombre) return;
+        setPagina('materias');
+        abrirMateria(nombre);
     };
 
     const volver = () => {
@@ -226,89 +276,108 @@ export function DashboardEstudiante() {
 
                 <main className="contenido">
 
-                    {/* INICIO */}
+                    {/* INICIO — orden RFC-004: bienvenida → continuar →
+                        progreso → comunidad → actividad reciente. */}
                     {pagina === "" && (
-                        <>
-                            <h1 style={{ pointerEvents: "none" }}>¡Hola, {nombreEstudiante.split(' ')[0]}! 👋</h1>
-                            <p className="contenido-sub" style={{ pointerEvents: "none" }}>Sigue aprendiendo y suma puntos para subir en el ranking.</p>
+                        <div className="dash-secciones">
+                            <DashboardHeader
+                                titulo={`¡Hola, ${nombreEstudiante.split(' ')[0]}! 👋`}
+                                subtitulo="Sigue aprendiendo y suma puntos para subir en el ranking."
+                                chips={[`Nivel ${gami.nivel}`, `${gami.xp} XP`]}
+                            />
 
-                            <div className="stats-row">
-                                <div className="stat-card">
-                                    <div className="stat-icon stat-icon-primary"><StarRoundedIcon /></div>
-                                    <div>
-                                        <span className="stat-value">{gami.xp}</span>
-                                        <span className="stat-label">XP acumulado</span>
-                                    </div>
-                                </div>
-                                <div className="stat-card">
-                                    <div className="stat-icon stat-icon-fire"><LocalFireDepartmentRoundedIcon /></div>
-                                    <div>
-                                        <span className="stat-value">{gami.nivel}</span>
-                                        <span className="stat-label">Nivel actual</span>
-                                    </div>
-                                </div>
-                                <div className="stat-card">
-                                    <div className="stat-icon stat-icon-accent"><EmojiEventsRoundedIcon /></div>
-                                    <div>
-                                        <span className="stat-value">{gami.totalLogros}</span>
-                                        <span className="stat-label">Logros obtenidos</span>
-                                    </div>
-                                </div>
-                            </div>
+                            <SectionCard titulo="Continuar aprendiendo" Icon={RocketLaunchRoundedIcon}>
+                                {ultimaActividad ? (
+                                    <QuickActionCard
+                                        Icon={ArrowForwardRoundedIcon}
+                                        titulo={`Continúa en ${ultimaActividad.materia}`}
+                                        descripcion={`Tu última actividad fue "${ultimaActividad.reto}" (${ultimaActividad.porcentaje}% completado).`}
+                                        cta={`Ir a ${ultimaActividad.materia}`}
+                                        onClick={() => irAMateria(ultimaActividad.materia)}
+                                    />
+                                ) : materiaPrimerReto ? (
+                                    <QuickActionCard
+                                        Icon={ArrowForwardRoundedIcon}
+                                        titulo="Tu primera actividad te espera"
+                                        descripcion={`"${primerRetoDisponible.titulo}" está disponible en ${materiaPrimerReto}.`}
+                                        cta={`Ir a ${materiaPrimerReto}`}
+                                        onClick={() => irAMateria(materiaPrimerReto)}
+                                    />
+                                ) : (
+                                    <EmptyState
+                                        Icon={MenuBookIcon}
+                                        titulo="Aún no hay actividades publicadas"
+                                        mensaje="Tu docente todavía no ha publicado retos. ¡Vuelve pronto!"
+                                    />
+                                )}
+                            </SectionCard>
 
-                            <div className="home-grid">
-                                <section className="card">
-                                    <div className="card-head">
-                                        <h3>Misiones de hoy</h3>
-                                        <span className="card-tag">{misiones.length} pendientes</span>
-                                    </div>
-                                    <ul className="mission-list">
-                                        {misiones.map((m, i) => (
-                                            <li key={i} className="mission-item">
-                                                <div className="mission-top">
-                                                    <span>{m.titulo}</span>
-                                                    <span className="mission-pct">{m.progreso}%</span>
+                            <SectionCard
+                                titulo="Mi progreso"
+                                Icon={StarRoundedIcon}
+                                accion={{ label: 'Ver mis logros', onClick: () => setPagina('logros') }}
+                            >
+                                <div className="stats-row">
+                                    <StatCard Icon={StarRoundedIcon} valor={gami.xp} etiqueta="XP acumulado" tono="primary" />
+                                    <StatCard Icon={LocalFireDepartmentRoundedIcon} valor={gami.nivel} etiqueta="Nivel actual" tono="fire" />
+                                    <StatCard Icon={EmojiEventsRoundedIcon} valor={gami.totalLogros} etiqueta="Logros obtenidos" tono="accent" />
+                                </div>
+                            </SectionCard>
+
+                            <SectionCard
+                                titulo="Mi comunidad"
+                                Icon={MilitaryTechRoundedIcon}
+                                tag={posicionPropia ? `Tu posición: #${posicionPropia}` : undefined}
+                            >
+                                {rankingDinamico.length ? (
+                                    <ol className="rank-list">
+                                        {rankingDinamico.slice(0, 3).map((r, i) => (
+                                            <li key={i} className={`rank-item ${r.esYo ? "rank-item-yo" : ""}`}>
+                                                <span className={`rank-pos rank-pos-${i + 1}`}>{i + 1}</span>
+                                                <span className="rank-name">{r.nombre}</span>
+                                                <span className="rank-points">{r.puntos} pts</span>
+                                            </li>
+                                        ))}
+                                    </ol>
+                                ) : (
+                                    <EmptyState
+                                        Icon={MilitaryTechRoundedIcon}
+                                        titulo="El ranking está vacío"
+                                        mensaje="Completa actividades para aparecer en el ranking de tu aula."
+                                    />
+                                )}
+                            </SectionCard>
+
+                            <SectionCard
+                                titulo="Actividad reciente"
+                                Icon={TaskAltRoundedIcon}
+                                tag={actividadReciente.length ? `${actividadReciente.length} actividades` : undefined}
+                            >
+                                {actividadReciente.length ? (
+                                    <ul className="actividad-lista">
+                                        {actividadReciente.slice(0, 5).map((a) => (
+                                            <li key={a.reto_id} className="actividad-item">
+                                                <span className="actividad-icono">
+                                                    {a.completado ? <CheckCircleRoundedIcon /> : <TaskAltRoundedIcon />}
+                                                </span>
+                                                <div className="actividad-meta">
+                                                    <strong>{a.reto}</strong>
+                                                    <span>{a.materia} · {a.porcentaje}%</span>
                                                 </div>
-                                                <div className="progress-track">
-                                                    <div className="progress-fill" style={{ width: `${m.progreso}%` }} />
-                                                </div>
+                                                <span className="actividad-fecha">{formatearFecha(a.actualizado_en)}</span>
                                             </li>
                                         ))}
                                     </ul>
-                                </section>
-
-                                <aside className="card-stack">
-                                    <section className="card profile-card">
-                                        <div className="profile-avatar">{nombreEstudiante.charAt(0).toUpperCase()}</div>
-                                        <h3>{nombreEstudiante}</h3>
-                                        <p className="profile-role">Aprendiz nivel {gami.nivel}</p>
-                                        <div className="profile-level">
-                                            <span>Nivel {gami.nivel}</span>
-                                            <div className="progress-track">
-                                                <div className="progress-fill progress-fill-accent" style={{ width: `${gami.porcentaje}%` }} />
-                                            </div>
-                                            <span className="profile-xp">{gami.xpActual} / {gami.xpNecesario} XP</span>
-                                        </div>
-                                    </section>
-
-                                    <section className="card">
-                                        <div className="card-head">
-                                            <h3>Ranking</h3>
-                                            <MilitaryTechRoundedIcon className="rank-head-icon" />
-                                        </div>
-                                        <ol className="rank-list">
-                                            {rankingDinamico.map((r, i) => (
-                                                <li key={i} className={`rank-item ${r.esYo ? "rank-item-yo" : ""}`}>
-                                                    <span className={`rank-pos rank-pos-${i + 1}`}>{i + 1}</span>
-                                                    <span className="rank-name">{r.nombre}</span>
-                                                    <span className="rank-points">{r.puntos} pts</span>
-                                                </li>
-                                            ))}
-                                        </ol>
-                                    </section>
-                                </aside>
-                            </div>
-                        </>
+                                ) : (
+                                    <EmptyState
+                                        Icon={TaskAltRoundedIcon}
+                                        titulo="Sin actividad todavía"
+                                        mensaje="Cuando completes quizzes, juegos o misiones aparecerán aquí."
+                                        accion={{ label: 'Explorar mis materias', onClick: () => setPagina('materias') }}
+                                    />
+                                )}
+                            </SectionCard>
+                        </div>
                     )}
 
                     {/* MATERIAS GRID */}
