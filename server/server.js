@@ -3,6 +3,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { verificarConexion } from './db.js';
+import { inicializarEsquema } from './initDb.js';
 import { autenticar } from './middleware/auth.js';
 import authRouter from './routes/auth.js';
 import adminRouter from './routes/admin.js';
@@ -49,5 +50,13 @@ app.use((err, _req, res, _next) => {
 
 app.listen(PORT, async () => {
     console.log(`🚀 API de GamificApp en http://localhost:${PORT}`);
-    await verificarConexion();
+    if (await verificarConexion()) {
+        // Crea las tablas y datos semilla si faltan (idempotente). Si falla,
+        // se registra pero el servidor sigue vivo para poder diagnosticarlo.
+        try {
+            await inicializarEsquema();
+        } catch (err) {
+            console.error('⚠️  No se pudo inicializar el esquema:', err.message);
+        }
+    }
 });
