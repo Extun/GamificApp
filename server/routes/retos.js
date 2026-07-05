@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import pool from '../db.js';
+import { soloDocente, puedeGestionarMateria } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -100,7 +101,7 @@ router.get('/', async (req, res, next) => {
 // los convierte a `configuracion_json`. Es un upsert por (materia_id, titulo):
 // volver a publicar el mismo reto actualiza su configuración sin duplicar la
 // fila ni perder el progreso ya registrado por los estudiantes.
-router.post('/', async (req, res, next) => {
+router.post('/', soloDocente, async (req, res, next) => {
     const materiaId = Number(req.body?.materia_id);
     const titulo = typeof req.body?.titulo === 'string' ? req.body.titulo.trim() : '';
     const tipo = req.body?.tipo;
@@ -119,6 +120,10 @@ router.post('/', async (req, res, next) => {
     const xp = esIdValido(xpRecompensa) ? xpRecompensa : 100;
 
     try {
+        // El docente solo publica retos en las materias que tiene asignadas.
+        if (!await puedeGestionarMateria(req.user, materiaId)) {
+            return res.status(403).json({ error: 'No tienes asignada esta materia' });
+        }
         const configJson = configuracion ? JSON.stringify(configuracion) : null;
 
         const [[existente]] = await pool.query(

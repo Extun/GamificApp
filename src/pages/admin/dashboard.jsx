@@ -1,5 +1,7 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './dashboard.css';
+import './adminDashboard.css';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import LockRoundedIcon from '@mui/icons-material/LockRounded';
@@ -8,6 +10,9 @@ import MenuBookIcon from '@mui/icons-material/MenuBook';
 import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
 import MilitaryTechRoundedIcon from '@mui/icons-material/MilitaryTechRounded';
 import LocalFireDepartmentRoundedIcon from '@mui/icons-material/LocalFireDepartmentRounded';
+import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
+import RestartAltRoundedIcon from '@mui/icons-material/RestartAltRounded';
+import VpnKeyRoundedIcon from '@mui/icons-material/VpnKeyRounded';
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import WorkspacePremiumRoundedIcon from '@mui/icons-material/WorkspacePremiumRounded';
@@ -15,8 +20,13 @@ import TrendingUpRoundedIcon from '@mui/icons-material/TrendingUpRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import { FileChip, FilePreviewModal, getKind, formatSize, descargarArchivo } from '../../components/archivos/ArchivoChip';
 import { procesarPdf } from '../../services/pdfService';
-import { NOMBRES_MATERIAS } from '../../constants/materias';
+import MATERIAS from '../../constants/materias';
 import { migrarMateriasAntiguas } from '../../services/migracionMaterias';
+import { obtenerMaterial, subirMaterial, eliminarMaterial } from '../../services/materialesService';
+import authService from '../../services/authService';
+import docenteService from '../../services/docenteService';
+
+const materiaIdPorNombre = (nombre) => MATERIAS.find((m) => m.nombre === nombre)?.id;
 
 // Lee un File como dataURL (base64) para persistirlo y poder descargarlo luego.
 const leerComoDataUrl = (file) => new Promise((resolve, reject) => {
@@ -26,15 +36,6 @@ const leerComoDataUrl = (file) => new Promise((resolve, reject) => {
     reader.readAsDataURL(file);
 });
 
-// Persiste el mapa de archivos en localStorage y lo devuelve para el setState.
-const persistirArchivos = (mapa) => {
-    try {
-        localStorage.setItem('edu_archivosMateria', JSON.stringify(mapa));
-    } catch {
-        // Ignorar errores de cuota/persistencia de localStorage
-    }
-    return mapa;
-};
 import { AsistenteIA } from './asistenteIA';
 import { GeneradorQuiz } from './GeneradorQuiz';
 import { EditorClasificador } from '../../components/clasificador/EditorClasificador';
@@ -177,6 +178,7 @@ function MaterialContenedor({ titulo, subtitulo, Icon, vacioMsg, archivos, isPri
 
 export function Dashboard() {
 
+    const navigate = useNavigate();
     const [pagina, setPagina] = useState("");
     const [materiaSeleccionada, setMateriaSeleccionada] = useState(null);
     const [subVistaMateria, setSubVistaMateria] = useState('');
@@ -185,17 +187,87 @@ export function Dashboard() {
     const [materiasSinEquivalente, setMateriasSinEquivalente] = useState(
         () => migrarMateriasAntiguas().sinEquivalente
     );
-    const [archivosPorMateria, setArchivosPorMateria] = useState(() => {
-        try {
-            const guardado = localStorage.getItem('edu_archivosMateria');
-            return guardado ? JSON.parse(guardado) : {};
-        } catch {
-            return {};
-        }
-    });
+    // Material de estudio: la fuente de verdad es MySQL (vía API). Este mapa
+    // { nombreMateria: Archivo[] } es solo el reflejo de la última consulta.
+    const [archivosPorMateria, setArchivosPorMateria] = useState({});
     const [archivoPreview, setArchivoPreview] = useState(null);
+    const [errorMaterial, setErrorMaterial] = useState('');
 
-    const materias = NOMBRES_MATERIAS;
+    // Refresca la lista de una materia CONSULTANDO AL SERVIDOR (no estados
+    // locales): así web y móvil siempre muestran el mismo material.
+    const refrescarMaterial = async (materia) => {
+        const materiaId = materiaIdPorNombre(materia);
+        if (!materiaId) return;
+        const archivos = await obtenerMaterial(materiaId);
+        setArchivosPorMateria((prev) => ({ ...prev, [materia]: archivos }));
+    };
+
+    // Al abrir una materia se descarga su material desde la BD central.
+    useEffect(() => {
+        if (materiaSeleccionada) refrescarMaterial(materiaSeleccionada);
+    }, [materiaSeleccionada]);
+
+    // Materias ASIGNADAS a este docente por el admin: definen todo lo que
+    // este panel muestra y permite editar (el servidor lo vuelve a validar).
+    const [materias, setMaterias] = useState([]);
+    useEffect(() => {
+        docenteService.misMaterias()
+            .then((lista) => setMaterias(lista.map((m) => m.nombre)))
+            .catch((err) => setErrorMaterial(`No se pudieron cargar tus materias: ${err.message}`));
+    }, []);
+
+    // Gestión de estudiantes e invitaciones del docente.
+    const [misEstudiantes, setMisEstudiantes] = useState([]);
+    const [invitaciones, setInvitaciones] = useState([]);
+    const [codigosNuevos, setCodigosNuevos] = useState([]);
+    const [invCurso, setInvCurso] = useState('');
+    const [invCantidad, setInvCantidad] = useState(10);
+    const [avisoOk, setAvisoOk] = useState('');
+
+    const cargarEstudiantes = async () => {
+        try {
+            const [est, inv] = await Promise.all([
+                docenteService.misEstudiantes(),
+                docenteService.listarInvitaciones()
+            ]);
+            setMisEstudiantes(est);
+            setInvitaciones(inv);
+        } catch (err) {
+            setErrorMaterial(err.message);
+        }
+    };
+
+    useEffect(() => {
+        if (pagina === 'estudiantes') cargarEstudiantes();
+    }, [pagina]);
+
+    const handleGenerarInvitaciones = async (e) => {
+        e.preventDefault();
+        try {
+            setErrorMaterial('');
+            const data = await docenteService.generarInvitaciones(invCantidad, invCurso.trim());
+            setCodigosNuevos(data.codigos);
+            setAvisoOk(`${data.codigos.length} códigos generados para ${data.curso} (válidos ${data.dias_vigencia} días).`);
+            await cargarEstudiantes();
+        } catch (err) {
+            setErrorMaterial(err.message);
+        }
+    };
+
+    const handleResetPin = async (est) => {
+        try {
+            setErrorMaterial('');
+            const data = await docenteService.resetearPinEstudiante(est.usuario_id);
+            setAvisoOk(`${est.nombre_completo}: ${data.mensaje}`);
+        } catch (err) {
+            setErrorMaterial(err.message);
+        }
+    };
+
+    const cerrarSesion = () => {
+        authService.logout();
+        navigate('/');
+    };
 
     const misiones = [
         { titulo: "Revisar entregas de Matemáticas", progreso: 80 },
@@ -212,7 +284,6 @@ export function Dashboard() {
     const handleUploadMateria = async (materia, file, { isPrivate = false } = {}) => {
         const kind = getKind(file.name);
         const archivo = {
-            id: `${Date.now()}-${file.name}`,
             name: file.name,
             sizeLabel: formatSize(file.size),
             kind,
@@ -239,17 +310,26 @@ export function Dashboard() {
             }
         }
 
-        setArchivosPorMateria((prev) => persistirArchivos({
-            ...prev,
-            [materia]: [...(prev[materia] || []), archivo]
-        }));
+        // POST al servidor (debe responder 201) y luego SIEMPRE se refresca
+        // la lista desde el API: ningún archivo existe solo en este navegador.
+        try {
+            setErrorMaterial('');
+            await subirMaterial(materiaIdPorNombre(materia), archivo);
+            await refrescarMaterial(materia);
+        } catch (err) {
+            setErrorMaterial(`No se pudo subir "${file.name}": ${err.message}`);
+        }
     };
 
-    const handleEliminarArchivo = (materia, id) => {
-        setArchivosPorMateria((prev) => persistirArchivos({
-            ...prev,
-            [materia]: (prev[materia] || []).filter((a) => a.id !== id)
-        }));
+    const handleEliminarArchivo = async (materia, id) => {
+        try {
+            setErrorMaterial('');
+            await eliminarMaterial(materiaIdPorNombre(materia), id);
+        } catch (err) {
+            setErrorMaterial(`No se pudo eliminar el archivo: ${err.message}`);
+        } finally {
+            await refrescarMaterial(materia);
+        }
     };
 
     return (
@@ -277,6 +357,14 @@ export function Dashboard() {
                                 </ListItemButton>
                         </ListItem>
                         <ListItem disablePadding>
+                            <ListItemButton className="nav-item" onClick={() => setPagina("estudiantes")}>
+                                <ListItemIcon className="nav-icon">
+                                <GroupsRoundedIcon sx={{ fontSize: "1.3rem" }} />
+                            </ListItemIcon>
+                            <ListItemText primary="Mis Estudiantes" />
+                            </ListItemButton>
+                        </ListItem>
+                        <ListItem disablePadding>
                             <ListItemButton className="nav-item" onClick={() => setPagina("asistente")}>
                                 <ListItemIcon className="nav-icon">
                                 <AutoAwesomeRoundedIcon sx={{ fontSize: "1.3rem" }} />
@@ -290,9 +378,13 @@ export function Dashboard() {
                     <div className="user-avatar">D</div>
                     <div className="user-meta">
                         <span className="user-name">Docente</span>
-                        <span className='email-user-account'>docente@esclemencia.edu.ec</span>
+                        <span className='email-user-account'>{authService.getUsuario()?.username}</span>
                     </div>
                 </div>
+                <button className="logout-btn" onClick={cerrarSesion}>
+                    <LogoutRoundedIcon sx={{ fontSize: "1.1rem" }} />
+                    Cerrar sesión
+                </button>
             </aside>
 
             <main className="contenido">
@@ -439,6 +531,13 @@ export function Dashboard() {
                             onAccion={(destino) => setSubVistaMateria(destino)}
                         />
 
+                        {errorMaterial && (
+                            <div className="aviso-migracion" role="alert">
+                                <p>{errorMaterial}</p>
+                                <button onClick={() => setErrorMaterial('')}>Entendido</button>
+                            </div>
+                        )}
+
                         {/* Área de archivos siempre visible, dividida por audiencia */}
                         <div className="materia-archivos-grid">
                             <MaterialContenedor
@@ -497,6 +596,101 @@ export function Dashboard() {
                                 <h3>Libro de Calificaciones de {materiaSeleccionada}</h3>
                             </section>
                         )}
+                    </>
+                )}
+
+                {/* MIS ESTUDIANTES: invitaciones de registro y reseteo de PIN */}
+                {pagina === "estudiantes" && (
+                    <>
+                        <h1 style={{pointerEvents:"none"}}>Mis Estudiantes</h1>
+                        <p className="contenido-sub">Genera códigos de invitación para que tus estudiantes se registren, y ayúdalos si olvidan su PIN.</p>
+
+                        {avisoOk && (
+                            <div className="admin-aviso-ok" role="status">
+                                <p>{avisoOk}</p>
+                                <button onClick={() => setAvisoOk('')}>OK</button>
+                            </div>
+                        )}
+
+                        <section className="card">
+                            <div className="card-head">
+                                <h3><VpnKeyRoundedIcon sx={{ fontSize: '1.1rem', verticalAlign: 'middle' }} /> Generar invitaciones</h3>
+                            </div>
+                            <form className="admin-form" onSubmit={handleGenerarInvitaciones}>
+                                <input
+                                    placeholder='Curso (ej: "2do A")'
+                                    value={invCurso}
+                                    onChange={(e) => setInvCurso(e.target.value)}
+                                />
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="40"
+                                    value={invCantidad}
+                                    onChange={(e) => setInvCantidad(Number(e.target.value))}
+                                />
+                                <button type="submit" className="upload-mini-btn">Generar códigos</button>
+                            </form>
+                            {codigosNuevos.length > 0 && (
+                                <div className="inv-codigos-nuevos">
+                                    {codigosNuevos.map((c) => <code key={c}>{c}</code>)}
+                                </div>
+                            )}
+                        </section>
+
+                        <section className="card">
+                            <div className="card-head">
+                                <h3>Estudiantes registrados con mis códigos</h3>
+                                <span className="card-tag">{misEstudiantes.length}</span>
+                            </div>
+                            <table className="admin-tabla">
+                                <thead>
+                                    <tr><th>Nombre</th><th>Curso</th><th>XP</th><th>PIN</th></tr>
+                                </thead>
+                                <tbody>
+                                    {misEstudiantes.map((est) => (
+                                        <tr key={est.usuario_id}>
+                                            <td>{est.nombre_completo}</td>
+                                            <td>{est.curso}</td>
+                                            <td>{est.xp_total}</td>
+                                            <td className="admin-acciones">
+                                                <button title="Restablecer PIN a su fecha de nacimiento" onClick={() => handleResetPin(est)}>
+                                                    <RestartAltRoundedIcon sx={{ fontSize: '1.1rem' }} /> Restablecer
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {!misEstudiantes.length && (
+                                        <tr><td colSpan={4} className="vacio-msg">Aún no hay estudiantes registrados con tus códigos.</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </section>
+
+                        <section className="card">
+                            <div className="card-head">
+                                <h3>Mis códigos emitidos</h3>
+                                <span className="card-tag">{invitaciones.length}</span>
+                            </div>
+                            <table className="admin-tabla">
+                                <thead>
+                                    <tr><th>Código</th><th>Curso</th><th>Estado</th><th>Usado por</th></tr>
+                                </thead>
+                                <tbody>
+                                    {invitaciones.map((i) => (
+                                        <tr key={i.id}>
+                                            <td><code>{i.codigo}</code></td>
+                                            <td>{i.curso}</td>
+                                            <td><span className={`inv-estado inv-${i.estado}`}>{i.estado}</span></td>
+                                            <td>{i.usado_por || '—'}</td>
+                                        </tr>
+                                    ))}
+                                    {!invitaciones.length && (
+                                        <tr><td colSpan={4} className="vacio-msg">Aún no has generado códigos.</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </section>
                     </>
                 )}
 

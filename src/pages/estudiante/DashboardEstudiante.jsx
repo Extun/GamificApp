@@ -26,20 +26,13 @@ import { JuegoDragAndDrop } from '../../components/clasificador/JuegoDragAndDrop
 import { obtenerRetosPublicados } from '../../services/retosService';
 import ExtensionRoundedIcon from '@mui/icons-material/ExtensionRounded';
 import gamificationService, { CATALOGO_LOGROS } from '../../services/gamificationService';
+import authService from '../../services/authService';
+import { obtenerMaterial } from '../../services/materialesService';
 import { migrarMateriasAntiguas } from '../../services/migracionMaterias';
 import MATERIAS, { NOMBRES_MATERIAS } from '../../constants/materias';
 
-// El estudiante consume el material y los quizzes que el docente ya publicó. Se
-// leen de las mismas claves de localStorage que escribe el panel del docente.
-const leerArchivos = () => {
-    try {
-        const data = localStorage.getItem('edu_archivosMateria');
-        return data ? JSON.parse(data) : {};
-    } catch {
-        return {};
-    }
-};
-
+// El estudiante consume el material desde la API (misma BD que el docente y
+// que la app móvil); los quizzes generados aún se leen de localStorage.
 const leerQuizzes = () => {
     try {
         const data = localStorage.getItem('edu_historialQuizzes');
@@ -101,8 +94,10 @@ export function DashboardEstudiante() {
 
     // Reubica el contenido guardado bajo nombres de materias antiguos ANTES
     // de leerlo, para que nada quede invisible tras el cambio de catálogo.
-    const archivosPorMateria = useMemo(() => { migrarMateriasAntiguas(); return leerArchivos(); }, []);
-    const quizzesPorMateria = useMemo(() => leerQuizzes(), []);
+    const quizzesPorMateria = useMemo(() => { migrarMateriasAntiguas(); return leerQuizzes(); }, []);
+    // Material de estudio de la materia abierta, consultado a la API (la BD
+    // central): es el mismo que ve el docente y cualquier otro dispositivo.
+    const [archivos, setArchivos] = useState([]);
 
     // Identidad del estudiante en sesión: habilita la persistencia en MySQL.
     const estudianteId = gamificationService.getEstudianteId();
@@ -111,11 +106,6 @@ export function DashboardEstudiante() {
     // XP/los logros más recientes al cambiar de página o al salir de un quiz.
     const gami = gamificationService.getResumen();
 
-    // RBAC: el estudiante solo accede a los recursos públicos. Los archivos
-    // marcados como privados por el docente (isPrivate === true) se filtran aquí.
-    const archivos = materiaSeleccionada
-        ? (archivosPorMateria[materiaSeleccionada] || []).filter((a) => !a.isPrivate)
-        : [];
     // RBAC: el alumno solo ve los quizzes que el docente ya PUBLICÓ; los borradores
     // en edición permanecen ocultos.
     const quizzes = materiaSeleccionada
@@ -135,8 +125,10 @@ export function DashboardEstudiante() {
         };
     }, [quizActivo, materiaSeleccionada]);
 
-    // Carga desde la BD los juegos publicados de la materia abierta. Si la red
-    // falla, el servicio devuelve [] y la pestaña muestra su estado vacío.
+    // Carga desde la BD los juegos publicados y el material de estudio de la
+    // materia abierta. Si la red falla, los servicios devuelven [] y las
+    // pestañas muestran su estado vacío. El servidor ya filtra el material
+    // privado del docente para el rol estudiante.
     useEffect(() => {
         if (!materiaSeleccionada) return;
         const materia = MATERIAS.find((m) => m.nombre === materiaSeleccionada);
@@ -144,6 +136,8 @@ export function DashboardEstudiante() {
         let vigente = true;
         obtenerRetosPublicados({ materiaId: materia.id, tipo: 'clasificador' })
             .then((retos) => { if (vigente) setJuegos(retos); });
+        obtenerMaterial(materia.id)
+            .then((lista) => { if (vigente) setArchivos(lista); });
         return () => { vigente = false; };
     }, [materiaSeleccionada]);
 
@@ -160,6 +154,7 @@ export function DashboardEstudiante() {
         setQuizActivo(null);
         setJuegoActivo(null);
         setJuegos([]);
+        setArchivos([]);
     };
 
     const volver = () => {
@@ -171,9 +166,25 @@ export function DashboardEstudiante() {
     };
 
     const cerrarSesion = () => {
-        localStorage.removeItem('isAuthenticated');
-        localStorage.removeItem('userRole');
+        authService.logout();
         navigate('/');
+    };
+
+    // Nombre real del estudiante (viene del registro con invitación); las
+    // cuentas antiguas sin nombre completo muestran el genérico.
+    const nombreEstudiante = authService.getUsuario()?.nombre_completo || 'Estudiante';
+
+    const handleCambiarPin = async () => {
+        const pinActual = window.prompt('Escribe tu PIN actual (6 números):');
+        if (!pinActual) return;
+        const pinNuevo = window.prompt('Escribe tu PIN nuevo (6 números):');
+        if (!pinNuevo) return;
+        try {
+            const data = await authService.cambiarPin(pinActual.trim(), pinNuevo.trim());
+            window.alert(data.mensaje);
+        } catch (err) {
+            window.alert(err.message);
+        }
     };
 
     return (
@@ -205,12 +216,16 @@ export function DashboardEstudiante() {
                     </div>
                     <div className="aside-bottom">
                         <div className="aside-content-user">
-                            <div className="user-avatar">E</div>
+                            <div className="user-avatar">{nombreEstudiante.charAt(0).toUpperCase()}</div>
                             <div className="user-meta">
-                                <span className="user-name">Estudiante</span>
-                                <span className="email-user-account">estudiante@esclemencia.edu.ec</span>
+                                <span className="user-name">{nombreEstudiante}</span>
+                                <span className="email-user-account">Estudiante</span>
                             </div>
                         </div>
+                        <button className="logout-btn" onClick={handleCambiarPin}>
+                            <LockRoundedIcon sx={{ fontSize: "1.1rem" }} />
+                            Cambiar mi PIN
+                        </button>
                         <button className="logout-btn" onClick={cerrarSesion}>
                             <LogoutRoundedIcon sx={{ fontSize: "1.1rem" }} />
                             Cerrar sesión
@@ -223,7 +238,7 @@ export function DashboardEstudiante() {
                     {/* INICIO */}
                     {pagina === "" && (
                         <>
-                            <h1 style={{ pointerEvents: "none" }}>¡Hola, Estudiante! 👋</h1>
+                            <h1 style={{ pointerEvents: "none" }}>¡Hola, {nombreEstudiante.split(' ')[0]}! 👋</h1>
                             <p className="contenido-sub" style={{ pointerEvents: "none" }}>Sigue aprendiendo y suma puntos para subir en el ranking.</p>
 
                             <div className="stats-row">
@@ -273,8 +288,8 @@ export function DashboardEstudiante() {
 
                                 <aside className="card-stack">
                                     <section className="card profile-card">
-                                        <div className="profile-avatar">E</div>
-                                        <h3>Estudiante</h3>
+                                        <div className="profile-avatar">{nombreEstudiante.charAt(0).toUpperCase()}</div>
+                                        <h3>{nombreEstudiante}</h3>
                                         <p className="profile-role">Aprendiz nivel {gami.nivel}</p>
                                         <div className="profile-level">
                                             <span>Nivel {gami.nivel}</span>

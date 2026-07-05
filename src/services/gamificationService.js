@@ -4,6 +4,8 @@
 // mantiene como caché local para que la UI responda al instante y siga
 // funcionando si la red falla (se resincroniza en la próxima lectura).
 
+import { authFetch } from './authService';
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const KEY_XP = 'edu_xpTotal';
@@ -143,7 +145,7 @@ export const getEstudianteId = () => {
 // la red falló; en ese caso la UI sigue con el valor local en caché.
 export const guardarProgreso = async ({ estudianteId, retoId, materiaId, retoTitulo, xpRecompensa, puntosObtenidos }) => {
     try {
-        const res = await fetch(`${API_URL}/api/progreso`, {
+        const res = await authFetch(`${API_URL}/api/progreso`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -171,7 +173,7 @@ export const guardarProgreso = async ({ estudianteId, retoId, materiaId, retoTit
 // la caché local de XP. Devuelve { estudiante, progreso } o null si falla.
 export const obtenerProgreso = async (estudianteId) => {
     try {
-        const res = await fetch(`${API_URL}/api/progreso/${estudianteId}`);
+        const res = await authFetch(`${API_URL}/api/progreso/${estudianteId}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json();
@@ -222,7 +224,7 @@ export const completarReto = ({ estudianteId, reto, tipo, aciertos = 0, total = 
 // Devuelve [] si la red falla, para que las vistas muestren su estado vacío.
 export const obtenerRanking = async (limite = 10) => {
     try {
-        const res = await fetch(`${API_URL}/api/ranking?limite=${limite}`);
+        const res = await authFetch(`${API_URL}/api/ranking?limite=${limite}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return await res.json();
     } catch (err) {
