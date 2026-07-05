@@ -1,25 +1,34 @@
 import { useState } from 'react'
-import { GoogleGenAI } from '@google/genai'
 import { RespuestaIA } from './respuestaIA';
+import { authFetch } from '../../services/authService';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export function AsistenteIA() {
     const [message, setMessage] = useState("");
     const [responseIA, setResponseIA] = useState("");
+    const [cargando, setCargando] = useState(false);
 
+    // La consulta viaja al backend (POST /api/ia/asistente), que es quien
+    // habla con Gemini: la API key nunca llega al navegador.
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!message.trim() || cargando) return;
+        setCargando(true);
         try {
-            const genAI = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-            const response = await genAI.models.generateContent({
-                model: 'gemini-1.5-flash',
-                contents: message
+            const res = await authFetch(`${API_URL}/api/ia/asistente`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mensaje: message })
             });
-
-            console.log(response.text);
-            setResponseIA(response.text);
+            const data = await res.json().catch(() => null);
+            if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+            setResponseIA(data.texto);
         } catch (error) {
             console.error("Error:", error);
-            setResponseIA("Error al obtener la respuesta.");
+            setResponseIA(error.message || "Error al obtener la respuesta.");
+        } finally {
+            setCargando(false);
         }
     }
 
@@ -29,7 +38,7 @@ export function AsistenteIA() {
             <form onSubmit={handleSubmit}>
                 <label>Escribe tu mensaje:</label>
                 <textarea value={message} onChange={(e) => { setMessage(e.target.value) }}></textarea>
-                <button type="submit">Enviar</button>
+                <button type="submit" disabled={cargando}>{cargando ? 'Pensando…' : 'Enviar'}</button>
             </form>
             <RespuestaIA respuesta={responseIA} />
         </div>

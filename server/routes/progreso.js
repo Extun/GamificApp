@@ -12,6 +12,11 @@ router.get('/:estudiante_id', async (req, res, next) => {
     if (!esIdValido(estudianteId)) {
         return res.status(400).json({ error: 'estudiante_id debe ser un entero positivo' });
     }
+    // Un estudiante solo puede consultar SU propio progreso; docente y admin
+    // pueden consultar el de cualquiera.
+    if (req.user.rol === 'estudiante' && req.user.estudiante_id !== estudianteId) {
+        return res.status(403).json({ error: 'Solo puedes consultar tu propio progreso' });
+    }
 
     try {
         const [[estudiante]] = await pool.query(
@@ -69,6 +74,12 @@ router.post('/', async (req, res, next) => {
         return res.status(400).json({
             error: 'Se requieren estudiante_id y puntos_obtenidos válidos, y reto_id o materia_id + reto_titulo'
         });
+    }
+    // Un estudiante solo puede registrar progreso EN SU PROPIA cuenta: sin
+    // esto, cualquier alumno autenticado podría inflar (o alterar) el XP de
+    // otro con un simple POST.
+    if (req.user.rol === 'estudiante' && req.user.estudiante_id !== estudianteId) {
+        return res.status(403).json({ error: 'Solo puedes registrar tu propio progreso' });
     }
 
     const conn = await pool.getConnection();

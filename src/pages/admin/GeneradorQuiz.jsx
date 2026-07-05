@@ -1,48 +1,14 @@
 import { useState } from 'react';
-import { GoogleGenAI, Type } from '@google/genai';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import { EditorQuiz } from '../../components/quiz/EditorQuiz';
 import { publicarReto } from '../../services/retosService';
+import { authFetch } from '../../services/authService';
 import MATERIAS from '../../constants/materias';
 
-const MAX_INTENTOS = 3;
-const ESPERA_MS = 2000;
-
-const dormir = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// Esquema que obliga a Gemini a devolver el quiz como JSON estructurado, para
-// poder renderizarlo de forma interactiva en lugar de como texto plano.
-const QUIZ_SCHEMA = {
-    type: Type.ARRAY,
-    items: {
-        type: Type.OBJECT,
-        properties: {
-            pregunta: { type: Type.STRING },
-            alternativas: {
-                type: Type.OBJECT,
-                properties: {
-                    A: { type: Type.STRING },
-                    B: { type: Type.STRING },
-                    C: { type: Type.STRING },
-                    D: { type: Type.STRING }
-                },
-                required: ['A', 'B', 'C', 'D']
-            },
-            correcta: { type: Type.STRING, description: 'Letra de la alternativa correcta: A, B, C o D' },
-            justificacion: { type: Type.STRING }
-        },
-        required: ['pregunta', 'alternativas', 'correcta', 'justificacion']
-    }
-};
-
-// Errores temporales del lado del servidor: saturación (503) o límite de
-// peticiones (429). En estos casos conviene reintentar o probar otro modelo.
-const esTemporal = (err) =>
-    err?.status === 503 || err?.status === 429 ||
-    /\b(503|429)\b|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand/i.test(err?.message ?? '');
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 // Persistencia del historial: guardamos los últimos 3 quizzes POR MATERIA, en
 // un objeto { [materia]: Quiz[] }, igual que el dashboard con los archivos.
@@ -59,65 +25,6 @@ const leerHistorialTodo = () => {
     } catch {
         return {};
     }
-};
-
-// Cache de la lista de candidatos ya resuelta, para no listar en cada generación.
-let candidatosCache = null;
-
-// Descubre dinámicamente los modelos "flash" válidos de la cuenta y los devuelve
-// ORDENADOS por preferencia, para no depender de un string fijo que Google puede
-// no ofrecer en esta región/cuenta. Probaremos uno tras otro si alguno está
-// saturado (503) o sin cuota (429).
-async function resolverModelos(genAI) {
-    if (candidatosCache) return candidatosCache;
-
-    // Variantes que NO sirven para generar texto (imagen, audio, embeddings…).
-    const NO_TEXTO = /image|tts|audio|embedding|vision|veo|imagen|lyria|robotics/i;
-
-    const disponibles = [];
-    for await (const m of await genAI.models.list()) {
-        const metodos = m?.supportedActions || m?.supportedGenerationMethods || [];
-        const soportaGenerar = !metodos.length || metodos.includes('generateContent');
-        const nombre = m?.name?.replace(/^models\//, '') ?? '';
-        if (soportaGenerar && nombre && !NO_TEXTO.test(nombre)) {
-            disponibles.push(nombre);
-        }
-    }
-
-    const flash = disponibles.filter((n) => n.toLowerCase().includes('flash'));
-
-    if (!flash.length) {
-        // Depuración: mostramos el array completo para saber qué acepta la cuenta.
-        console.error('No se encontró ningún modelo "flash". Modelos disponibles:', disponibles);
-        throw new Error('No hay ningún modelo "flash" disponible en esta cuenta.');
-    }
-
-    // Priorizamos los modelos "lite" (responden más rápido), luego el flash
-    // normal. Preferimos alias estables ("...-latest") y dejamos al final los
-    // preview/experimental, que suelen estar más saturados.
-    const puntua = (n) => {
-        let p = 0;
-        if (n.includes('lite')) p -= 6;
-        if (n.includes('latest')) p -= 4;
-        if (/preview|exp/.test(n)) p += 3;
-        return p;
-    };
-    flash.sort((a, b) => puntua(a) - puntua(b));
-
-    console.log('Modelos "flash" candidatos (en orden de preferencia):', flash);
-    candidatosCache = flash;
-    return flash;
-}
-
-// Normaliza el JSON devuelto por la IA a un array de preguntas válidas.
-const parsearQuiz = (texto = '') => {
-    const limpio = texto.trim().replace(/^```json\s*/i, '').replace(/```$/i, '').trim();
-    const data = JSON.parse(limpio);
-    const preguntas = Array.isArray(data) ? data : data?.preguntas;
-    if (!Array.isArray(preguntas) || !preguntas.length) {
-        throw new Error('La IA no devolvió preguntas en el formato esperado.');
-    }
-    return preguntas;
 };
 
 export function GeneradorQuiz({ materia = 'la materia' }) {
@@ -216,63 +123,23 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
         }
     };
 
-    // Pide N preguntas a la IA sobre un tema y devuelve el array ya parseado.
-    // Reutilizado tanto por "Generar con IA" como por "Añadir con IA". Lanza si
-    // ningún modelo responde, para que cada caller decida cómo informar el error.
+    // Pide N preguntas a la IA vía el backend (POST /api/ia/quiz): la API key
+    // de Gemini vive solo en el servidor. Reutilizado por "Generar con IA" y
+    // "Añadir con IA"; lanza si el servidor no pudo generar.
     const pedirPreguntasIA = async (temaTxt, n, existentes = []) => {
-        // Reglas estrictas de integridad de datos aplicadas a TODA generación.
-        const reglas =
-            `REGLAS ESTRICTAS:\n` +
-            `1. Regla de Veracidad: Utiliza únicamente información verificada y factual. ` +
-            `Si no tienes certeza sobre un dato, no lo inventes.\n` +
-            `2. Regla de Unicidad: Antes de generar una nueva pregunta, analiza la lista de ` +
-            `preguntas existentes en el quiz actual y asegúrate de que la nueva pregunta no sea ` +
-            `duplicada ni conceptualmente idéntica a ninguna de ellas.`;
-
-        // Lista de enunciados ya presentes para que la IA evite repetirlos.
-        const yaExisten = existentes
-            .map((p) => (p?.pregunta || '').trim())
-            .filter(Boolean);
-        const bloqueExistentes = yaExisten.length
-            ? `\n\nPreguntas que YA existen en el quiz (NO las repitas ni reformules):\n` +
-              yaExisten.map((q, idx) => `${idx + 1}. ${q}`).join('\n')
-            : '';
-
-        const systemPrompt =
-            `Eres un docente experto en ${materia}. Genera un quiz de opción múltiple ` +
-            `sobre el tema '${temaTxt}' con EXACTAMENTE ${n} preguntas. Cada pregunta debe tener ` +
-            `4 alternativas (A–D), indicar la letra de la respuesta correcta y una justificación. ` +
-            `Usa lenguaje pedagógico para educación básica, en español. ` +
-            `Devuelve EXACTAMENTE ${n} preguntas, ni más ni menos.\n\n` +
-            reglas +
-            bloqueExistentes;
-
-        const genAI = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-        const candidatos = await resolverModelos(genAI);
-        let ultimoError = null;
-
-        // Recorremos los modelos "flash" disponibles; ante saturación/cuota
-        // reintentamos el mismo y, si sigue fallando, pasamos al siguiente.
-        for (const modelName of candidatos) {
-            for (let intento = 1; intento <= MAX_INTENTOS; intento++) {
-                try {
-                    const response = await genAI.models.generateContent({
-                        model: modelName,
-                        contents: systemPrompt,
-                        config: { responseMimeType: 'application/json', responseSchema: QUIZ_SCHEMA }
-                    });
-                    return parsearQuiz(response.text);
-                } catch (err) {
-                    ultimoError = err;
-                    if (esTemporal(err) && intento < MAX_INTENTOS) {
-                        await dormir(ESPERA_MS);
-                        continue;
-                    }
-                    break;
-                }
-            }
-        }
-        throw ultimoError ?? new Error('No se obtuvo respuesta de ningún modelo.');
+        const res = await authFetch(`${API_URL}/api/ia/quiz`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                materia,
+                tema: temaTxt,
+                cantidad: n,
+                existentes: existentes.map((p) => (p?.pregunta || '').trim()).filter(Boolean)
+            })
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+        return data.preguntas;
     };
 
     const handleGenerar = async (e) => {
@@ -302,7 +169,7 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
         } catch (err) {
             console.error('Error al generar el quiz:', err);
             const detalle = err?.message ? ` (${err.message})` : '';
-            setError(`No se pudo generar el quiz. Verifica tu conexión o la API Key.${detalle}`);
+            setError(`No se pudo generar el quiz. Verifica tu conexión.${detalle}`);
         } finally {
             setCargando(false);
         }

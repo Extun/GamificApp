@@ -13,9 +13,53 @@ import materialesRouter from './routes/materiales.js';
 import progresoRouter from './routes/progreso.js';
 import retosRouter from './routes/retos.js';
 import rankingRouter from './routes/ranking.js';
+import iaRouter from './routes/ia.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
+
+// Render/Vercel ponen un proxy delante: sin esto req.ip sería la IP del
+// proxy y el rate limiting por IP castigaría a todos los usuarios juntos.
+app.set('trust proxy', 1);
+// No anunciar la tecnología del servidor.
+app.disable('x-powered-by');
+
+// Cabeceras de seguridad básicas en TODAS las respuestas.
+app.use((_req, res, next) => {
+    res.set({
+        'X-Content-Type-Options': 'nosniff',   // no adivinar tipos MIME
+        'X-Frame-Options': 'DENY',             // la API no se incrusta en iframes
+        'Referrer-Policy': 'no-referrer',
+        'Strict-Transport-Security': 'max-age=31536000; includeSubDomains'
+    });
+    next();
+});
+
+// Rate limiting por IP para las rutas públicas de auth (login, registro,
+// emergencia): frena fuerza bruta de PINs y de códigos de invitación.
+// En memoria: suficiente para una sola instancia como la de Render.
+const VENTANA_MS = 5 * 60 * 1000;
+const MAX_PETICIONES = 30;
+const intentosPorIp = new Map();
+const limitarAuth = (req, res, next) => {
+    const ahora = Date.now();
+    const registro = intentosPorIp.get(req.ip);
+    if (!registro || ahora - registro.desde > VENTANA_MS) {
+        intentosPorIp.set(req.ip, { desde: ahora, cuenta: 1 });
+        return next();
+    }
+    if (++registro.cuenta > MAX_PETICIONES) {
+        return res.status(429).json({ error: 'Demasiadas peticiones. Espera unos minutos.' });
+    }
+    next();
+};
+// Poda periódica para que el mapa no crezca sin límite.
+setInterval(() => {
+    const ahora = Date.now();
+    for (const [ip, r] of intentosPorIp) {
+        if (ahora - r.desde > VENTANA_MS) intentosPorIp.delete(ip);
+    }
+}, VENTANA_MS).unref();
 
 // Solo los frontends autorizados pueden consumir la API.
 // CORS_ORIGIN acepta varios orígenes separados por coma, sin barra final.
@@ -29,7 +73,7 @@ app.use(express.json({ limit: '25mb' }));
 
 // ---- Rutas públicas (sin token) ----
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
-app.use('/api/auth', authRouter);
+app.use('/api/auth', limitarAuth, authRouter);
 
 // ---- A partir de aquí, TODA la API exige un JWT válido ----
 app.use('/api', autenticar);
@@ -41,6 +85,7 @@ app.use('/api/materias', materiasRouter);
 app.use('/api/progreso', progresoRouter);
 app.use('/api/retos', retosRouter);
 app.use('/api/ranking', rankingRouter);
+app.use('/api/ia', iaRouter);
 
 // Manejador central de errores: nunca filtra detalles internos al cliente.
 app.use((err, _req, res, _next) => {

@@ -11,10 +11,10 @@
 --   mysql -h <DB_HOST> -P <DB_PORT> -u <DB_USER> -p <DB_NAME> \
 --         < database/produccion_defaultdb.sql
 --
--- Usuarios semilla creados (CAMBIA estas claves al entrar):
---   admin      / admin123        (rol admin)
---   docente    / docente123      (rol docente)
---   estudiante / estudiante123   (rol estudiante, vinculado al demo id 1)
+-- Usuarios: este script NO crea cuentas con claves públicas. La cuenta
+-- admin la crea el servidor al arrancar (server/initDb.js) con la
+-- contraseña de la variable de entorno ADMIN_PASSWORD. Los docentes se
+-- crean desde el panel del admin, y los estudiantes con invitaciones.
 -- ============================================================
 
 -- ------------------------------------------------------------
@@ -155,25 +155,7 @@ INSERT INTO materias (id, nombre) VALUES
     (5, 'Educación Física')
 ON DUPLICATE KEY UPDATE nombre = VALUES(nombre);
 
--- Estudiante demo (id 1): la sesión de estudiante se vincula a esta fila.
-INSERT INTO estudiantes (id, nombres, apellidos, curso)
-VALUES (1, 'Estudiante', 'Demo', '2do A')
-ON DUPLICATE KEY UPDATE curso = VALUES(curso);
-
--- Usuarios iniciales (contraseñas hasheadas con bcrypt). CÁMBIALAS al entrar.
---   admin / admin123 · docente / docente123 · estudiante / estudiante123
-INSERT INTO usuarios (username, password_hash, rol, estudiante_id) VALUES
-    ('admin',      '$2b$10$i.zRZVABI1pk8Pd5d4UL9uPmybN2bAP4KeGYq0qKAAHwOQrVDenYC', 'admin',      NULL),
-    ('docente',    '$2b$10$TrnHcucqGS53KEM5qrv/W.eLG/IGOh7T0aOwRHfY28wZ6NYgg8qGG', 'docente',    NULL),
-    ('estudiante', '$2b$10$P1ORlUCwJrGZIayNPbc00etpS9xbkqtZYCuC9OH9wKQYXeqS5YccS', 'estudiante', 1)
-ON DUPLICATE KEY UPDATE rol = VALUES(rol);
-
--- El docente semilla queda asignado a todas las materias.
-INSERT IGNORE INTO docente_materia (docente_id, materia_id)
-SELECT u.id, m.id FROM usuarios u JOIN materias m
-WHERE u.username = 'docente';
-
 -- ------------------------------------------------------------
 -- 3. VERIFICACIÓN
 -- ------------------------------------------------------------
-SELECT id, username, rol FROM usuarios ORDER BY id;
+SELECT id, nombre FROM materias ORDER BY id;
