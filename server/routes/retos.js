@@ -37,9 +37,33 @@ const validarConfigClasificador = (config) => {
     return null;
 };
 
+// Valida la configuración de una 'mision' narrativa (generada con IA en el
+// panel del docente). Forma esperada: { titulo, introduccion, final,
+// desafios: [{ narrativa, pregunta, alternativas: {A,B,C}, correcta, pista, exito }] }
+const validarConfigMision = (config) => {
+    if (!config?.introduccion || !config?.final) {
+        return 'La misión necesita introducción y final narrativos';
+    }
+    if (!Array.isArray(config.desafios) || config.desafios.length < 3) {
+        return 'La misión necesita al menos 3 desafíos';
+    }
+    for (const [i, d] of config.desafios.entries()) {
+        const etiqueta = `El desafío ${i + 1}`;
+        if (!d?.narrativa || !d?.pregunta) return `${etiqueta} necesita narrativa y pregunta`;
+        if (!d?.alternativas?.A || !d?.alternativas?.B || !d?.alternativas?.C) {
+            return `${etiqueta} necesita las alternativas A, B y C`;
+        }
+        if (!['A', 'B', 'C'].includes(String(d?.correcta || '').trim().toUpperCase())) {
+            return `${etiqueta} necesita una respuesta correcta (A, B o C)`;
+        }
+    }
+    return null;
+};
+
 // Validadores opcionales de configuracion_json por tipo de reto.
 const VALIDADORES_CONFIG = {
-    clasificador: validarConfigClasificador
+    clasificador: validarConfigClasificador,
+    mision: validarConfigMision
 };
 
 // mysql2 ya parsea las columnas JSON, pero si el driver devolviera un string

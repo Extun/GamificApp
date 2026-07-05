@@ -23,6 +23,8 @@ import {
 import { FileChip, FilePreviewModal, descargarArchivo } from '../../components/archivos/ArchivoChip';
 import { QuizInteractivo } from '../../components/quiz/QuizInteractivo';
 import { JuegoDragAndDrop } from '../../components/clasificador/JuegoDragAndDrop';
+import { MisionNarrativa } from '../../components/mision/MisionNarrativa';
+import AutoStoriesRoundedIcon from '@mui/icons-material/AutoStoriesRounded';
 import { obtenerRetosPublicados } from '../../services/retosService';
 import ExtensionRoundedIcon from '@mui/icons-material/ExtensionRounded';
 import gamificationService, { CATALOGO_LOGROS } from '../../services/gamificationService';
@@ -72,6 +74,8 @@ export function DashboardEstudiante() {
     const [quizzes, setQuizzes] = useState([]);
     const [juegos, setJuegos] = useState([]);
     const [juegoActivo, setJuegoActivo] = useState(null);
+    const [misionesRetos, setMisionesRetos] = useState([]);
+    const [misionActiva, setMisionActiva] = useState(null);
     // Material de estudio de la materia abierta, consultado a la API (la BD
     // central): es el mismo que ve el docente y cualquier otro dispositivo.
     const [archivos, setArchivos] = useState([]);
@@ -115,6 +119,8 @@ export function DashboardEstudiante() {
             .then((retos) => { if (vigente) setQuizzes(retos.filter((r) => r.configuracion?.preguntas?.length)); });
         obtenerRetosPublicados({ materiaId: materia.id, tipo: 'clasificador' })
             .then((retos) => { if (vigente) setJuegos(retos); });
+        obtenerRetosPublicados({ materiaId: materia.id, tipo: 'mision' })
+            .then((retos) => { if (vigente) setMisionesRetos(retos.filter((r) => r.configuracion?.desafios?.length)); });
         obtenerMaterial(materia.id)
             .then((lista) => { if (vigente) setArchivos(lista); });
         return () => { vigente = false; };
@@ -134,8 +140,10 @@ export function DashboardEstudiante() {
         setSubVista('material');
         setQuizActivo(null);
         setJuegoActivo(null);
+        setMisionActiva(null);
         setQuizzes([]);
         setJuegos([]);
+        setMisionesRetos([]);
         setArchivos([]);
     };
 
@@ -144,6 +152,7 @@ export function DashboardEstudiante() {
         setArchivoPreview(null);
         setQuizActivo(null);
         setJuegoActivo(null);
+        setMisionActiva(null);
         setSubVista('material');
     };
 
@@ -339,9 +348,15 @@ export function DashboardEstudiante() {
                                 </button>
                                 <button
                                     className={`opcion ${subVista === 'juegos' ? 'opcion-activa' : ''}`}
-                                    onClick={() => { setSubVista('juegos'); setQuizActivo(null); }}
+                                    onClick={() => { setSubVista('juegos'); setQuizActivo(null); setMisionActiva(null); }}
                                 >
                                     Juegos
+                                </button>
+                                <button
+                                    className={`opcion ${subVista === 'misiones' ? 'opcion-activa' : ''}`}
+                                    onClick={() => { setSubVista('misiones'); setQuizActivo(null); setJuegoActivo(null); }}
+                                >
+                                    Misiones
                                 </button>
                             </div>
 
@@ -436,6 +451,51 @@ export function DashboardEstudiante() {
                                     ) : (
                                         <p className="vacio-msg">Aún no hay juegos publicados en esta materia. ¡Vuelve pronto!</p>
                                     )}
+                                </section>
+                            )}
+
+                            {subVista === 'misiones' && !misionActiva && (
+                                <section className="card materia-cards">
+                                    <div className="card-head">
+                                        <h3>Misiones narrativas</h3>
+                                        <span className="card-tag">{misionesRetos.length} aventuras</span>
+                                    </div>
+                                    {misionesRetos.length > 0 ? (
+                                        <ul className="quiz-disponible-lista">
+                                            {misionesRetos.map((m) => (
+                                                <li key={m.id}>
+                                                    <button className="quiz-disponible-item" onClick={() => setMisionActiva(m)}>
+                                                        <span className="quiz-disponible-icon"><AutoStoriesRoundedIcon /></span>
+                                                        <span className="quiz-disponible-meta">
+                                                            <span className="quiz-disponible-tema">{m.titulo}</span>
+                                                            <span className="quiz-disponible-sub">
+                                                                Aventura · {m.configuracion.desafios.length} desafíos · {m.xp_recompensa} XP
+                                                            </span>
+                                                        </span>
+                                                        <span className="quiz-disponible-cta">
+                                                            Comenzar <ArrowForwardRoundedIcon sx={{ fontSize: "1rem" }} />
+                                                        </span>
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="vacio-msg">Aún no hay misiones publicadas en esta materia. ¡Vuelve pronto!</p>
+                                    )}
+                                </section>
+                            )}
+
+                            {subVista === 'misiones' && misionActiva && (
+                                <section className="card materia-subvista">
+                                    <div className="card-head">
+                                        <h3>{misionActiva.titulo}</h3>
+                                        <button className="back-btn back-btn-inline" onClick={() => setMisionActiva(null)}>← Otras misiones</button>
+                                    </div>
+                                    <MisionNarrativa
+                                        reto={misionActiva}
+                                        estudianteId={estudianteId}
+                                        onSalir={() => setMisionActiva(null)}
+                                    />
                                 </section>
                             )}
 

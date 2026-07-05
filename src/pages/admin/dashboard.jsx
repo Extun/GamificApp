@@ -38,6 +38,7 @@ const leerComoDataUrl = (file) => new Promise((resolve, reject) => {
 
 import { AsistenteIA } from './asistenteIA';
 import { GeneradorQuiz } from './GeneradorQuiz';
+import { GeneradorMision } from './GeneradorMision';
 import { EditorClasificador } from '../../components/clasificador/EditorClasificador';
 import {
   List,
@@ -560,6 +561,12 @@ export function Dashboard() {
                                 Juego Clasificador
                             </button>
                             <button
+                                className={`opcion ${subVistaMateria === 'mision' ? 'opcion-activa' : ''}`}
+                                onClick={() => setSubVistaMateria('mision')}
+                            >
+                                Misión Narrativa
+                            </button>
+                            <button
                                 className={`opcion ${subVistaMateria === 'calificaciones' ? 'opcion-activa' : ''}`}
                                 onClick={() => setSubVistaMateria('calificaciones')}
                             >
@@ -569,6 +576,10 @@ export function Dashboard() {
 
                         {subVistaMateria === 'quiz' && (
                             <GeneradorQuiz materia={materiaSeleccionada} />
+                        )}
+
+                        {subVistaMateria === 'mision' && (
+                            <GeneradorMision materia={materiaSeleccionada} />
                         )}
 
                         {subVistaMateria === 'clasificador' && (
