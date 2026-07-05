@@ -157,9 +157,9 @@ export function DashboardEstudiante() {
     const nombreEstudiante = authService.getUsuario()?.nombre_completo || 'Estudiante';
 
     const handleCambiarPin = async () => {
-        const pinActual = window.prompt('Escribe tu PIN actual (6 números):');
+        const pinActual = window.prompt('Escribe tu PIN actual (6 letras o números):');
         if (!pinActual) return;
-        const pinNuevo = window.prompt('Escribe tu PIN nuevo (6 números):');
+        const pinNuevo = window.prompt('Escribe tu PIN nuevo (6 letras o números):');
         if (!pinNuevo) return;
         try {
             const data = await authService.cambiarPin(pinActual.trim(), pinNuevo.trim());

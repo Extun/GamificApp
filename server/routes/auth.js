@@ -33,7 +33,8 @@ const pinDesdeFecha = (fechaISO) => {
     return `${dia}${mes}${anio.slice(2)}`;
 };
 
-const PIN_VALIDO = /^\d{6}$/;
+// Acepta letras y números: el admin puede asignar PINs alfanuméricos.
+const PIN_VALIDO = /^[a-zA-Z0-9]{6}$/;
 
 // Alfabeto sin caracteres confundibles (sin 0/O, 1/I/L) para códigos que
 // los niños copian a mano desde la pizarra o un carné.
@@ -260,7 +261,7 @@ router.put('/cambiar-pin', autenticar, async (req, res, next) => {
             return res.status(403).json({ error: 'Solo los estudiantes usan PIN' });
         }
         if (!PIN_VALIDO.test(String(pin_nuevo || ''))) {
-            return res.status(400).json({ error: 'El nuevo PIN debe tener exactamente 6 dígitos' });
+            return res.status(400).json({ error: 'El nuevo PIN debe tener exactamente 6 letras o números' });
         }
 
         const [[usuario]] = await pool.query('SELECT * FROM usuarios WHERE id = ?', [req.user.id]);

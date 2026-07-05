@@ -9,7 +9,7 @@ import authService from '../../services/authService';
 
 // El rol NUNCA se elige aquí: lo determina el servidor según la cuenta y
 // viaja firmado dentro del JWT. Las pestañas solo cambian el formulario:
-//   · Estudiante → nombre completo + PIN de 6 dígitos
+//   · Estudiante → nombre completo + PIN de 6 caracteres (letras o números)
 //   · Docente / Admin → usuario + contraseña
 export function Login(){
     const [modo, setModo] = useState("estudiante");     // estudiante | docente | emergencia
@@ -123,12 +123,11 @@ export function Login(){
                                 />
                             </label>
                             <label className="login-field">
-                                <span>Tu PIN (6 números)</span>
+                                <span>Tu PIN (6 letras o números)</span>
                                 <input
                                     type="password"
-                                    inputMode="numeric"
                                     value={pin}
-                                    onChange={(e)=>setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                    onChange={(e)=>setPin(e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6))}
                                     placeholder="••••••"
                                 />
                             </label>
