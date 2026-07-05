@@ -72,7 +72,10 @@ app.use(cors({ origin: origenesPermitidos }));
 app.use(express.json({ limit: '25mb' }));
 
 // ---- Rutas públicas (sin token) ----
-app.get('/api/health', (_req, res) => res.json({ ok: true }));
+// Liviano a propósito: lo consulta un monitor externo cada 14 min para
+// evitar el cold start del plan gratuito de Render. Sin tocar la BD.
+app.get('/api/health', (_req, res) =>
+    res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() }));
 app.use('/api/auth', limitarAuth, authRouter);
 
 // ---- A partir de aquí, TODA la API exige un JWT válido ----
