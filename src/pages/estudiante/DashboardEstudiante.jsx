@@ -5,7 +5,6 @@ import './dashboardEstudiante.css';
 import HomeFilledIcon from '@mui/icons-material/HomeFilled';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
-import MilitaryTechRoundedIcon from '@mui/icons-material/MilitaryTechRounded';
 import LocalFireDepartmentRoundedIcon from '@mui/icons-material/LocalFireDepartmentRounded';
 import StarRoundedIcon from '@mui/icons-material/StarRounded';
 import QuizRoundedIcon from '@mui/icons-material/QuizRounded';
@@ -14,8 +13,6 @@ import WorkspacePremiumRoundedIcon from '@mui/icons-material/WorkspacePremiumRou
 import LockRoundedIcon from '@mui/icons-material/LockRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import RocketLaunchRoundedIcon from '@mui/icons-material/RocketLaunchRounded';
-import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded';
-import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import {
     List,
     ListItem,
@@ -34,16 +31,19 @@ import gamificationService, { CATALOGO_LOGROS } from '../../services/gamificatio
 import authService from '../../services/authService';
 import { obtenerMaterial } from '../../services/materialesService';
 import MATERIAS, { NOMBRES_MATERIAS } from '../../constants/materias';
-import {
-    DashboardHeader,
-    StatCard,
-    SectionCard,
-    EmptyState,
-    QuickActionCard,
-    formatearFecha
-} from '../../components/dashboard/DashboardWidgets';
+import { EmptyState } from '../../components/dashboard/DashboardWidgets';
 
 const materias = NOMBRES_MATERIAS;
+
+// Identidad visual de cada "mundo" (materia) en el Home del estudiante.
+// `tono` elige la paleta de la tarjeta en dashboardEstudiante.css.
+const MATERIA_UI = {
+    'Matemáticas': { emoji: '🔢', tono: 1 },
+    'Lenguaje': { emoji: '📖', tono: 2 },
+    'Ciencias Naturales': { emoji: '🌱', tono: 3 },
+    'Ciencias Sociales': { emoji: '🌎', tono: 4 },
+    'Educación Física': { emoji: '⚽', tono: 5 }
+};
 
 // Presentación (icono + color) por cada logro del catálogo del servicio.
 const LOGRO_UI = {
@@ -84,9 +84,6 @@ export function DashboardEstudiante() {
     // Material de estudio de la materia abierta, consultado a la API (la BD
     // central): es el mismo que ve el docente y cualquier otro dispositivo.
     const [archivos, setArchivos] = useState([]);
-    // Ranking real del aula (GET /api/ranking). Se pide amplio (50) para
-    // poder mostrar la posición propia aunque no esté en el Top 3.
-    const [ranking, setRanking] = useState([]);
     // Detalle del avance por reto (GET /api/progreso/:id): alimenta
     // "Continuar aprendiendo" y "Actividad reciente" con datos reales.
     const [progresoDetalle, setProgresoDetalle] = useState([]);
@@ -104,14 +101,11 @@ export function DashboardEstudiante() {
     // XP/los logros más recientes al cambiar de página o al salir de un quiz.
     const gami = gamificationService.getResumen();
 
-    // Al entrar: trae de la BD el XP oficial del estudiante, el ranking del
-    // aula, su avance por reto y los retos publicados; refresca al llegar.
+    // Al entrar: trae de la BD el XP oficial del estudiante, su avance por
+    // reto y los retos publicados; refresca al llegar.
     useEffect(() => {
         let vigente = true;
         const tareas = [
-            gamificationService.obtenerRanking(50).then((filas) => {
-                if (vigente) setRanking(filas);
-            }),
             obtenerRetosPublicados().then((retos) => {
                 if (vigente) setRetosDisponibles(retos);
             })
@@ -144,21 +138,6 @@ export function DashboardEstudiante() {
             .then((lista) => { if (vigente) setArchivos(lista); });
         return () => { vigente = false; };
     }, [materiaSeleccionada]);
-
-    // Ranking real del aula; el propio estudiante se resalta por su id.
-    const rankingDinamico = useMemo(() => (
-        ranking.map((r) => ({
-            esYo: r.id === estudianteId,
-            nombre: r.id === estudianteId ? 'Tú' : r.nombre,
-            puntos: r.xp_total
-        }))
-    ), [ranking, estudianteId]);
-
-    // Posición real del estudiante dentro del ranking consultado (o null).
-    const posicionPropia = useMemo(
-        () => ranking.find((r) => r.id === estudianteId)?.posicion ?? null,
-        [ranking, estudianteId]
-    );
 
     // Avance por reto ordenado del más reciente al más antiguo.
     const actividadReciente = useMemo(
@@ -276,107 +255,83 @@ export function DashboardEstudiante() {
 
                 <main className="contenido">
 
-                    {/* INICIO — orden RFC-004: bienvenida → continuar →
-                        progreso → comunidad → actividad reciente. */}
+                    {/* INICIO — responde una sola pregunta: "¿qué hago ahora?".
+                        Saludo + nivel visual → acción principal → mundos → logros. */}
                     {pagina === "" && (
-                        <div className="dash-secciones">
-                            <DashboardHeader
-                                titulo={`¡Hola, ${nombreEstudiante.split(' ')[0]}! 👋`}
-                                subtitulo="Sigue aprendiendo y suma puntos para subir en el ranking."
-                                chips={[`Nivel ${gami.nivel}`, `${gami.xp} XP`]}
-                            />
-
-                            <SectionCard titulo="Continuar aprendiendo" Icon={RocketLaunchRoundedIcon}>
-                                {ultimaActividad ? (
-                                    <QuickActionCard
-                                        Icon={ArrowForwardRoundedIcon}
-                                        titulo={`Continúa en ${ultimaActividad.materia}`}
-                                        descripcion={`Tu última actividad fue "${ultimaActividad.reto}" (${ultimaActividad.porcentaje}% completado).`}
-                                        cta={`Ir a ${ultimaActividad.materia}`}
-                                        onClick={() => irAMateria(ultimaActividad.materia)}
-                                    />
-                                ) : materiaPrimerReto ? (
-                                    <QuickActionCard
-                                        Icon={ArrowForwardRoundedIcon}
-                                        titulo="Tu primera actividad te espera"
-                                        descripcion={`"${primerRetoDisponible.titulo}" está disponible en ${materiaPrimerReto}.`}
-                                        cta={`Ir a ${materiaPrimerReto}`}
-                                        onClick={() => irAMateria(materiaPrimerReto)}
-                                    />
-                                ) : (
-                                    <EmptyState
-                                        Icon={MenuBookIcon}
-                                        titulo="Aún no hay actividades publicadas"
-                                        mensaje="Tu docente todavía no ha publicado retos. ¡Vuelve pronto!"
-                                    />
-                                )}
-                            </SectionCard>
-
-                            <SectionCard
-                                titulo="Mi progreso"
-                                Icon={StarRoundedIcon}
-                                accion={{ label: 'Ver mis logros', onClick: () => setPagina('logros') }}
-                            >
-                                <div className="stats-row">
-                                    <StatCard Icon={StarRoundedIcon} valor={gami.xp} etiqueta="XP acumulado" tono="primary" />
-                                    <StatCard Icon={LocalFireDepartmentRoundedIcon} valor={gami.nivel} etiqueta="Nivel actual" tono="fire" />
-                                    <StatCard Icon={EmojiEventsRoundedIcon} valor={gami.totalLogros} etiqueta="Logros obtenidos" tono="accent" />
+                        <div className="home-nino">
+                            <header className="home-saludo">
+                                <span className="home-avatar" aria-hidden="true">
+                                    {nombreEstudiante.charAt(0).toUpperCase()}
+                                </span>
+                                <div className="home-saludo-meta">
+                                    <h1>¡Hola, {nombreEstudiante.split(' ')[0]}! 👋</h1>
+                                    <div className="home-nivel">
+                                        <span className="home-nivel-badge">Nivel {gami.nivel}</span>
+                                        <div className="progress-track home-nivel-track">
+                                            <div className="progress-fill" style={{ width: `${gami.porcentaje}%` }} />
+                                        </div>
+                                        <span className="home-nivel-xp">⭐ {gami.xp} XP</span>
+                                    </div>
                                 </div>
-                            </SectionCard>
+                            </header>
 
-                            <SectionCard
-                                titulo="Mi comunidad"
-                                Icon={MilitaryTechRoundedIcon}
-                                tag={posicionPropia ? `Tu posición: #${posicionPropia}` : undefined}
-                            >
-                                {rankingDinamico.length ? (
-                                    <ol className="rank-list">
-                                        {rankingDinamico.slice(0, 3).map((r, i) => (
-                                            <li key={i} className={`rank-item ${r.esYo ? "rank-item-yo" : ""}`}>
-                                                <span className={`rank-pos rank-pos-${i + 1}`}>{i + 1}</span>
-                                                <span className="rank-name">{r.nombre}</span>
-                                                <span className="rank-points">{r.puntos} pts</span>
-                                            </li>
-                                        ))}
-                                    </ol>
-                                ) : (
-                                    <EmptyState
-                                        Icon={MilitaryTechRoundedIcon}
-                                        titulo="El ranking está vacío"
-                                        mensaje="Completa actividades para aparecer en el ranking de tu aula."
-                                    />
-                                )}
-                            </SectionCard>
+                            {ultimaActividad ? (
+                                <button className="home-hero" onClick={() => irAMateria(ultimaActividad.materia)}>
+                                    <span className="home-hero-emoji" aria-hidden="true">🚀</span>
+                                    <span className="home-hero-texto">
+                                        <strong>¡Seguir jugando!</strong>
+                                        <span>Te espera "{ultimaActividad.reto}" en {ultimaActividad.materia}</span>
+                                    </span>
+                                    <ArrowForwardRoundedIcon className="home-hero-flecha" />
+                                </button>
+                            ) : materiaPrimerReto ? (
+                                <button className="home-hero" onClick={() => irAMateria(materiaPrimerReto)}>
+                                    <span className="home-hero-emoji" aria-hidden="true">🎁</span>
+                                    <span className="home-hero-texto">
+                                        <strong>¡Tu primera aventura!</strong>
+                                        <span>"{primerRetoDisponible.titulo}" te espera en {materiaPrimerReto}</span>
+                                    </span>
+                                    <ArrowForwardRoundedIcon className="home-hero-flecha" />
+                                </button>
+                            ) : (
+                                <EmptyState
+                                    Icon={RocketLaunchRoundedIcon}
+                                    titulo="Todavía no hay juegos"
+                                    mensaje="Tu docente está preparando aventuras. ¡Vuelve pronto!"
+                                />
+                            )}
 
-                            <SectionCard
-                                titulo="Actividad reciente"
-                                Icon={TaskAltRoundedIcon}
-                                tag={actividadReciente.length ? `${actividadReciente.length} actividades` : undefined}
-                            >
-                                {actividadReciente.length ? (
-                                    <ul className="actividad-lista">
-                                        {actividadReciente.slice(0, 5).map((a) => (
-                                            <li key={a.reto_id} className="actividad-item">
-                                                <span className="actividad-icono">
-                                                    {a.completado ? <CheckCircleRoundedIcon /> : <TaskAltRoundedIcon />}
-                                                </span>
-                                                <div className="actividad-meta">
-                                                    <strong>{a.reto}</strong>
-                                                    <span>{a.materia} · {a.porcentaje}%</span>
-                                                </div>
-                                                <span className="actividad-fecha">{formatearFecha(a.actualizado_en)}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <EmptyState
-                                        Icon={TaskAltRoundedIcon}
-                                        titulo="Sin actividad todavía"
-                                        mensaje="Cuando completes quizzes, juegos o misiones aparecerán aquí."
-                                        accion={{ label: 'Explorar mis materias', onClick: () => setPagina('materias') }}
-                                    />
-                                )}
-                            </SectionCard>
+                            <section className="home-mundos">
+                                <h2>Mis mundos</h2>
+                                <div className="home-mundos-grid">
+                                    {materias.map((mat) => {
+                                        const ui = MATERIA_UI[mat] || { emoji: '📚', tono: 1 };
+                                        return (
+                                            <button
+                                                key={mat}
+                                                className={`home-mundo home-mundo-${ui.tono}`}
+                                                onClick={() => irAMateria(mat)}
+                                            >
+                                                <span className="home-mundo-emoji" aria-hidden="true">{ui.emoji}</span>
+                                                <span>{mat}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </section>
+
+                            <button className="home-logros" onClick={() => setPagina('logros')}>
+                                <span className="home-logros-emoji" aria-hidden="true">🏆</span>
+                                <span className="home-logros-texto">
+                                    <strong>Mis premios</strong>
+                                    <span>
+                                        {gami.totalLogros > 0
+                                            ? `¡Ya ganaste ${gami.totalLogros} ${gami.totalLogros === 1 ? 'insignia' : 'insignias'}!`
+                                            : 'Juega para ganar tu primera insignia'}
+                                    </span>
+                                </span>
+                                <ArrowForwardRoundedIcon className="home-logros-flecha" />
+                            </button>
                         </div>
                     )}
 
