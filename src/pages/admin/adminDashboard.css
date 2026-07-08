@@ -40,6 +40,17 @@
     color: #3730a3;
 }
 
+/* Contenedor con scroll horizontal para tablas en pantallas pequeñas
+   (el Libro de Calificaciones se consulta desde tablets compartidas). */
+.tabla-scroll {
+    overflow-x: auto;
+}
+
+.libro-estado {
+    color: #64748b;
+    padding: 8px 0;
+}
+
 .admin-tabla {
     width: 100%;
     border-collapse: collapse;

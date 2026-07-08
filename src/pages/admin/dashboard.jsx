@@ -49,6 +49,7 @@ import { AsistenteIA } from './asistenteIA';
 import { GeneradorQuiz } from './GeneradorQuiz';
 import { GeneradorMision } from './GeneradorMision';
 import { EditorClasificador } from '../../components/clasificador/EditorClasificador';
+import { LibroCalificaciones } from '../../components/dashboard/LibroCalificaciones';
 import {
   List,
   ListItem,
@@ -174,7 +175,9 @@ export function Dashboard() {
     const navigate = useNavigate();
     const [pagina, setPagina] = useState("");
     const [materiaSeleccionada, setMateriaSeleccionada] = useState(null);
-    const [subVistaMateria, setSubVistaMateria] = useState('');
+    // Al entrar a una materia siempre hay una herramienta de creación visible
+    // (quiz por defecto): crear actividades es la acción principal del docente.
+    const [subVistaMateria, setSubVistaMateria] = useState('quiz');
     // Material de estudio: la fuente de verdad es MySQL (vía API). Este mapa
     // { nombreMateria: Archivo[] } es solo el reflejo de la última consulta.
     const [archivosPorMateria, setArchivosPorMateria] = useState({});
@@ -284,7 +287,7 @@ export function Dashboard() {
 
     // Salto directo desde el Home a una materia (y opcionalmente a una
     // sub-vista concreta, p. ej. el generador de quiz).
-    const irAMateria = (nombre, subvista = '') => {
+    const irAMateria = (nombre, subvista = 'quiz') => {
         if (!nombre) return;
         setPagina('materias');
         setMateriaSeleccionada(nombre);
@@ -591,7 +594,7 @@ export function Dashboard() {
                                 <div
                                     key={index}
                                     className="materia-card"
-                                    onClick={() => setMateriaSeleccionada(mat)}
+                                    onClick={() => { setMateriaSeleccionada(mat); setSubVistaMateria('quiz'); }}
                                 >
                                     <MenuBookIcon className="materia-card-icon" />
                                     <span>{mat}</span>
@@ -606,7 +609,7 @@ export function Dashboard() {
                     <>
                         <button
                             className="back-btn"
-                            onClick={() => { setMateriaSeleccionada(null); setArchivoPreview(null); setSubVistaMateria('recursos'); }}
+                            onClick={() => { setMateriaSeleccionada(null); setArchivoPreview(null); setSubVistaMateria('quiz'); }}
                         >
                             ← Volver
                         </button>
@@ -632,28 +635,10 @@ export function Dashboard() {
                             </div>
                         )}
 
-                        {/* Área de archivos siempre visible, dividida por audiencia */}
-                        <div className="materia-archivos-grid">
-                            <MaterialContenedor
-                                titulo="Material para Estudiantes"
-                                subtitulo="Visible para toda la clase"
-                                Icon={GroupsRoundedIcon}
-                                vacioMsg="Aún no has publicado material para los estudiantes."
-                                archivos={(archivosPorMateria[materiaSeleccionada] || []).filter((a) => !a.isPrivate)}
-                                isPrivate={false}
-                                onUpload={(file, opts) => handleUploadMateria(materiaSeleccionada, file, opts)}
-                                onPreview={setArchivoPreview}
-                            />
-                            <MaterialContenedor
-                                titulo="Material Exclusivo del Docente"
-                                subtitulo="Privado · solo tú puedes verlo"
-                                Icon={LockRoundedIcon}
-                                vacioMsg="No tienes material privado en esta materia."
-                                archivos={(archivosPorMateria[materiaSeleccionada] || []).filter((a) => a.isPrivate)}
-                                isPrivate={true}
-                                onUpload={(file, opts) => handleUploadMateria(materiaSeleccionada, file, opts)}
-                                onPreview={setArchivoPreview}
-                            />
+                        {/* Crear actividad: la acción principal del docente va primero */}
+                        <div className="materia-crear-head">
+                            <h2>Crear una actividad</h2>
+                            <p>Elige el tipo de actividad, revísala y publícala para tus estudiantes.</p>
                         </div>
 
                         <div className="materia-panel">
@@ -698,8 +683,38 @@ export function Dashboard() {
                         {subVistaMateria === 'calificaciones' && (
                             <section className="card materia-subvista">
                                 <h3>Libro de Calificaciones de {materiaSeleccionada}</h3>
+                                <LibroCalificaciones materia={materiaSeleccionada} />
                             </section>
                         )}
+
+                        {/* Material de estudio, dividido por audiencia */}
+                        <div className="materia-crear-head">
+                            <h2>Material de estudio</h2>
+                            <p>Sube documentos de apoyo: los públicos los ven tus estudiantes; los privados, solo tú.</p>
+                        </div>
+
+                        <div className="materia-archivos-grid">
+                            <MaterialContenedor
+                                titulo="Material para Estudiantes"
+                                subtitulo="Visible para toda la clase"
+                                Icon={GroupsRoundedIcon}
+                                vacioMsg="Aún no has publicado material para los estudiantes."
+                                archivos={(archivosPorMateria[materiaSeleccionada] || []).filter((a) => !a.isPrivate)}
+                                isPrivate={false}
+                                onUpload={(file, opts) => handleUploadMateria(materiaSeleccionada, file, opts)}
+                                onPreview={setArchivoPreview}
+                            />
+                            <MaterialContenedor
+                                titulo="Material Exclusivo del Docente"
+                                subtitulo="Privado · solo tú puedes verlo"
+                                Icon={LockRoundedIcon}
+                                vacioMsg="No tienes material privado en esta materia."
+                                archivos={(archivosPorMateria[materiaSeleccionada] || []).filter((a) => a.isPrivate)}
+                                isPrivate={true}
+                                onUpload={(file, opts) => handleUploadMateria(materiaSeleccionada, file, opts)}
+                                onPreview={setArchivoPreview}
+                            />
+                        </div>
                     </>
                 )}
 
