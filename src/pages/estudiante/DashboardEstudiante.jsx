@@ -212,7 +212,7 @@ export function DashboardEstudiante() {
             <div className="sidebar-container">
                 <aside className="sidebar">
                     <div className="aside-content-options">
-                        <h2 style={{ pointerEvents: "none" }}>Unidad Educativa Benemérita Sociedad Filantrópica del Guayas</h2>
+                        <h2 style={{ pointerEvents: "none" }}>Unidad Educativa Fiscal Clemencia Coronel de Pincay</h2>
                         <List>
                             <ListItem disablePadding>
                                 <ListItemButton className="nav-item" onClick={() => { setPagina(""); setMateriaSeleccionada(null); }}>
@@ -223,13 +223,13 @@ export function DashboardEstudiante() {
                             <ListItem disablePadding>
                                 <ListItemButton className="nav-item" onClick={() => { setPagina("materias"); setMateriaSeleccionada(null); }}>
                                     <ListItemIcon className="nav-icon"><MenuBookIcon sx={{ fontSize: "1.3rem" }} /></ListItemIcon>
-                                    <ListItemText primary="Mis Materias" />
+                                    <ListItemText primary="Mis Mundos" />
                                 </ListItemButton>
                             </ListItem>
                             <ListItem disablePadding>
                                 <ListItemButton className="nav-item" onClick={() => { setPagina("logros"); setMateriaSeleccionada(null); }}>
                                     <ListItemIcon className="nav-icon"><EmojiEventsRoundedIcon sx={{ fontSize: "1.3rem" }} /></ListItemIcon>
-                                    <ListItemText primary="Mis Logros" />
+                                    <ListItemText primary="Mis Premios" />
                                 </ListItemButton>
                             </ListItem>
                         </List>
@@ -337,50 +337,71 @@ export function DashboardEstudiante() {
 
                     {/* MATERIAS GRID */}
                     {pagina === "materias" && !materiaSeleccionada && (
-                        <>
-                            <h1 style={{ pointerEvents: "none" }}>Mis Materias</h1>
-                            <p className="contenido-sub" style={{ pointerEvents: "none" }}>Elige una materia para repasar el material y poner a prueba lo aprendido.</p>
-                            <div className="materias-grid">
-                                {materias.map((mat, index) => (
-                                    <div key={index} className="materia-card" onClick={() => abrirMateria(mat)}>
-                                        <MenuBookIcon className="materia-card-icon" />
-                                        <span>{mat}</span>
-                                    </div>
-                                ))}
+                        <div className="home-nino">
+                            <div>
+                                <h1 style={{ pointerEvents: "none" }}>Mis mundos</h1>
+                                <p className="contenido-sub" style={{ pointerEvents: "none" }}>Elige un mundo para repasar y jugar lo que preparó tu docente.</p>
                             </div>
-                        </>
+                            <div className="home-mundos-grid">
+                                {materias.map((mat) => {
+                                    const ui = MATERIA_UI[mat] || { emoji: '📚', tono: 1 };
+                                    return (
+                                        <button
+                                            key={mat}
+                                            className={`home-mundo home-mundo-${ui.tono}`}
+                                            onClick={() => abrirMateria(mat)}
+                                        >
+                                            <span className="home-mundo-emoji" aria-hidden="true">{ui.emoji}</span>
+                                            <span>{mat}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     )}
 
                     {/* MATERIA DETALLE */}
                     {pagina === "materias" && materiaSeleccionada && (
                         <>
-                            <button className="back-btn" onClick={volver}>← Volver</button>
-                            <h1 style={{ pointerEvents: "none" }}>{materiaSeleccionada}</h1>
+                            <button className="back-btn" onClick={volver}>← Volver a mis mundos</button>
+
+                            {(() => {
+                                const ui = MATERIA_UI[materiaSeleccionada] || { emoji: '📚', tono: 1 };
+                                return (
+                                    <header className={`materia-hero materia-hero-${ui.tono}`}>
+                                        <span className="materia-hero-emoji" aria-hidden="true">{ui.emoji}</span>
+                                        <div className="materia-hero-meta">
+                                            <h1>{materiaSeleccionada}</h1>
+                                            <p>¿Qué quieres hacer hoy en este mundo?</p>
+                                        </div>
+                                    </header>
+                                );
+                            })()}
 
                             <div className="materia-panel materia-panel-est">
                                 <button
                                     className={`opcion ${subVista === 'material' ? 'opcion-activa' : ''}`}
                                     onClick={() => { setSubVista('material'); setQuizActivo(null); }}
                                 >
-                                    Material de estudio
+                                    📚 Material de estudio
                                 </button>
                                 <button
                                     className={`opcion ${subVista === 'quizzes' ? 'opcion-activa' : ''}`}
                                     onClick={() => { setSubVista('quizzes'); setJuegoActivo(null); }}
                                 >
-                                    Quizzes disponibles
+                                    ✨ Quizzes
                                 </button>
                                 <button
                                     className={`opcion ${subVista === 'juegos' ? 'opcion-activa' : ''}`}
                                     onClick={() => { setSubVista('juegos'); setQuizActivo(null); setMisionActiva(null); }}
                                 >
-                                    Juegos
+                                    🧩 Juegos
                                 </button>
                                 <button
                                     className={`opcion ${subVista === 'misiones' ? 'opcion-activa' : ''}`}
                                     onClick={() => { setSubVista('misiones'); setQuizActivo(null); setJuegoActivo(null); }}
                                 >
-                                    Misiones
+                                    🗺️ Misiones
                                 </button>
                             </div>
 
@@ -542,8 +563,8 @@ export function DashboardEstudiante() {
                     {/* LOGROS */}
                     {pagina === "logros" && (
                         <>
-                            <h1 style={{ pointerEvents: "none" }}>Mis Logros</h1>
-                            <p className="contenido-sub" style={{ pointerEvents: "none" }}>Desbloquea insignias completando misiones y quizzes.</p>
+                            <h1 style={{ pointerEvents: "none" }}>🏆 Mis premios</h1>
+                            <p className="contenido-sub" style={{ pointerEvents: "none" }}>Gana insignias jugando quizzes, juegos y misiones.</p>
                             <div className="logros-grid">
                                 {CATALOGO_LOGROS.map((logro) => (
                                     <LogroCard key={logro.id} logro={logro} obtenido={gami.logros.includes(logro.id)} />

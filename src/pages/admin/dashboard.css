@@ -448,27 +448,50 @@
 
 .widget-action-btn:hover { transform: translateY(-1px); opacity: 0.95; }
 
+/* Título de sección dentro del detalle de materia (Crear actividad / Material) */
+.materia-crear-head {
+    margin-top: 28px;
+    pointer-events: none;
+}
+
+.materia-crear-head h2 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: var(--color-text);
+}
+
+.materia-crear-head p {
+    margin: 4px 0 0;
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+}
+
 .materia-panel {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 18px;
-    margin-top: 24px;
+    margin-top: 16px;
+}
+
+@media (max-width: 560px) {
+    .materia-panel { grid-template-columns: 1fr; }
+    .opcion { padding: 18px; }
 }
 
 .opcion {
     width: 100%;
     background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    padding: 30px;
+    border: 2px solid var(--color-border);
+    padding: 16px 14px;
     border-radius: var(--radius-md);
     text-align: center;
     font-family: inherit;
-    font-size: inherit;
+    font-size: 0.98rem;
     color: var(--color-text);
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
     box-shadow: var(--shadow-sm);
-    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
 .opcion:hover {
@@ -480,7 +503,7 @@
 .opcion-activa {
     background: var(--color-primary-soft);
     border-color: var(--color-primary);
-    box-shadow: inset 0 0 0 1px var(--color-primary);
+    color: var(--color-primary-dark);
 }
 
 .materia-subvista {
@@ -1373,4 +1396,321 @@
     padding: 8px 14px;
     border-radius: 10px;
     cursor: pointer;
+}
+
+/* ===== Home del docente (Polish Sprint) =====
+   Misma identidad visual que el Home del estudiante: saludo con avatar,
+   una gran acción principal (crear actividad), materias como tarjetas
+   pastel y accesos amigables. Solo tokens del design system. */
+
+.home-doc {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+/* Saludo con avatar (espejo del home-saludo del estudiante,
+   con ámbito .home-doc para no interferir con esa vista). */
+.home-doc .home-saludo {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.home-doc .home-avatar {
+    flex-shrink: 0;
+    width: 64px;
+    height: 64px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
+    color: #fff;
+    font-size: 1.7rem;
+    font-weight: 700;
+    box-shadow: var(--shadow-md);
+}
+
+.home-doc .home-saludo-meta { flex: 1; min-width: 0; }
+.home-doc .home-saludo-meta h1 { margin: 0 0 6px; font-size: 1.6rem; }
+
+.home-doc-sub {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 0.98rem;
+}
+
+/* Acción principal: crear una actividad */
+.home-hero-doc {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    width: 100%;
+    padding: 22px 24px;
+    border: none;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+    color: #fff;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: var(--shadow-lg);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.home-hero-doc:hover { transform: translateY(-3px) scale(1.01); }
+.home-hero-doc:active { transform: scale(0.99); }
+
+.home-hero-doc-emoji { font-size: 2.6rem; }
+
+.home-hero-doc-texto {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.home-hero-doc-texto strong { font-size: 1.45rem; }
+.home-hero-doc-texto span { font-size: 0.95rem; opacity: 0.9; }
+
+.home-hero-doc-flecha {
+    flex-shrink: 0;
+    font-size: 2rem !important;
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 50%;
+    padding: 8px;
+}
+
+/* Materias como tarjetas pastel (mismos tonos que los "mundos") */
+.home-doc-materias h2,
+.home-doc-reciente h2 {
+    margin: 0 0 12px;
+    font-size: 1.15rem;
+}
+
+.home-doc-materias-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 14px;
+}
+
+.home-doc-materia {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 18px 14px;
+    border: 2px solid transparent;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    color: var(--color-text);
+    cursor: pointer;
+    text-align: center;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.home-doc-materia:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
+.home-doc-materia-emoji { font-size: 2.2rem; }
+.home-doc-materia-nombre { font-size: 0.95rem; font-weight: 700; }
+
+.home-doc-materia-detalle {
+    font-size: 0.76rem;
+    color: var(--color-text-muted);
+    line-height: 1.35;
+}
+
+.home-doc-materia-1 { background: #e0f2fe; border-color: #bae6fd; }
+.home-doc-materia-2 { background: #fce7f3; border-color: #fbcfe8; }
+.home-doc-materia-3 { background: #dcfce7; border-color: #bbf7d0; }
+.home-doc-materia-4 { background: #fef3c7; border-color: #fde68a; }
+.home-doc-materia-5 { background: #ede9fe; border-color: #ddd6fe; }
+
+/* Mi aula: tarjeta-acceso amigable (espejo de home-logros) */
+.home-doc-aula {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    padding: 16px 20px;
+    border: 2px solid var(--color-accent-soft);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.home-doc-aula:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.home-doc-aula-emoji { font-size: 2rem; }
+
+.home-doc-aula-texto {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.home-doc-aula-texto strong { font-size: 1.05rem; color: var(--color-text); }
+.home-doc-aula-texto span { font-size: 0.88rem; color: var(--color-text-muted); }
+
+.home-doc-aula-flecha { color: var(--color-accent-dark); }
+
+/* Lo último publicado: lista ligera dentro de una tarjeta suave */
+.home-doc-reciente .actividad-lista {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    padding: 10px 16px;
+}
+
+@media (max-width: 720px) {
+    .home-doc .home-avatar { width: 52px; height: 52px; font-size: 1.4rem; }
+    .home-doc .home-saludo-meta h1 { font-size: 1.3rem; }
+    .home-hero-doc { padding: 18px; gap: 12px; }
+    .home-hero-doc-texto strong { font-size: 1.15rem; }
+    .home-doc-materias-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+}
+
+/* ===== Vista de materia del docente (Polish Sprint) =====
+   Misma identidad que los Home: cabecera pastel de la materia,
+   tarjetas grandes para elegir qué actividad crear y accesos amigables. */
+
+.materia-doc {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.materia-doc .back-btn { align-self: flex-start; margin: 0; }
+
+/* Cabecera pastel con el emoji-identidad de la materia */
+.materia-hero {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 22px 24px;
+    border: 2px solid transparent;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.materia-hero-emoji {
+    font-size: 2.8rem;
+    line-height: 1;
+}
+
+.materia-hero-meta h1 { margin: 0 0 4px; font-size: 1.7rem; }
+.materia-hero-meta p { margin: 0; color: var(--color-text-muted); font-size: 0.95rem; }
+
+.materia-hero-1 { background: #e0f2fe; border-color: #bae6fd; }
+.materia-hero-2 { background: #fce7f3; border-color: #fbcfe8; }
+.materia-hero-3 { background: #dcfce7; border-color: #bbf7d0; }
+.materia-hero-4 { background: #fef3c7; border-color: #fde68a; }
+.materia-hero-5 { background: #ede9fe; border-color: #ddd6fe; }
+
+/* Selector de tipo de actividad: el protagonista */
+.materia-crear {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.materia-crear .materia-crear-head { margin: 0; }
+
+.crear-tipos {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+}
+
+.crear-tipo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 18px 16px;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    font-family: inherit;
+    color: var(--color-text);
+    text-align: center;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.crear-tipo:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--color-primary-light); }
+
+.crear-tipo-emoji { font-size: 2.1rem; }
+.crear-tipo strong { font-size: 1rem; }
+
+.crear-tipo-desc {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    line-height: 1.4;
+}
+
+.crear-tipo-activo {
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary);
+}
+
+.crear-tipo-activo strong { color: var(--color-primary-dark); }
+
+/* Acceso al Libro de Calificaciones (espejo de home-doc-aula) */
+.materia-libro-btn {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    padding: 16px 20px;
+    border: 2px solid var(--color-accent-soft);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.materia-libro-btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.materia-libro-emoji { font-size: 2rem; }
+
+.materia-libro-texto {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.materia-libro-texto strong { font-size: 1.05rem; color: var(--color-text); }
+.materia-libro-texto span { font-size: 0.88rem; color: var(--color-text-muted); }
+
+.materia-libro-flecha {
+    color: var(--color-accent-dark);
+    transition: transform 0.2s ease;
+}
+
+.materia-libro-flecha.is-abierto { transform: rotate(90deg); }
+
+@media (max-width: 900px) {
+    .crear-tipos { grid-template-columns: 1fr; }
+    .materia-hero { padding: 18px; gap: 14px; }
+    .materia-hero-emoji { font-size: 2.2rem; }
+    .materia-hero-meta h1 { font-size: 1.35rem; }
 }

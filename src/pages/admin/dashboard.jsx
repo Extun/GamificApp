@@ -24,16 +24,22 @@ import docenteService from '../../services/docenteService';
 import { obtenerRanking } from '../../services/gamificationService';
 import { obtenerRetosPublicados } from '../../services/retosService';
 import {
-    DashboardHeader,
-    StatCard,
-    SectionCard,
     EmptyState,
-    QuickActionCard,
     formatearFecha
 } from '../../components/dashboard/DashboardWidgets';
 
 // Etiquetas legibles de los tipos de reto publicables.
 const TIPO_RETO_LABEL = { quiz: 'Quiz', clasificador: 'Juego', mision: 'Misión' };
+
+// Identidad visual de cada materia en el Home del docente: el mismo
+// emoji y tono pastel que ven los estudiantes en sus "mundos".
+const MATERIA_UI = {
+    'Matemáticas': { emoji: '🔢', tono: 1 },
+    'Lenguaje': { emoji: '📖', tono: 2 },
+    'Ciencias Naturales': { emoji: '🌱', tono: 3 },
+    'Ciencias Sociales': { emoji: '🌎', tono: 4 },
+    'Educación Física': { emoji: '⚽', tono: 5 }
+};
 
 const materiaIdPorNombre = (nombre) => MATERIAS.find((m) => m.nombre === nombre)?.id;
 
@@ -45,7 +51,6 @@ const leerComoDataUrl = (file) => new Promise((resolve, reject) => {
     reader.readAsDataURL(file);
 });
 
-import { AsistenteIA } from './asistenteIA';
 import { GeneradorQuiz } from './GeneradorQuiz';
 import { GeneradorMision } from './GeneradorMision';
 import { EditorClasificador } from '../../components/clasificador/EditorClasificador';
@@ -387,14 +392,14 @@ export function Dashboard() {
             <div className ="sidebar-container">
                 <aside className="sidebar">
                 <div className="aside-content-options">
-                    <h2 style={{pointerEvents:"none"}}>Unidad Educativa Benemérita Sociedad Filantrópica del Guayas</h2>
+                    <h2 style={{pointerEvents:"none"}}>Unidad Educativa Fiscal Clemencia Coronel de Pincay</h2>
                     <List>
                         <ListItem disablePadding>
                             <ListItemButton className="nav-item" onClick={() => setPagina("")}>
                                 <ListItemIcon className="nav-icon">
                                 <HomeFilledIcon sx={{ fontSize: "1.3rem" }} />
                             </ListItemIcon>
-                            <ListItemText primary="Home" />
+                            <ListItemText primary="Inicio" />
                             </ListItemButton>
                         </ListItem>
                         <ListItem disablePadding>
@@ -411,14 +416,6 @@ export function Dashboard() {
                                 <GroupsRoundedIcon sx={{ fontSize: "1.3rem" }} />
                             </ListItemIcon>
                             <ListItemText primary="Mis Estudiantes" />
-                            </ListItemButton>
-                        </ListItem>
-                        <ListItem disablePadding>
-                            <ListItemButton className="nav-item" onClick={() => setPagina("asistente")}>
-                                <ListItemIcon className="nav-icon">
-                                <AutoAwesomeRoundedIcon sx={{ fontSize: "1.3rem" }} />
-                            </ListItemIcon>
-                            <ListItemText primary="Asistente IA" />
                             </ListItemButton>
                         </ListItem>
                     </List>
@@ -441,120 +438,94 @@ export function Dashboard() {
                 {/* HOME — orden RFC-004: bienvenida → continuar trabajando →
                     mi aula → contenido → actividad reciente. Solo datos reales. */}
                 {pagina === "" && (
-                    <div className="dash-secciones">
-                        <DashboardHeader
-                            titulo={`Hola, ${authService.getUsuario()?.username || 'docente'}`}
-                            subtitulo="Crea contenido para tus materias y acompaña el avance de tu aula."
-                            chips={[
-                                `${materias.length} ${materias.length === 1 ? 'materia asignada' : 'materias asignadas'}`,
-                                `${misEstudiantes.length} ${misEstudiantes.length === 1 ? 'estudiante' : 'estudiantes'}`
-                            ]}
-                        />
+                    <div className="home-doc">
+                        <header className="home-saludo">
+                            <span className="home-avatar" aria-hidden="true">
+                                {(authService.getUsuario()?.username || 'D').charAt(0).toUpperCase()}
+                            </span>
+                            <div className="home-saludo-meta">
+                                <h1>¡Hola, {authService.getUsuario()?.username || 'docente'}! 👋</h1>
+                                <p className="home-doc-sub">
+                                    {materias.length
+                                        ? `Tienes ${materias.length} ${materias.length === 1 ? 'materia' : 'materias'} y ${misEstudiantes.length} ${misEstudiantes.length === 1 ? 'estudiante' : 'estudiantes'} esperando nuevas aventuras.`
+                                        : 'Bienvenido a tu espacio para crear actividades.'}
+                                </p>
+                            </div>
+                        </header>
 
-                        <SectionCard titulo="Continuar trabajando" Icon={AutoAwesomeRoundedIcon}>
-                            {borradorReciente ? (
-                                <QuickActionCard
-                                    Icon={AutoAwesomeRoundedIcon}
-                                    titulo="Retoma tu borrador de quiz"
-                                    descripcion={`"${borradorReciente.tema}" en ${borradorReciente.materia} · ${borradorReciente.cantidad} preguntas sin publicar.`}
-                                    cta="Continuar editando"
-                                    onClick={() => irAMateria(borradorReciente.materia, 'quiz')}
-                                />
-                            ) : materiaSugerida ? (
-                                <QuickActionCard
-                                    Icon={MenuBookIcon}
-                                    titulo={`Crea contenido en ${materiaSugerida}`}
-                                    descripcion={`Tiene ${(retosPorMateria[materiaSugerida] || []).length} retos publicados. Genera un quiz, un juego o una misión.`}
-                                    cta={`Ir a ${materiaSugerida}`}
-                                    onClick={() => irAMateria(materiaSugerida)}
-                                />
-                            ) : (
-                                <EmptyState
-                                    Icon={MenuBookIcon}
-                                    titulo="Aún no tienes materias asignadas"
-                                    mensaje="Pide al administrador que te asigne materias para empezar a crear contenido."
-                                />
-                            )}
-                        </SectionCard>
+                        {borradorReciente ? (
+                            <button className="home-hero-doc" onClick={() => irAMateria(borradorReciente.materia, 'quiz')}>
+                                <span className="home-hero-doc-emoji" aria-hidden="true">✨</span>
+                                <span className="home-hero-doc-texto">
+                                    <strong>Termina tu quiz de "{borradorReciente.tema}"</strong>
+                                    <span>Lo dejaste a medias en {borradorReciente.materia} · {borradorReciente.cantidad} preguntas listas para revisar</span>
+                                </span>
+                                <ArrowForwardRoundedIcon className="home-hero-doc-flecha" />
+                            </button>
+                        ) : materiaSugerida ? (
+                            <button className="home-hero-doc" onClick={() => irAMateria(materiaSugerida)}>
+                                <span className="home-hero-doc-emoji" aria-hidden="true">✨</span>
+                                <span className="home-hero-doc-texto">
+                                    <strong>Crea una actividad hoy</strong>
+                                    <span>
+                                        {(retosPorMateria[materiaSugerida] || []).length
+                                            ? `${materiaSugerida} es la materia con menos actividades: dale una nueva.`
+                                            : `${materiaSugerida} todavía no tiene actividades: ¡estrénala con un quiz, un juego o una misión!`}
+                                    </span>
+                                </span>
+                                <ArrowForwardRoundedIcon className="home-hero-doc-flecha" />
+                            </button>
+                        ) : (
+                            <EmptyState
+                                Icon={MenuBookIcon}
+                                titulo="Aún no tienes materias asignadas"
+                                mensaje="Pide al administrador que te asigne materias para empezar a crear actividades."
+                            />
+                        )}
 
-                        <SectionCard
-                            titulo="Mi Aula"
-                            Icon={GroupsRoundedIcon}
-                            accion={{ label: 'Gestionar', onClick: () => setPagina('estudiantes') }}
-                        >
-                            {(misEstudiantes.length || invitaciones.length) ? (
-                                <div className="stats-row">
-                                    <StatCard
-                                        Icon={GroupsRoundedIcon}
-                                        valor={misEstudiantes.length}
-                                        etiqueta="Estudiantes registrados"
-                                        tono="primary"
-                                    />
-                                    <StatCard
-                                        Icon={VpnKeyRoundedIcon}
-                                        valor={invitaciones.filter((i) => i.estado === 'pendiente').length}
-                                        etiqueta="Invitaciones pendientes"
-                                        tono="accent"
-                                    />
-                                    <StatCard
-                                        Icon={TaskAltRoundedIcon}
-                                        valor={invitaciones.filter((i) => i.estado === 'usado').length}
-                                        etiqueta="Códigos usados"
-                                        tono="primary"
-                                    />
-                                </div>
-                            ) : (
-                                <EmptyState
-                                    Icon={VpnKeyRoundedIcon}
-                                    titulo="Tu aula está vacía"
-                                    mensaje="Genera códigos de invitación para que tus estudiantes se registren solos."
-                                    accion={{ label: 'Generar invitaciones', onClick: () => setPagina('estudiantes') }}
-                                />
-                            )}
-                        </SectionCard>
-
-                        <SectionCard
-                            titulo="Contenido"
-                            Icon={MenuBookIcon}
-                            tag={materias.length ? `${materias.length} materias` : undefined}
-                        >
-                            {materias.length ? (
-                                <ul className="contenido-materias">
+                        {materias.length > 0 && (
+                            <section className="home-doc-materias">
+                                <h2>Tus materias</h2>
+                                <div className="home-doc-materias-grid">
                                     {materias.map((mat) => {
+                                        const ui = MATERIA_UI[mat] || { emoji: '📚', tono: 1 };
                                         const retos = retosPorMateria[mat] || [];
                                         const cuenta = (tipo) => retos.filter((r) => r.tipo === tipo).length;
                                         return (
-                                            <li key={mat}>
-                                                <button
-                                                    type="button"
-                                                    className="contenido-materia-btn"
-                                                    onClick={() => irAMateria(mat)}
-                                                >
-                                                    <MenuBookIcon className="contenido-materia-icono" />
-                                                    <span className="contenido-materia-nombre">{mat}</span>
-                                                    <span className="contenido-materia-detalle">
-                                                        {cuenta('quiz')} quizzes · {cuenta('clasificador')} juegos · {cuenta('mision')} misiones
-                                                    </span>
-                                                    <ArrowForwardRoundedIcon sx={{ fontSize: '1rem' }} />
-                                                </button>
-                                            </li>
+                                            <button
+                                                key={mat}
+                                                className={`home-doc-materia home-doc-materia-${ui.tono}`}
+                                                onClick={() => irAMateria(mat)}
+                                            >
+                                                <span className="home-doc-materia-emoji" aria-hidden="true">{ui.emoji}</span>
+                                                <span className="home-doc-materia-nombre">{mat}</span>
+                                                <span className="home-doc-materia-detalle">
+                                                    {retos.length
+                                                        ? `${cuenta('quiz')} quizzes · ${cuenta('clasificador')} juegos · ${cuenta('mision')} misiones`
+                                                        : 'Sin actividades todavía'}
+                                                </span>
+                                            </button>
                                         );
                                     })}
-                                </ul>
-                            ) : (
-                                <EmptyState
-                                    Icon={MenuBookIcon}
-                                    titulo="Sin materias asignadas"
-                                    mensaje="Cuando el administrador te asigne materias, aparecerán aquí con su contenido."
-                                />
-                            )}
-                        </SectionCard>
+                                </div>
+                            </section>
+                        )}
 
-                        <SectionCard
-                            titulo="Actividad reciente"
-                            Icon={TaskAltRoundedIcon}
-                            tag={retosRecientes.length ? `${retosRecientes.length} retos` : undefined}
-                        >
+                        <button className="home-doc-aula" onClick={() => setPagina('estudiantes')}>
+                            <span className="home-doc-aula-emoji" aria-hidden="true">🎒</span>
+                            <span className="home-doc-aula-texto">
+                                <strong>Mi aula</strong>
+                                <span>
+                                    {(misEstudiantes.length || invitaciones.length)
+                                        ? `${misEstudiantes.length} ${misEstudiantes.length === 1 ? 'estudiante registrado' : 'estudiantes registrados'} · ${invitaciones.filter((i) => i.estado === 'pendiente').length} invitaciones por usar · ${invitaciones.filter((i) => i.estado === 'usado').length} códigos usados`
+                                        : 'Tu aula está vacía: genera códigos de invitación para que tus estudiantes se registren solos.'}
+                                </span>
+                            </span>
+                            <ArrowForwardRoundedIcon className="home-doc-aula-flecha" />
+                        </button>
+
+                        <section className="home-doc-reciente">
+                            <h2>Lo último que publicaste</h2>
                             {retosRecientes.length ? (
                                 <ul className="actividad-lista">
                                     {retosRecientes.map((r) => (
@@ -573,60 +544,76 @@ export function Dashboard() {
                             ) : (
                                 <EmptyState
                                     Icon={TaskAltRoundedIcon}
-                                    titulo="Aún no has publicado retos"
-                                    mensaje="Publica tu primer quiz, juego o misión para que aparezca aquí."
+                                    titulo="Todavía no has publicado actividades"
+                                    mensaje="Cuando publiques tu primer quiz, juego o misión, aparecerá aquí."
                                     accion={materiaSugerida
-                                        ? { label: 'Crear mi primer reto', onClick: () => irAMateria(materiaSugerida, 'quiz') }
+                                        ? { label: 'Crear mi primera actividad', onClick: () => irAMateria(materiaSugerida, 'quiz') }
                                         : undefined}
                                 />
                             )}
-                        </SectionCard>
+                        </section>
                     </div>
                 )}
 
                 {/* MATERIAS GRID */}
                 {pagina === "materias" && !materiaSeleccionada && (
-                    <>
-                        <h1 style={{pointerEvents:"none"}}>Materias</h1>
-
-                        <div className="materias-grid">
-                            {materias.map((mat, index) => (
-                                <div
-                                    key={index}
-                                    className="materia-card"
-                                    onClick={() => { setMateriaSeleccionada(mat); setSubVistaMateria('quiz'); }}
-                                >
-                                    <MenuBookIcon className="materia-card-icon" />
-                                    <span>{mat}</span>
-                                </div>
-                            ))}
+                    <div className="home-doc">
+                        <div>
+                            <h1 style={{pointerEvents:"none"}}>Tus materias</h1>
+                            <p className="contenido-sub" style={{ pointerEvents: "none" }}>Elige una materia para crear actividades y subir material.</p>
                         </div>
-                    </>
+
+                        <div className="home-doc-materias-grid">
+                            {materias.map((mat) => {
+                                const ui = MATERIA_UI[mat] || { emoji: '📚', tono: 1 };
+                                const retos = retosPorMateria[mat] || [];
+                                return (
+                                    <button
+                                        key={mat}
+                                        className={`home-doc-materia home-doc-materia-${ui.tono}`}
+                                        onClick={() => { setMateriaSeleccionada(mat); setSubVistaMateria('quiz'); }}
+                                    >
+                                        <span className="home-doc-materia-emoji" aria-hidden="true">{ui.emoji}</span>
+                                        <span className="home-doc-materia-nombre">{mat}</span>
+                                        <span className="home-doc-materia-detalle">
+                                            {retos.length
+                                                ? `${retos.length} ${retos.length === 1 ? 'actividad publicada' : 'actividades publicadas'}`
+                                                : 'Sin actividades todavía'}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
                 )}
 
                 {/* MATERIA DETALLE */}
-                {pagina === "materias" && materiaSeleccionada && (
-                    <>
+                {pagina === "materias" && materiaSeleccionada && (() => {
+                    const ui = MATERIA_UI[materiaSeleccionada] || { emoji: '📚', tono: 1 };
+                    const retosMateria = retosPorMateria[materiaSeleccionada] || [];
+                    const archivosMateria = archivosPorMateria[materiaSeleccionada] || [];
+                    return (
+                    <div className="materia-doc">
                         <button
                             className="back-btn"
                             onClick={() => { setMateriaSeleccionada(null); setArchivoPreview(null); setSubVistaMateria('quiz'); }}
                         >
-                            ← Volver
+                            ← Volver a mis materias
                         </button>
 
-                        <h1 style={{pointerEvents:"none"}}>{materiaSeleccionada}</h1>
-
-                        <WidgetsRendimiento
-                            materia={materiaSeleccionada}
-                            topEstudiantes={ranking}
-                            retosPublicados={(retosPorMateria[materiaSeleccionada] || []).length}
-                            siguientePaso={
-                                (archivosPorMateria[materiaSeleccionada] || []).length > 0
-                                    ? { descripcion: "Ya tienes material cargado. Pon a prueba a tus estudiantes generando un quiz.", label: "Ir al Quiz", destino: "quiz" }
-                                    : { descripcion: "Aún no hay material en esta materia. Súbelo desde los contenedores y luego genera un quiz.", label: "Generar Quiz", destino: "quiz" }
-                            }
-                            onAccion={(destino) => setSubVistaMateria(destino)}
-                        />
+                        {/* Cabecera con la identidad pastel de la materia */}
+                        <header className={`materia-hero materia-hero-${ui.tono}`}>
+                            <span className="materia-hero-emoji" aria-hidden="true">{ui.emoji}</span>
+                            <div className="materia-hero-meta">
+                                <h1>{materiaSeleccionada}</h1>
+                                <p>
+                                    {retosMateria.length
+                                        ? `${retosMateria.length} ${retosMateria.length === 1 ? 'actividad publicada' : 'actividades publicadas'} para tus estudiantes`
+                                        : 'Todavía sin actividades: crea la primera aquí abajo'}
+                                    {archivosMateria.length ? ` · ${archivosMateria.length} ${archivosMateria.length === 1 ? 'archivo de material' : 'archivos de material'}` : ''}
+                                </p>
+                            </div>
+                        </header>
 
                         {errorMaterial && (
                             <div className="aviso-migracion" role="alert">
@@ -635,57 +622,52 @@ export function Dashboard() {
                             </div>
                         )}
 
-                        {/* Crear actividad: la acción principal del docente va primero */}
-                        <div className="materia-crear-head">
-                            <h2>Crear una actividad</h2>
-                            <p>Elige el tipo de actividad, revísala y publícala para tus estudiantes.</p>
-                        </div>
+                        {/* Crear actividad: el protagonista de la pantalla */}
+                        <section className="materia-crear">
+                            <div className="materia-crear-head">
+                                <h2>¿Qué actividad quieres crear hoy?</h2>
+                                <p>Elige un tipo, revisa el contenido y publícalo para tus estudiantes.</p>
+                            </div>
 
-                        <div className="materia-panel">
-                            <button
-                                className={`opcion ${subVistaMateria === 'quiz' ? 'opcion-activa' : ''}`}
-                                onClick={() => setSubVistaMateria('quiz')}
-                            >
-                                Generar Quiz
-                            </button>
-                            <button
-                                className={`opcion ${subVistaMateria === 'clasificador' ? 'opcion-activa' : ''}`}
-                                onClick={() => setSubVistaMateria('clasificador')}
-                            >
-                                Juego Clasificador
-                            </button>
-                            <button
-                                className={`opcion ${subVistaMateria === 'mision' ? 'opcion-activa' : ''}`}
-                                onClick={() => setSubVistaMateria('mision')}
-                            >
-                                Misión Narrativa
-                            </button>
-                            <button
-                                className={`opcion ${subVistaMateria === 'calificaciones' ? 'opcion-activa' : ''}`}
-                                onClick={() => setSubVistaMateria('calificaciones')}
-                            >
-                                Libro de Calificaciones
-                            </button>
-                        </div>
+                            <div className="crear-tipos">
+                                <button
+                                    className={`crear-tipo ${subVistaMateria === 'quiz' ? 'crear-tipo-activo' : ''}`}
+                                    onClick={() => setSubVistaMateria('quiz')}
+                                >
+                                    <span className="crear-tipo-emoji" aria-hidden="true">✨</span>
+                                    <strong>Quiz</strong>
+                                    <span className="crear-tipo-desc">Preguntas con opciones, generadas con IA a partir de un tema</span>
+                                </button>
+                                <button
+                                    className={`crear-tipo ${subVistaMateria === 'clasificador' ? 'crear-tipo-activo' : ''}`}
+                                    onClick={() => setSubVistaMateria('clasificador')}
+                                >
+                                    <span className="crear-tipo-emoji" aria-hidden="true">🧩</span>
+                                    <strong>Juego Clasificador</strong>
+                                    <span className="crear-tipo-desc">Arrastrar y soltar elementos en su categoría correcta</span>
+                                </button>
+                                <button
+                                    className={`crear-tipo ${subVistaMateria === 'mision' ? 'crear-tipo-activo' : ''}`}
+                                    onClick={() => setSubVistaMateria('mision')}
+                                >
+                                    <span className="crear-tipo-emoji" aria-hidden="true">🗺️</span>
+                                    <strong>Misión Narrativa</strong>
+                                    <span className="crear-tipo-desc">Una historia por capítulos con desafíos para avanzar</span>
+                                </button>
+                            </div>
 
-                        {subVistaMateria === 'quiz' && (
-                            <GeneradorQuiz materia={materiaSeleccionada} />
-                        )}
+                            {subVistaMateria === 'quiz' && (
+                                <GeneradorQuiz materia={materiaSeleccionada} />
+                            )}
 
-                        {subVistaMateria === 'mision' && (
-                            <GeneradorMision materia={materiaSeleccionada} />
-                        )}
+                            {subVistaMateria === 'mision' && (
+                                <GeneradorMision materia={materiaSeleccionada} />
+                            )}
 
-                        {subVistaMateria === 'clasificador' && (
-                            <EditorClasificador materia={materiaSeleccionada} />
-                        )}
-
-                        {subVistaMateria === 'calificaciones' && (
-                            <section className="card materia-subvista">
-                                <h3>Libro de Calificaciones de {materiaSeleccionada}</h3>
-                                <LibroCalificaciones materia={materiaSeleccionada} />
-                            </section>
-                        )}
+                            {subVistaMateria === 'clasificador' && (
+                                <EditorClasificador materia={materiaSeleccionada} />
+                            )}
+                        </section>
 
                         {/* Material de estudio, dividido por audiencia */}
                         <div className="materia-crear-head">
@@ -709,20 +691,61 @@ export function Dashboard() {
                                 subtitulo="Privado · solo tú puedes verlo"
                                 Icon={LockRoundedIcon}
                                 vacioMsg="No tienes material privado en esta materia."
-                                archivos={(archivosPorMateria[materiaSeleccionada] || []).filter((a) => a.isPrivate)}
+                                archivos={archivosMateria.filter((a) => a.isPrivate)}
                                 isPrivate={true}
                                 onUpload={(file, opts) => handleUploadMateria(materiaSeleccionada, file, opts)}
                                 onPreview={setArchivoPreview}
                             />
                         </div>
-                    </>
-                )}
+
+                        {/* Tu clase: cómo va el aula en esta materia */}
+                        <div className="materia-crear-head">
+                            <h2>Tu clase en {materiaSeleccionada}</h2>
+                            <p>Un vistazo rápido a cómo van tus estudiantes.</p>
+                        </div>
+
+                        <WidgetsRendimiento
+                            materia={materiaSeleccionada}
+                            topEstudiantes={ranking}
+                            retosPublicados={retosMateria.length}
+                            siguientePaso={
+                                archivosMateria.length > 0
+                                    ? { descripcion: "Ya tienes material cargado. Pon a prueba a tus estudiantes generando un quiz.", label: "Crear un quiz", destino: "quiz" }
+                                    : { descripcion: "Aún no hay material en esta materia. Súbelo arriba y luego genera un quiz.", label: "Crear un quiz", destino: "quiz" }
+                            }
+                            onAccion={(destino) => setSubVistaMateria(destino)}
+                        />
+
+                        {/* Libro de Calificaciones: seguimiento, separado de la creación */}
+                        <button
+                            className="materia-libro-btn"
+                            onClick={() => setSubVistaMateria(subVistaMateria === 'calificaciones' ? 'quiz' : 'calificaciones')}
+                        >
+                            <span className="materia-libro-emoji" aria-hidden="true">📒</span>
+                            <span className="materia-libro-texto">
+                                <strong>Libro de Calificaciones</strong>
+                                <span>Revisa las notas de tus estudiantes en {materiaSeleccionada}</span>
+                            </span>
+                            <ArrowForwardRoundedIcon className={`materia-libro-flecha ${subVistaMateria === 'calificaciones' ? 'is-abierto' : ''}`} />
+                        </button>
+
+                        {subVistaMateria === 'calificaciones' && (
+                            <section className="card materia-subvista">
+                                <h3>Libro de Calificaciones de {materiaSeleccionada}</h3>
+                                <LibroCalificaciones materia={materiaSeleccionada} />
+                            </section>
+                        )}
+                    </div>
+                    );
+                })()}
 
                 {/* MIS ESTUDIANTES: invitaciones de registro y reseteo de PIN */}
                 {pagina === "estudiantes" && (
-                    <>
-                        <h1 style={{pointerEvents:"none"}}>Mis Estudiantes</h1>
-                        <p className="contenido-sub">Genera códigos de invitación para que tus estudiantes se registren, y ayúdalos si olvidan su PIN.</p>
+                    <div className="home-doc">
+                        <div>
+                            <h1 style={{pointerEvents:"none"}}>Mis Estudiantes</h1>
+                            <p className="contenido-sub" style={{ marginBottom: 0 }}>Genera códigos de invitación para que tus estudiantes se registren, y ayúdalos si olvidan su PIN.</p>
+                        </div>
 
                         {avisoOk && (
                             <div className="admin-aviso-ok" role="status">
@@ -810,12 +833,7 @@ export function Dashboard() {
                                 </tbody>
                             </table>
                         </section>
-                    </>
-                )}
-
-                {/* ASISTENTE IA */}
-                {pagina === "asistente" && (
-                    <AsistenteIA />
+                    </div>
                 )}
 
             </main>

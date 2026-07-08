@@ -216,9 +216,14 @@
 }
 .rank-item-yo .rank-name { color: var(--color-primary-dark); }
 
-/* --- Panel de pestañas del estudiante (solo 2 columnas) --- */
+/* --- Panel de pestañas del estudiante: 4 opciones en fila --- */
 .materia-panel-est {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+
+@media (max-width: 900px) {
+    .materia-panel-est { grid-template-columns: repeat(2, 1fr); }
 }
 
 .vacio-msg {
@@ -349,3 +354,14 @@
     background: var(--color-surface-alt);
 }
 .logro-bloqueado .logro-icon { background: var(--color-border) !important; color: var(--color-text-muted) !important; }
+
+/* Ancho de lectura consistente con los Home: el detalle de materia del
+   estudiante se centra igual que .home-nino y .materia-doc del docente. */
+.contenido > .materia-hero,
+.contenido > .materia-panel,
+.contenido > .card,
+.contenido > .logros-grid {
+    max-width: 1100px;
+    margin-left: auto;
+    margin-right: auto;
+}

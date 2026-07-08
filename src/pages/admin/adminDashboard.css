@@ -35,9 +35,9 @@
 }
 
 .admin-materias-check label.sel {
-    background: #eef2ff;
-    border-color: #4f46e5;
-    color: #3730a3;
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary);
+    color: var(--color-primary-dark);
 }
 
 /* Contenedor con scroll horizontal para tablas en pantallas pequeñas
@@ -92,8 +92,8 @@
 }
 
 .admin-acciones button:hover {
-    background: #f8fafc;
-    color: #4f46e5;
+    background: var(--color-primary-soft);
+    color: var(--color-primary-dark);
 }
 
 .admin-aviso-ok {
@@ -139,8 +139,8 @@
 }
 
 .inv-codigos-nuevos code {
-    background: #eef2ff;
-    color: #3730a3;
+    background: var(--color-primary-soft);
+    color: var(--color-primary-dark);
     padding: 8px 14px;
     border-radius: 10px;
     font-size: 1.05rem;

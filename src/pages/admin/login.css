@@ -1,8 +1,384 @@
+/* ===== Login de GamificApp (Polish Sprint) =====
+   Primera impresión de la plataforma: bienvenida centrada, tarjetas de rol
+   grandes y un solo botón protagonista. Misma identidad que los Home
+   (gradiente primario, pasteles suaves, tokens del design system). */
+
 .login-page {
+    position: relative;
     min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 20px;
+    background: var(--color-bg);
+    overflow: hidden;
+}
+
+/* Formas suaves de fondo: color e identidad sin ruido */
+.login-fondo {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.login-burbuja {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(2px);
+    opacity: 0.55;
+}
+
+.login-burbuja-1 {
+    width: 420px;
+    height: 420px;
+    top: -140px;
+    left: -120px;
+    background: var(--color-primary-soft);
+}
+
+.login-burbuja-2 {
+    width: 320px;
+    height: 320px;
+    bottom: -110px;
+    right: -90px;
+    background: var(--color-accent-soft);
+}
+
+.login-burbuja-3 {
+    width: 200px;
+    height: 200px;
+    top: 18%;
+    right: 8%;
+    background: #e0f2fe;
+}
+
+.login-centro {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+}
+
+/* Marca sobre la tarjeta */
+.login-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.login-brand-icon {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    color: #fff;
+    background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
+    box-shadow: var(--shadow-md);
+}
+
+.login-brand-icon svg { font-size: 1.9rem; }
+
+.login-brand-nombre {
+    font-family: var(--font-head);
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: var(--color-text);
+}
+
+.login-card {
+    width: 100%;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.login-bienvenida h1 {
+    margin: 0 0 6px;
+    font-size: 1.55rem;
+}
+
+.login-card-sub {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.login-error {
+    padding: 11px 14px;
+    border-radius: var(--radius-sm);
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #dc2626;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.login-aviso {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--color-accent-soft);
+    color: var(--color-accent-dark);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+/* Selección de rol: dos tarjetas grandes, no un control de formulario */
+.login-role {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.login-role-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.login-role-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.login-role-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 16px 12px;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    font-family: inherit;
+    color: var(--color-text);
+    text-align: center;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.login-role-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--color-primary-light);
+}
+
+.login-role-emoji { font-size: 1.9rem; }
+.login-role-card strong { font-size: 1rem; }
+
+.login-role-desc {
+    font-size: 0.76rem;
+    color: var(--color-text-muted);
+    line-height: 1.35;
+}
+
+.login-role-card.active {
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary);
+}
+
+.login-role-card.active strong { color: var(--color-primary-dark); }
+
+/* Campos */
+.login-field {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--color-text);
+    margin-bottom: 14px;
+}
+
+.login-field input {
+    width: 100%;
+    padding: 14px 16px;
+    font-family: var(--font-body);
+    font-size: 1.05rem;
+    color: var(--color-text);
+    background: var(--color-surface-alt);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.login-field input::placeholder {
+    color: #94a3b8;
+}
+
+.login-field input:focus {
+    background: #fff;
+    border-color: var(--color-primary-light);
+    box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.15);
+}
+
+.login-password {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.login-password input {
+    padding-right: 46px;
+}
+
+.login-eye {
+    position: absolute;
+    right: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    transition: color 0.2s ease, background 0.2s ease;
+}
+
+.login-eye:hover {
+    color: var(--color-primary);
+    background: var(--color-primary-soft);
+}
+
+/* Botón protagonista: mismo gradiente que el hero de los Home */
+.login-submit {
+    width: 100%;
+    margin-top: 4px;
+    padding: 16px;
+    font-family: var(--font-head);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    box-shadow: 0 6px 16px rgba(15, 118, 110, 0.3);
+    transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.login-submit:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.05);
+    box-shadow: 0 10px 22px rgba(15, 118, 110, 0.38);
+}
+
+.login-submit:active {
+    transform: translateY(0);
+}
+
+.login-submit:disabled {
+    opacity: 0.7;
+    cursor: wait;
+    transform: none;
+}
+
+/* Enlaces de ayuda */
+.login-links {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 14px;
+    align-items: flex-start;
+}
+
+.login-link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--color-primary-dark);
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    font-family: inherit;
+}
+
+.login-ayuda-pin {
+    margin-top: 12px;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--color-primary-soft);
+    color: var(--color-primary-dark);
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.login-ayuda-pin p + p { margin-top: 8px; }
+
+.login-emergencia-titulo {
+    margin: 0 0 14px;
+    padding: 11px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--color-accent-soft);
+    color: var(--color-accent-dark);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.login-pie {
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+    text-align: center;
+}
+
+@media (max-width: 520px) {
+    .login-card { padding: 24px 20px; }
+    .login-bienvenida h1 { font-size: 1.3rem; }
+    .login-role-options { gap: 8px; }
+}
+
+/* Pantalla de registro: tarjeta de credenciales para anotar */
+.registro-credenciales {
+    margin-top: 16px;
+    padding: 16px;
+    border: 2px dashed #4f46e5;
+    border-radius: 14px;
+    background: #f5f3ff;
+    text-align: center;
+}
+
+.registro-credenciales h3 { margin: 0 0 10px; color: #3730a3; }
+
+.registro-credenciales .cred-dato {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 4px;
+    font-size: 0.95rem;
+}
+
+.registro-credenciales .cred-dato strong {
+    font-size: 1.15rem;
+    letter-spacing: 2px;
+    color: #1e1b4b;
+}
+
+/* ---- Compatibilidad: la pantalla de Registro sigue usando el layout
+   anterior (aside + formulario). Estas reglas la mantienen intacta hasta
+   que le toque su propio rediseño. ---- */
+.login-page:has(.login-aside) {
     display: grid;
     grid-template-columns: 1.05fr 1fr;
-    background: var(--color-bg);
+    padding: 0;
+    align-items: stretch;
 }
 
 .login-aside {
@@ -18,20 +394,21 @@
     overflow: hidden;
 }
 
-.login-brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+.login-aside .login-brand {
     font-family: var(--font-head);
     font-weight: 600;
     font-size: 1.3rem;
 }
 
-.login-brand-icon {
+.login-aside .login-brand-icon {
+    width: auto;
+    height: auto;
+    display: initial;
     background: rgba(255, 255, 255, 0.15);
     border-radius: 12px;
     padding: 8px;
     font-size: 2rem !important;
+    box-shadow: none;
 }
 
 .login-aside-body h2 {
@@ -81,174 +458,12 @@
     padding: 40px;
 }
 
-.login-card {
-    width: 100%;
-    max-width: 400px;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
-    padding: 40px;
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-}
-
-.login-card h1 {
-    margin: 0;
-    font-size: 1.8rem;
-}
-
-.login-card-sub {
-    margin: -10px 0 6px;
-    color: var(--color-text-muted);
-    font-size: 0.95rem;
-}
-
-.login-error {
-    padding: 11px 14px;
-    border-radius: var(--radius-sm);
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    color: #dc2626;
-    font-size: 0.9rem;
-    font-weight: 500;
-}
-
-.login-role {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.login-role-label {
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: var(--color-text);
-}
-
-.login-role-options {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    padding: 4px;
-    background: var(--color-surface-alt);
-    border: 1.5px solid var(--color-border);
-    border-radius: var(--radius-sm);
-}
-
-.login-role-btn {
-    padding: 10px;
-    font-family: var(--font-body);
-    font-size: 0.92rem;
-    font-weight: 600;
-    color: var(--color-text-muted);
-    background: transparent;
-    border: none;
-    border-radius: 7px;
-    cursor: pointer;
-    transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-}
-
-.login-role-btn:hover {
-    color: var(--color-primary);
-}
-
-.login-role-btn.active {
-    color: var(--color-primary-dark);
-    background: var(--color-surface);
-    box-shadow: var(--shadow-sm);
-}
-
-.login-field {
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: var(--color-text);
-}
-
-.login-field input {
-    width: 100%;
-    padding: 13px 14px;
-    font-family: var(--font-body);
-    font-size: 1rem;
-    color: var(--color-text);
-    background: var(--color-surface-alt);
-    border: 1.5px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    outline: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-}
-
-.login-field input::placeholder {
-    color: #94a3b8;
-}
-
-.login-field input:focus {
-    background: #fff;
-    border-color: var(--color-primary-light);
-    box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.15);
-}
-
-.login-password {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.login-password input {
-    padding-right: 46px;
-}
-
-.login-eye {
-    position: absolute;
-    right: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    background: transparent;
-    color: var(--color-text-muted);
-    cursor: pointer;
-    padding: 8px;
-    border-radius: 8px;
-    transition: color 0.2s ease, background 0.2s ease;
-}
-
-.login-eye:hover {
-    color: var(--color-primary);
-    background: var(--color-primary-soft);
-}
-
-.login-submit {
-    margin-top: 8px;
-    padding: 14px;
-    font-family: var(--font-head);
-    font-size: 1rem;
-    font-weight: 600;
-    color: #fff;
-    background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
-    border: none;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    box-shadow: 0 6px 16px rgba(15, 118, 110, 0.3);
-    transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
-}
-
-.login-submit:hover {
-    transform: translateY(-2px);
-    filter: brightness(1.05);
-    box-shadow: 0 10px 22px rgba(15, 118, 110, 0.38);
-}
-
-.login-submit:active {
-    transform: translateY(0);
+.login-form-wrap .login-card {
+    max-width: 440px;
 }
 
 @media (max-width: 880px) {
-    .login-page {
+    .login-page:has(.login-aside) {
         grid-template-columns: 1fr;
     }
     .login-aside {
@@ -257,61 +472,4 @@
     .login-form-wrap {
         min-height: 100vh;
     }
-}
-
-/* ---- Login profesional: enlaces de ayuda y recuperación de PIN ---- */
-.login-links {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-top: 14px;
-    align-items: flex-start;
-}
-
-.login-link {
-    background: none;
-    border: none;
-    padding: 0;
-    color: #4f46e5;
-    font-size: 0.85rem;
-    cursor: pointer;
-    text-decoration: underline;
-    font-family: inherit;
-}
-
-.login-ayuda-pin {
-    margin-top: 12px;
-    padding: 12px 14px;
-    border-radius: 12px;
-    background: #eef2ff;
-    color: #3730a3;
-    font-size: 0.85rem;
-    line-height: 1.5;
-}
-
-.login-ayuda-pin p + p { margin-top: 8px; }
-
-/* Pantalla de registro: tarjeta de credenciales para anotar */
-.registro-credenciales {
-    margin-top: 16px;
-    padding: 16px;
-    border: 2px dashed #4f46e5;
-    border-radius: 14px;
-    background: #f5f3ff;
-    text-align: center;
-}
-
-.registro-credenciales h3 { margin: 0 0 10px; color: #3730a3; }
-
-.registro-credenciales .cred-dato {
-    display: flex;
-    justify-content: space-between;
-    padding: 6px 4px;
-    font-size: 0.95rem;
-}
-
-.registro-credenciales .cred-dato strong {
-    font-size: 1.15rem;
-    letter-spacing: 2px;
-    color: #1e1b4b;
 }

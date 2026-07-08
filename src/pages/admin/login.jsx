@@ -67,46 +67,48 @@ export function Login(){
 
     return(
         <div className="login-page">
-            <aside className="login-aside">
-                <div className="login-brand">
-                    <SchoolRoundedIcon className="login-brand-icon" />
-                    <span>GamificApp</span>
-                </div>
-                <div className="login-aside-body">
-                    <h2>Aprender también<br/>se siente como ganar.</h2>
-                    <p>Plataforma de gamificación educativa para la Unidad Educativa Benemérita Sociedad Filantrópica del Guayas.</p>
-                    <div className="login-badge">
-                        <EmojiEventsRoundedIcon />
-                        <span>Logros, misiones y rankings para motivar a cada estudiante.</span>
-                    </div>
-                </div>
-                <span className="login-aside-foot">Unidad Educativa · Plataforma docente</span>
-            </aside>
+            {/* Formas suaves de fondo: dan identidad sin distraer del formulario */}
+            <div className="login-fondo" aria-hidden="true">
+                <span className="login-burbuja login-burbuja-1" />
+                <span className="login-burbuja login-burbuja-2" />
+                <span className="login-burbuja login-burbuja-3" />
+            </div>
 
-            <section className="login-form-wrap">
+            <main className="login-centro">
+                <div className="login-brand">
+                    <span className="login-brand-icon"><SchoolRoundedIcon /></span>
+                    <span className="login-brand-nombre">GamificApp</span>
+                </div>
+
                 <div className="login-card">
-                    <h1>Inicio de Sesión</h1>
-                    <p className="login-card-sub">Ingresa tus credenciales para continuar.</p>
+                    <header className="login-bienvenida">
+                        <h1>¡Hola! 👋 Qué bueno verte</h1>
+                        <p className="login-card-sub">Aquí se aprende jugando: quizzes, misiones e insignias te esperan.</p>
+                    </header>
 
                     {error && <div className="login-error" role="alert">{error}</div>}
-                    {aviso && <div className="login-badge" role="status">{aviso}</div>}
+                    {aviso && <div className="login-aviso" role="status"><EmojiEventsRoundedIcon /> {aviso}</div>}
 
                     <div className="login-role">
-                        <span className="login-role-label">Soy</span>
+                        <span className="login-role-label">¿Quién entra hoy?</span>
                         <div className="login-role-options">
                             <button
                                 type="button"
-                                className={`login-role-btn ${modo !== "docente" ? "active" : ""}`}
+                                className={`login-role-card ${modo !== "docente" ? "active" : ""}`}
                                 onClick={() => cambiarModo("estudiante")}
                             >
-                                Estudiante
+                                <span className="login-role-emoji" aria-hidden="true">🎒</span>
+                                <strong>Estudiante</strong>
+                                <span className="login-role-desc">Entro con mi nombre y mi PIN</span>
                             </button>
                             <button
                                 type="button"
-                                className={`login-role-btn ${modo === "docente" ? "active" : ""}`}
+                                className={`login-role-card ${modo === "docente" ? "active" : ""}`}
                                 onClick={() => cambiarModo("docente")}
                             >
-                                Docente
+                                <span className="login-role-emoji" aria-hidden="true">📗</span>
+                                <strong>Docente</strong>
+                                <span className="login-role-desc">Entro con mi usuario y contraseña</span>
                             </button>
                         </div>
                     </div>
@@ -132,7 +134,7 @@ export function Login(){
                                 />
                             </label>
                             <button type="submit" className="login-submit" disabled={cargando}>
-                                {cargando ? 'Verificando…' : 'Entrar'}
+                                {cargando ? 'Un momento…' : '¡Entrar a jugar!'}
                             </button>
 
                             <div className="login-links">
@@ -163,6 +165,7 @@ export function Login(){
 
                     {modo === "emergencia" && (
                         <form onSubmit={handleEmergencia} noValidate autoComplete="off">
+                            <p className="login-emergencia-titulo">🛟 Entrada de emergencia: usa el código que está en tu carné.</p>
                             <label className="login-field">
                                 <span>Tu nombre completo</span>
                                 <input
@@ -229,7 +232,9 @@ export function Login(){
                         </form>
                     )}
                 </div>
-            </section>
+
+                <span className="login-pie">Unidad Educativa Fiscal Clemencia Coronel de Pincay</span>
+            </main>
         </div>
     )
 }
