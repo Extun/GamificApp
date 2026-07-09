@@ -33,6 +33,8 @@ export const eliminarEstudiante = (usuarioId) =>
     pedir(`/api/admin/estudiantes/${usuarioId}`, { method: 'DELETE' });
 
 export const listarInvitaciones = () => pedir('/api/admin/invitaciones');
+export const eliminarInvitacion = (id) =>
+    pedir(`/api/admin/invitaciones/${id}`, { method: 'DELETE' });
 
 export default {
     listarDocentes,
@@ -42,5 +44,6 @@ export default {
     listarEstudiantes,
     resetearPinEstudiante,
     eliminarEstudiante,
-    listarInvitaciones
+    listarInvitaciones,
+    eliminarInvitacion
 };

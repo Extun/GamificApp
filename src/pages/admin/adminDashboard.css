@@ -172,3 +172,465 @@
     border-color: #fecaca;
     color: #dc2626;
 }
+
+/* ===== Rediseño del panel Admin (sprint final) =====
+   Misma identidad que los Home de estudiante y docente:
+   tokens del tema, pasteles por materia y ancho máximo consistente. */
+
+.admin-vista {
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+/* Ítem activo del menú lateral */
+.nav-item-activo {
+    background: var(--color-primary-soft) !important;
+    color: var(--color-primary-dark) !important;
+}
+
+/* Cabecera-hero del Inicio (espejo del saludo del docente) */
+.admin-hero {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 22px 24px;
+    border: 2px solid var(--color-primary-soft);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sm);
+}
+
+.admin-hero-avatar {
+    flex-shrink: 0;
+    width: 64px;
+    height: 64px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    font-size: 1.9rem;
+    background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
+    box-shadow: var(--shadow-md);
+}
+
+.admin-hero-meta { min-width: 0; }
+.admin-hero-meta h1 { margin: 0 0 4px; font-size: 1.7rem; }
+.admin-hero-meta p { margin: 0; color: var(--color-text-muted); font-size: 0.93rem; }
+
+/* Accesos rápidos del Inicio: tarjetas-botón hacia cada módulo */
+.admin-accesos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 18px;
+}
+
+.admin-acceso {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 20px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.admin-acceso:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--color-primary-light);
+}
+
+.admin-acceso-icono {
+    width: 46px;
+    height: 46px;
+    flex-shrink: 0;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.admin-acceso-icono svg { font-size: 1.4rem; }
+.admin-acceso-icono.is-primary { background: var(--color-primary-soft); color: var(--color-primary); }
+.admin-acceso-icono.is-accent { background: var(--color-accent-soft); color: var(--color-accent-dark); }
+.admin-acceso-icono.is-fire { background: #fee2e2; color: #ef4444; }
+
+.admin-acceso-texto {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.admin-acceso-texto strong { font-size: 1rem; color: var(--color-text); }
+.admin-acceso-texto span { font-size: 0.85rem; color: var(--color-text-muted); line-height: 1.4; }
+
+/* ===== Asistente de creación de docentes ===== */
+.docente-asistente {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.asistente-paso {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.asistente-paso-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.asistente-num {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    font-family: var(--font-head);
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #fff;
+    background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
+}
+
+.asistente-paso-head strong { display: block; font-size: 1rem; color: var(--color-text); }
+
+.asistente-paso-head p {
+    margin: 2px 0 0;
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+}
+
+.asistente-campos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    padding-left: 42px;
+}
+
+.asistente-campo {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.asistente-campo span {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+}
+
+.asistente-campo input {
+    padding: 11px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 0.95rem;
+    font-family: inherit;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.asistente-campo input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+.asistente-pie {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-top: 18px;
+    border-top: 1px solid var(--color-border);
+}
+
+.asistente-resumen {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+}
+
+/* Selector de materias como tarjetas pastel (asistente y modal) */
+.materia-pick-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    padding-left: 42px;
+}
+
+.materia-pick {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 14px 10px;
+    border: 2px solid transparent;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    color: var(--color-text);
+    text-align: center;
+    cursor: pointer;
+    opacity: 0.72;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.materia-pick:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); opacity: 1; }
+
+.materia-pick.is-activa {
+    opacity: 1;
+    box-shadow: var(--shadow-md);
+}
+
+.materia-pick-emoji { font-size: 1.9rem; }
+.materia-pick-nombre { font-size: 0.85rem; font-weight: 700; line-height: 1.3; }
+
+.materia-pick-check {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 1.15rem !important;
+    color: var(--color-primary-dark);
+    background: #fff;
+    border-radius: 50%;
+}
+
+.materia-pick-1 { background: #e0f2fe; } .materia-pick-1.is-activa { border-color: #38bdf8; }
+.materia-pick-2 { background: #fce7f3; } .materia-pick-2.is-activa { border-color: #f472b6; }
+.materia-pick-3 { background: #dcfce7; } .materia-pick-3.is-activa { border-color: #4ade80; }
+.materia-pick-4 { background: #fef3c7; } .materia-pick-4.is-activa { border-color: #fbbf24; }
+.materia-pick-5 { background: #ede9fe; } .materia-pick-5.is-activa { border-color: #a78bfa; }
+
+/* ===== Lista de docentes registrados ===== */
+.docente-lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.docente-fila {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 14px 16px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.docente-fila:hover {
+    border-color: var(--color-primary-light);
+    box-shadow: var(--shadow-sm);
+}
+
+.docente-avatar {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    font-family: var(--font-head);
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #fff;
+    background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
+}
+
+.docente-info {
+    flex: 1;
+    min-width: 180px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.docente-info strong { font-size: 0.98rem; color: var(--color-text); }
+
+.docente-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.docente-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+    color: var(--color-text);
+}
+
+.docente-chip-1 { background: #e0f2fe; }
+.docente-chip-2 { background: #fce7f3; }
+.docente-chip-3 { background: #dcfce7; }
+.docente-chip-4 { background: #fef3c7; }
+.docente-chip-5 { background: #ede9fe; }
+
+.docente-sin-materias {
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+.docente-acciones {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.docente-btn-editar {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-head);
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 8px 14px;
+    color: var(--color-primary-dark);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.docente-btn-editar:hover {
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary-light);
+}
+
+.docente-btn-eliminar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.docente-btn-eliminar:hover {
+    background: #fee2e2;
+    border-color: #fecaca;
+    color: #dc2626;
+}
+
+/* ===== Tablas modernizadas (Estudiantes e Invitaciones) ===== */
+.admin-tabla-moderna th {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 10px 12px;
+}
+
+.admin-tabla-moderna td {
+    padding: 12px;
+    vertical-align: middle;
+}
+
+.admin-tabla-moderna tbody tr {
+    transition: background 0.15s ease;
+}
+
+.admin-tabla-moderna tbody tr:hover {
+    background: var(--color-surface-alt);
+}
+
+.estudiante-celda {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 160px;
+}
+
+.estudiante-avatar {
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    font-family: var(--font-head);
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--color-primary-dark);
+    background: var(--color-primary-soft);
+}
+
+.estudiante-nombre { font-weight: 600; color: var(--color-text); }
+
+.curso-chip {
+    display: inline-block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--color-accent-soft);
+    color: var(--color-accent-dark);
+    white-space: nowrap;
+}
+
+.xp-valor { font-weight: 600; color: var(--color-text); white-space: nowrap; }
+
+.admin-acciones .accion-peligro:hover {
+    background: #fee2e2;
+    border-color: #fecaca;
+    color: #dc2626;
+}
+
+/* ===== Modal "Editar materias" ===== */
+.modal-materias { max-width: 520px; }
+.modal-materias .materia-pick-grid { padding-left: 0; }
+
+.modal-materias-ayuda {
+    margin: 0 0 16px;
+    font-size: 0.88rem;
+    color: var(--color-text-muted);
+    line-height: 1.55;
+}
+
+.preview-action:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 640px) {
+    .admin-hero { padding: 18px; gap: 14px; }
+    .admin-hero-avatar { width: 52px; height: 52px; font-size: 1.5rem; }
+    .admin-hero-meta h1 { font-size: 1.3rem; }
+    .asistente-campos,
+    .materia-pick-grid { padding-left: 0; }
+    .materia-pick-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+    .asistente-pie { flex-direction: column; align-items: stretch; }
+    .asistente-pie .quiz-generar-btn { justify-content: center; }
+    .docente-acciones { width: 100%; justify-content: flex-end; }
+}

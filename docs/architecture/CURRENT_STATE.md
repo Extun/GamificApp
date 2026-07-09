@@ -19,8 +19,8 @@ El **MVP está completo y en producción** (Vercel + Render + Aiven). Los tres r
 | Módulo | Estado |
 |--------|--------|
 | Autenticación (login nombre+PIN, registro, emergencia, rate limiting) | ✅ Completo — Login y Registro unificados (2026-07-09, sprint final): layout centrado compartido, tono institucional (sin "jugar" como acción), selector de dos perfiles (Estudiante/Docente); el admin entra por el formulario Docente y `DashboardPorRol` (App.jsx) abre el panel según el rol del JWT — sin login especial ni credenciales hardcodeadas. Nota fija de contraseña olvidada → administrador. Fondo con deriva lenta de burbujas y microanimaciones, todo con `prefers-reduced-motion` |
-| Gestión de docentes (admin) | 🟡 Parcial — falta UI de edición (endpoint `PUT /api/admin/docentes/:id` existe) |
-| Gestión de estudiantes e invitaciones | ✅ Completo |
+| Gestión de docentes (admin) | ✅ Completo — rediseño del panel admin (2026-07-09): formulario de alta como asistente en 2 pasos con materias como tarjetas pastel, lista de docentes con chips por materia y modal "Editar materias" que consume el `PUT /api/admin/docentes/:id` existente (agregar/quitar materias sin recrear al docente) |
+| Gestión de estudiantes e invitaciones | ✅ Completo — rediseño (2026-07-09): tabla de estudiantes con avatares y chips de curso; Invitaciones dividida en "Pendientes" (pendiente/expirado, con eliminación previa confirmación vía nuevo `DELETE /api/admin/invitaciones/:id`, que rechaza códigos usados) e "Historial de utilizadas" (solo lectura, con fecha de uso = fecha de registro del estudiante, sin columna nueva en BD). Home del admin con hero institucional, accesos rápidos y ancho máximo 1100px centrado |
 | Material de estudio (base64 en MySQL, preview PDF/docx) | ✅ Completo |
 | Generador de Quiz (IA + editor) / Clasificador / Misión Narrativa (IA) | ✅ Completo (crear y jugar) |
 | XP / niveles / ranking | ✅ Completo (transaccional, idempotente) |
@@ -50,7 +50,7 @@ Insumos: `docs/audit/Auditoria-UX-Estudiante-v1.md` y `docs/specifications/SPEC-
 
 1. Libro de Calificaciones real (consume `GET /api/progreso/:id`, ya existente).
 2. Lógica de los 3 logros faltantes.
-3. UI de edición de docente.
+3. ~~UI de edición de docente~~ ✅ Hecho (2026-07-09, rediseño panel admin).
 4. Unificar fuente de materias (consumir `GET /api/materias` en vez de la constante de `src/constants/`).
 
 ## 5. Trabajo post-tesis (no tocar ahora)

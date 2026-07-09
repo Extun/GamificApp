@@ -193,15 +193,37 @@ router.get('/invitaciones', async (_req, res, next) => {
         await pool.query(
             "UPDATE invitaciones_estudiante SET estado = 'expirado' WHERE estado = 'pendiente' AND expira_en < NOW()"
         );
+        // `usado_en`: el código se consume en el registro del estudiante,
+        // por lo que su fecha de alta es la fecha real de uso (sin columna nueva).
         const [filas] = await pool.query(
             `SELECT i.id, i.codigo, i.curso, i.estado, i.creado_en, i.expira_en,
-                    d.username AS docente, u.nombre_completo AS usado_por
+                    d.username AS docente, u.nombre_completo AS usado_por,
+                    u.creado_en AS usado_en
              FROM invitaciones_estudiante i
              JOIN usuarios d ON d.id = i.docente_id
              LEFT JOIN usuarios u ON u.id = i.usuario_id
              ORDER BY i.creado_en DESC, i.id DESC`
         );
         res.json(filas);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// DELETE /api/admin/invitaciones/:id — solo códigos no utilizados
+// (pendientes o expirados); el historial de usados es intocable.
+router.delete('/invitaciones/:id', async (req, res, next) => {
+    try {
+        const [[inv]] = await pool.query(
+            'SELECT estado FROM invitaciones_estudiante WHERE id = ?',
+            [Number(req.params.id)]
+        );
+        if (!inv) return res.status(404).json({ error: 'Invitación no encontrada' });
+        if (inv.estado === 'usado') {
+            return res.status(409).json({ error: 'No se puede eliminar una invitación ya utilizada' });
+        }
+        await pool.query('DELETE FROM invitaciones_estudiante WHERE id = ?', [Number(req.params.id)]);
+        res.json({ ok: true });
     } catch (err) {
         next(err);
     }
