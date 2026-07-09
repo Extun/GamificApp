@@ -21,6 +21,15 @@ El **MVP está completo y en producción** (Vercel + Render + Aiven). Los tres r
 > - Migraciones versionadas en `database/migraciones/002-admin-center.sql` (+ reversa). `initDb.js` las aplica de forma idempotente al arrancar. **Falta el paso 7 de la spec: backup de Aiven + aplicar migración + deploy.**
 > - Editores (Quiz/Clasificador) con candado anti doble publicación (botón "Publicado" hasta editar algo).
 
+> **Endurecimiento por auditoría externa (2026-07-09):** correcciones puntuales sin cambios de esquema ni de arquitectura: (1) un docente solo registra XP (`POST /api/progreso`) de estudiantes que él invitó (misma regla que resetear PIN); (2) los estudiantes ya no acceden a retos ni material de materias desactivadas por ID directo; (3) el DELETE de curso también rechaza cursos con invitaciones pendientes vigentes; (4) nombre + paralelo del curso se validan a máx. 19 caracteres en total (límite de las columnas VARCHAR(20) denormalizadas); (5) el PUT de cursos sincroniza catálogo y denormalizados en una transacción; (6) los textos institucionales hardcodeados en Home admin y Registro ahora usan `institucionService`; (7) ESLint con globals de Node para `server/` (lint: 38 → 15 errores; los 15 restantes son patrones de React documentados en MASTER_PLAN §3). Los hallazgos que requieren migración de BD quedaron en el backlog (MASTER_PLAN §3, ítems 7–14).
+
+> **Módulo Administradores (2026-07-09, adelantado de la Fase 2 de SPEC-002; migración a Aiven PENDIENTE):**
+> - Roles de admin: columnas `es_principal` y `activo` en `usuarios` (migración `003-administradores.sql` + reversa; `initDb.js` la aplica idempotente y garantiza que siempre exista ≥1 Principal activo, promoviendo al admin más antiguo si hace falta).
+> - **Administrador Principal**: todo el sistema, incluida la institución y la gestión de administradores. **Administrador**: operación diaria (docentes, estudiantes, cursos, materias, invitaciones) sin institución ni administradores.
+> - Backend: CRUD `/api/admin/administradores` + middleware `soloAdminPrincipal` (verifica rol contra la BD, no contra el token, para efecto inmediato; tolera la columna ausente pre-migración). `PUT /api/admin/institucion` ahora exige Principal. El login bloquea cuentas con `activo = FALSE` y la sesión incluye `es_principal`.
+> - Invariantes en servidor: no se puede quitar el rol, desactivar ni eliminar al último Principal activo (409); nadie puede eliminarse a sí mismo.
+> - Frontend: `ModuloAdministradores` (TablaPro + ModalPanel, chips de rol/estado, "(tú)" en la cuenta propia), entradas "Administradores" e "Institución" del sidebar visibles solo para el Principal (la UI oculta, el servidor protege).
+
 > Polish Sprint (2026-07-07/08): identidad visual unificada en Login, Home y materias de ambos roles (tarjetas pastel por materia, héroes con gradiente, pestañas píldora, tablas con acentos de la paleta). Nombre institucional actualizado a **Unidad Educativa Fiscal Clemencia Coronel de Pincay** en toda la UI. Sin cambios de lógica, APIs ni BD.
 
 ## 2. Módulos implementados (verificado contra el código)

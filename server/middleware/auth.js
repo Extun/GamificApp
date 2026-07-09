@@ -21,6 +21,7 @@ export const firmarToken = (usuario) =>
             id: usuario.id,
             username: usuario.username,
             rol: usuario.rol,
+            es_principal: Boolean(usuario.es_principal),
             estudiante_id: usuario.estudiante_id ?? null
         },
         JWT_SECRET,
@@ -48,6 +49,29 @@ export const soloAdmin = (req, res, next) => {
         return res.status(403).json({ error: 'Solo el administrador puede realizar esta acción' });
     }
     next();
+};
+
+// Solo el Administrador Principal (institución y gestión de administradores).
+// Se verifica contra la BD (no contra el token) para que promover/degradar
+// o desactivar surta efecto inmediato aunque la sesión siga abierta.
+export const soloAdminPrincipal = async (req, res, next) => {
+    if (req.user?.rol !== 'admin') {
+        return res.status(403).json({ error: 'Solo el administrador principal puede realizar esta acción' });
+    }
+    try {
+        const [[fila]] = await pool.query(
+            'SELECT es_principal, activo FROM usuarios WHERE id = ?', [req.user.id]
+        );
+        if (!fila?.es_principal || !fila.activo) {
+            return res.status(403).json({ error: 'Solo el administrador principal puede realizar esta acción' });
+        }
+        next();
+    } catch (err) {
+        // Deploy a medias (columnas aún sin migrar): comportamiento previo,
+        // todo admin tiene permisos completos.
+        if (err.code === 'ER_BAD_FIELD_ERROR') return next();
+        next(err);
+    }
 };
 
 // Docente o admin (el admin hereda todo lo que puede hacer un docente).

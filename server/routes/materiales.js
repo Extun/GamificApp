@@ -20,6 +20,17 @@ router.get('/', async (req, res, next) => {
         }
 
         const esDocente = req.user?.rol === 'docente';
+        // Los estudiantes no acceden al material de materias desactivadas,
+        // ni siquiera con el ID directo (la UI oculta, el servidor protege).
+        if (req.user?.rol === 'estudiante') {
+            const [[materia]] = await pool.query(
+                'SELECT activa FROM materias WHERE id = ?',
+                [materiaId]
+            );
+            if (!materia || !materia.activa) {
+                return res.status(404).json({ error: 'Materia no encontrada' });
+            }
+        }
         const [filas] = await pool.query(
             `SELECT id, materia_id, nombre, kind, size_label, is_private,
                     page_count, thumbnail, data_url, creado_en

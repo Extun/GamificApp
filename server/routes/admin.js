@@ -3,7 +3,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import pool from '../db.js';
-import { soloAdmin } from '../middleware/auth.js';
+import { soloAdmin, soloAdminPrincipal } from '../middleware/auth.js';
 import { resetearPinADefault } from '../lib/estudiantes.js';
 
 const router = Router();
@@ -317,6 +317,11 @@ const validarCurso = (body) => {
     const paralelo = String(body?.paralelo || '').trim().toUpperCase();
     if (!nombre || nombre.length > 20) return { error: 'Nombre de curso inválido (ej: "2do")' };
     if (!paralelo || paralelo.length > 5) return { error: 'Paralelo inválido (ej: "A")' };
+    // La etiqueta "nombre paralelo" se copia a columnas VARCHAR(20)
+    // (estudiantes.curso, invitaciones_estudiante.curso): no puede excederlas.
+    if (nombre.length + 1 + paralelo.length > 20) {
+        return { error: 'Nombre + paralelo no pueden superar 19 caracteres en total' };
+    }
     const nivel = String(body?.nivel || '').trim().slice(0, 30) || null;
     return { nombre, paralelo, nivel };
 };
@@ -365,22 +370,35 @@ router.put('/cursos/:id', async (req, res, next) => {
         const datos = validarCurso(req.body);
         if (datos.error) return res.status(400).json({ error: datos.error });
         const activo = req.body?.activo === undefined ? true : Boolean(req.body.activo);
-        const [resultado] = await pool.query(
-            `UPDATE cursos SET nombre = ?, paralelo = ?, nivel = ?, activo = ?
-             WHERE id = ?`,
-            [datos.nombre, datos.paralelo, datos.nivel, activo, id]
-        );
-        if (!resultado.affectedRows) return res.status(404).json({ error: 'Curso no encontrado' });
-        // El VARCHAR `curso` denormalizado acompaña al catálogo mientras dure
-        // la transición (SPEC-002 §1.2): se sincroniza al editar el curso.
-        await pool.query(
-            `UPDATE estudiantes SET curso = CONCAT(?, ' ', ?) WHERE curso_id = ?`,
-            [datos.nombre, datos.paralelo, id]
-        );
-        await pool.query(
-            `UPDATE invitaciones_estudiante SET curso = CONCAT(?, ' ', ?) WHERE curso_id = ?`,
-            [datos.nombre, datos.paralelo, id]
-        );
+        // Transacción: el catálogo y los VARCHAR `curso` denormalizados
+        // (SPEC-002 §1.2) se actualizan juntos o no se actualiza nada.
+        const conn = await pool.getConnection();
+        try {
+            await conn.beginTransaction();
+            const [resultado] = await conn.query(
+                `UPDATE cursos SET nombre = ?, paralelo = ?, nivel = ?, activo = ?
+                 WHERE id = ?`,
+                [datos.nombre, datos.paralelo, datos.nivel, activo, id]
+            );
+            if (!resultado.affectedRows) {
+                await conn.rollback();
+                return res.status(404).json({ error: 'Curso no encontrado' });
+            }
+            await conn.query(
+                `UPDATE estudiantes SET curso = CONCAT(?, ' ', ?) WHERE curso_id = ?`,
+                [datos.nombre, datos.paralelo, id]
+            );
+            await conn.query(
+                `UPDATE invitaciones_estudiante SET curso = CONCAT(?, ' ', ?) WHERE curso_id = ?`,
+                [datos.nombre, datos.paralelo, id]
+            );
+            await conn.commit();
+        } catch (err) {
+            await conn.rollback();
+            throw err;
+        } finally {
+            conn.release();
+        }
         res.json({ ok: true });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
@@ -395,11 +413,19 @@ router.delete('/cursos/:id', async (req, res, next) => {
     try {
         const id = Number(req.params.id);
         const [[uso]] = await pool.query(
-            'SELECT COUNT(*) AS estudiantes FROM estudiantes WHERE curso_id = ?', [id]
+            `SELECT (SELECT COUNT(*) FROM estudiantes WHERE curso_id = ?) AS estudiantes,
+                    (SELECT COUNT(*) FROM invitaciones_estudiante
+                     WHERE curso_id = ? AND estado = 'pendiente' AND expira_en >= NOW()) AS pendientes`,
+            [id, id]
         );
         if (uso.estudiantes) {
             return res.status(409).json({
                 error: 'El curso tiene estudiantes. Desactívalo en su lugar.'
+            });
+        }
+        if (uso.pendientes) {
+            return res.status(409).json({
+                error: 'El curso tiene invitaciones pendientes. Desactívalo o espera a que expiren.'
             });
         }
         const [resultado] = await pool.query('DELETE FROM cursos WHERE id = ?', [id]);
@@ -407,6 +433,151 @@ router.delete('/cursos/:id', async (req, res, next) => {
         res.json({ ok: true });
     } catch (err) {
         next(err);
+    }
+});
+
+// ---- ADMINISTRADORES (roles de admin: solo el Administrador Principal) ----
+
+// ¿Cuántos Administradores Principales activos quedarían sin contar a `id`?
+// Sostiene el invariante: nunca puede quedar el sistema sin uno.
+const otrosPrincipalesActivos = async (conn, id) => {
+    const [[fila]] = await conn.query(
+        `SELECT COUNT(*) AS n FROM usuarios
+         WHERE rol = 'admin' AND es_principal = TRUE AND activo = TRUE AND id <> ?`,
+        [id]
+    );
+    return fila.n;
+};
+
+// GET /api/admin/administradores — todos los admins con su rol y estado.
+router.get('/administradores', soloAdminPrincipal, async (_req, res, next) => {
+    try {
+        const [filas] = await pool.query(
+            `SELECT id, username, es_principal, activo, creado_en
+             FROM usuarios WHERE rol = 'admin'
+             ORDER BY es_principal DESC, username`
+        );
+        res.json(filas);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// POST /api/admin/administradores — crea un admin (principal u operativo).
+// Body: { username, password, es_principal? }
+router.post('/administradores', soloAdminPrincipal, async (req, res, next) => {
+    try {
+        const username = String(req.body?.username || '').trim().toLowerCase();
+        const password = String(req.body?.password || '');
+        if (!USERNAME_VALIDO.test(username)) {
+            return res.status(400).json({ error: 'Usuario inválido (3-50 caracteres: letras, números, . _ -)' });
+        }
+        if (password.length < 8) {
+            return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+        }
+        const [creado] = await pool.query(
+            "INSERT INTO usuarios (username, password_hash, rol, es_principal) VALUES (?, ?, 'admin', ?)",
+            [username, bcrypt.hashSync(password, 10), Boolean(req.body?.es_principal)]
+        );
+        res.status(201).json({ id: creado.insertId, username, rol: 'admin' });
+    } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ error: 'Ya existe un usuario con ese nombre' });
+        }
+        next(err);
+    }
+});
+
+// PUT /api/admin/administradores/:id — contraseña, rol y/o estado.
+// Body: { password?, es_principal?, activo? }
+// Regla: el cambio no puede dejar al sistema sin un Principal activo.
+router.put('/administradores/:id', soloAdminPrincipal, async (req, res, next) => {
+    const conn = await pool.getConnection();
+    try {
+        const id = Number(req.params.id);
+        await conn.beginTransaction();
+        const [[objetivo]] = await conn.query(
+            "SELECT id, es_principal, activo FROM usuarios WHERE id = ? AND rol = 'admin' FOR UPDATE",
+            [id]
+        );
+        if (!objetivo) {
+            await conn.rollback();
+            return res.status(404).json({ error: 'Administrador no encontrado' });
+        }
+
+        const esPrincipal = req.body?.es_principal === undefined
+            ? Boolean(objetivo.es_principal) : Boolean(req.body.es_principal);
+        const activo = req.body?.activo === undefined
+            ? Boolean(objetivo.activo) : Boolean(req.body.activo);
+
+        // Si era Principal activo y deja de serlo (o se desactiva), debe
+        // quedar al menos otro Principal activo.
+        const eraPrincipalActivo = objetivo.es_principal && objetivo.activo;
+        if (eraPrincipalActivo && (!esPrincipal || !activo)) {
+            if (!(await otrosPrincipalesActivos(conn, id))) {
+                await conn.rollback();
+                return res.status(409).json({
+                    error: 'Es el último Administrador Principal activo: promueve a otro antes de cambiarle el rol o desactivarlo.'
+                });
+            }
+        }
+
+        if (req.body?.password) {
+            if (String(req.body.password).length < 8) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+            }
+            await conn.query(
+                'UPDATE usuarios SET password_hash = ?, intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id = ?',
+                [bcrypt.hashSync(String(req.body.password), 10), id]
+            );
+        }
+        await conn.query(
+            'UPDATE usuarios SET es_principal = ?, activo = ? WHERE id = ?',
+            [esPrincipal, activo, id]
+        );
+        await conn.commit();
+        res.json({ ok: true });
+    } catch (err) {
+        await conn.rollback().catch(() => {});
+        next(err);
+    } finally {
+        conn.release();
+    }
+});
+
+// DELETE /api/admin/administradores/:id — baja definitiva.
+// No puedes eliminarte a ti mismo ni al último Principal activo.
+router.delete('/administradores/:id', soloAdminPrincipal, async (req, res, next) => {
+    const conn = await pool.getConnection();
+    try {
+        const id = Number(req.params.id);
+        if (id === req.user.id) {
+            return res.status(400).json({ error: 'No puedes eliminar tu propia cuenta.' });
+        }
+        await conn.beginTransaction();
+        const [[objetivo]] = await conn.query(
+            "SELECT id, es_principal, activo FROM usuarios WHERE id = ? AND rol = 'admin' FOR UPDATE",
+            [id]
+        );
+        if (!objetivo) {
+            await conn.rollback();
+            return res.status(404).json({ error: 'Administrador no encontrado' });
+        }
+        if (objetivo.es_principal && objetivo.activo && !(await otrosPrincipalesActivos(conn, id))) {
+            await conn.rollback();
+            return res.status(409).json({
+                error: 'Es el último Administrador Principal activo: promueve a otro antes de eliminarlo.'
+            });
+        }
+        await conn.query('DELETE FROM usuarios WHERE id = ?', [id]);
+        await conn.commit();
+        res.json({ ok: true });
+    } catch (err) {
+        await conn.rollback().catch(() => {});
+        next(err);
+    } finally {
+        conn.release();
     }
 });
 
@@ -427,7 +598,8 @@ const validarImagen = (dataUrl, maxKB) => {
 };
 
 // PUT /api/admin/institucion — actualiza la configuración institucional.
-router.put('/institucion', async (req, res, next) => {
+// Solo el Administrador Principal puede modificarla.
+router.put('/institucion', soloAdminPrincipal, async (req, res, next) => {
     try {
         const nombre = String(req.body?.nombre || '').trim();
         if (nombre.length < 3 || nombre.length > 160) {

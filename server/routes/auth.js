@@ -68,6 +68,7 @@ const respuestaSesion = (res, usuario, extra = {}) =>
             username: usuario.username,
             nombre_completo: usuario.nombre_completo,
             rol: usuario.rol,
+            es_principal: Boolean(usuario.es_principal),
             estudiante_id: usuario.estudiante_id
         },
         ...extra
@@ -118,6 +119,13 @@ router.post('/login', async (req, res, next) => {
             return res.status(401).json({
                 error: esEstudiante ? 'Nombre o PIN incorrectos' : 'Usuario o contraseña incorrectos'
             });
+        }
+
+        // Cuenta desactivada por un Administrador Principal: credenciales
+        // correctas pero sin acceso (usuario.activo puede no existir si la
+        // migración 003 aún no corrió; en ese caso todos entran).
+        if (usuario.activo === 0) {
+            return res.status(403).json({ error: 'Tu cuenta está desactivada. Contacta al administrador principal.' });
         }
 
         await limpiarFallos(usuario.id);

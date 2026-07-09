@@ -45,6 +45,17 @@ Insumos: `docs/audit/Auditoria-UX-Estudiante-v1.md`, `docs/specifications/SPEC-0
 5. Validador de configuración para retos tipo `quiz`.
 6. Memoria de conversación en Asistente IA.
 
+### Hallazgos de auditoría externa (2026-07-09) diferidos a post-sustentación
+
+7. Material privado por docente: `materiales` no guarda `docente_id`, así que cualquier docente autenticado ve el material privado de cualquier materia. Requiere migración de BD (columna + backfill) → spec propia.
+8. `POST /api/admin/materias` calcula `MAX(id)+1` sin bloqueo; con un solo admin real el riesgo es teórico. Ideal: AUTO_INCREMENT (migración).
+9. El upsert de retos por `(materia_id, titulo)` no tiene índice único en BD; dos publicaciones simultáneas podrían duplicar. Requiere migración con deduplicación previa.
+10. `useAutoRefresh` puede solapar peticiones si una tarda más que el intervalo (sin cancelación); riesgo bajo con los intervalos actuales.
+11. Migraciones manuales 002 no idempotentes y `initDb` agrupa `color/icono/activa` bajo una sola comprobación de `color`; frágil ante migraciones parciales.
+12. Lint: quedan 15 errores frontend (`react-hooks/set-state-in-effect`, `react-refresh/only-export-components`); corregirlos exige reestructurar componentes.
+13. Accesibilidad de modales: sin focus trap, cierre con Escape ni restauración de foco.
+14. Rendimiento menor: `TablaPro` recibe `buscar`/`renderFila` inline (memo inútil); chunks grandes de Vite (`index` ~1.34 MB, `pdf.worker` ~1.29 MB) → code-splitting post-tesis.
+
 ## 4. Dependencias
 
 - Specs 2–5 dependen de SPEC-001 (el shell con rutas es la base).

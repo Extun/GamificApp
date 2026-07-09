@@ -17,6 +17,7 @@ import PersonAddAlt1RoundedIcon from '@mui/icons-material/PersonAddAlt1Rounded';
 import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
 import Diversity3RoundedIcon from '@mui/icons-material/Diversity3Rounded';
 import ApartmentRoundedIcon from '@mui/icons-material/ApartmentRounded';
+import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
 import { List, ListItem, ListItemIcon, ListItemButton, ListItemText } from '@mui/material';
 import authService from '../../services/authService';
 import adminService from '../../services/adminService';
@@ -26,6 +27,7 @@ import useAutoRefresh from '../../hooks/useAutoRefresh';
 import ModuloMaterias from './modulos/ModuloMaterias';
 import ModuloCursos from './modulos/ModuloCursos';
 import ModuloInstitucion from './modulos/ModuloInstitucion';
+import ModuloAdministradores from './modulos/ModuloAdministradores';
 import {
     DashboardHeader,
     StatCard,
@@ -93,6 +95,10 @@ export function AdminDashboard() {
     const [materias, setMaterias] = useState([]);
     // Cursos con conteos de estudiantes y docentes (SPEC-002).
     const [cursos, setCursos] = useState([]);
+    // Cuentas de administrador (solo las carga y ve el Principal; la UI
+    // oculta, el servidor protege).
+    const esPrincipal = authService.esPrincipal();
+    const [administradores, setAdministradores] = useState([]);
     const [error, setError] = useState('');
     const [avisoOk, setAvisoOk] = useState('');
 
@@ -109,18 +115,20 @@ export function AdminDashboard() {
     const cargar = async () => {
         try {
             setError('');
-            const [d, e, i, m, c] = await Promise.all([
+            const [d, e, i, m, c, a] = await Promise.all([
                 adminService.listarDocentes(),
                 adminService.listarEstudiantes(),
                 adminService.listarInvitaciones(),
                 listarMaterias(),
-                adminService.listarCursos()
+                adminService.listarCursos(),
+                esPrincipal ? adminService.listarAdministradores() : Promise.resolve([])
             ]);
             setDocentes(d);
             setEstudiantes(e);
             setInvitaciones(i);
             setMaterias(m);
             setCursos(c);
+            setAdministradores(a);
         } catch (err) {
             setError(err.message);
         }
@@ -234,7 +242,13 @@ export function AdminDashboard() {
                                 { id: 'materias', label: 'Materias', Icon: MenuBookRoundedIcon },
                                 { id: 'cursos', label: 'Cursos', Icon: Diversity3RoundedIcon },
                                 { id: 'invitaciones', label: 'Invitaciones', Icon: VpnKeyRoundedIcon },
-                                { id: 'institucion', label: 'Institución', Icon: ApartmentRoundedIcon }
+                                // Solo el Administrador Principal gestiona
+                                // administradores e institución (el servidor
+                                // rechaza igual las peticiones de los demás).
+                                ...(esPrincipal ? [
+                                    { id: 'administradores', label: 'Administradores', Icon: AdminPanelSettingsRoundedIcon },
+                                    { id: 'institucion', label: 'Institución', Icon: ApartmentRoundedIcon }
+                                ] : [])
                             ].map(({ id, label, Icon }) => (
                                 <ListItem disablePadding key={id}>
                                     <ListItemButton
@@ -285,7 +299,7 @@ export function AdminDashboard() {
                                     <div className="admin-hero-avatar" aria-hidden="true">🏫</div>
                                     <div className="admin-hero-meta">
                                         <h1>Centro de administración</h1>
-                                        <p>Unidad Educativa Fiscal Clemencia Coronel de Pincay · Resumen general de la institución.</p>
+                                        <p>{getInstitucionCache()?.nombre || 'Institución educativa'} · Resumen general de la institución.</p>
                                     </div>
                                 </header>
 
@@ -580,8 +594,19 @@ export function AdminDashboard() {
                             </div>
                         )}
 
+                        {/* ADMINISTRADORES — roles de admin (solo el Principal). */}
+                        {pagina === 'administradores' && esPrincipal && (
+                            <div className="dash-secciones">
+                                <DashboardHeader
+                                    titulo="Administradores"
+                                    subtitulo="Las cuentas que gestionan la plataforma. El Administrador Principal controla la institución y a los demás administradores."
+                                />
+                                <ModuloAdministradores administradores={administradores} ejecutar={ejecutar} />
+                            </div>
+                        )}
+
                         {/* INSTITUCIÓN — configuración global (SPEC-002). */}
-                        {pagina === 'institucion' && (
+                        {pagina === 'institucion' && esPrincipal && (
                             <div className="dash-secciones">
                                 <DashboardHeader
                                     titulo="Institución"

@@ -81,6 +81,19 @@ router.post('/', async (req, res, next) => {
     if (req.user.rol === 'estudiante' && req.user.estudiante_id !== estudianteId) {
         return res.status(403).json({ error: 'Solo puedes registrar tu propio progreso' });
     }
+    // Un docente solo puede registrar progreso de estudiantes que él invitó
+    // (misma regla que resetear PIN); el admin no tiene restricción.
+    if (req.user.rol === 'docente') {
+        const [propio] = await pool.query(
+            `SELECT 1 FROM invitaciones_estudiante i
+             JOIN usuarios u ON u.id = i.usuario_id
+             WHERE i.docente_id = ? AND u.estudiante_id = ?`,
+            [req.user.id, estudianteId]
+        );
+        if (!propio.length) {
+            return res.status(403).json({ error: 'Ese estudiante no pertenece a tus grupos' });
+        }
+    }
 
     const conn = await pool.getConnection();
     try {

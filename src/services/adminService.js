@@ -53,6 +53,15 @@ export const actualizarCurso = (id, datos) =>
 export const eliminarCurso = (id) =>
     pedir(`/api/admin/cursos/${id}`, { method: 'DELETE' });
 
+// ---- Administradores (solo Administrador Principal) ----
+export const listarAdministradores = () => pedir('/api/admin/administradores');
+export const crearAdministrador = (datos) =>
+    pedir('/api/admin/administradores', { method: 'POST', body: JSON.stringify(datos) });
+export const actualizarAdministrador = (id, datos) =>
+    pedir(`/api/admin/administradores/${id}`, { method: 'PUT', body: JSON.stringify(datos) });
+export const eliminarAdministrador = (id) =>
+    pedir(`/api/admin/administradores/${id}`, { method: 'DELETE' });
+
 // ---- Institución (SPEC-002) ----
 export const actualizarInstitucion = (datos) =>
     pedir('/api/admin/institucion', { method: 'PUT', body: JSON.stringify(datos) });
@@ -74,5 +83,9 @@ export default {
     crearCurso,
     actualizarCurso,
     eliminarCurso,
+    listarAdministradores,
+    crearAdministrador,
+    actualizarAdministrador,
+    eliminarAdministrador,
     actualizarInstitucion
 };

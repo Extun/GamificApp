@@ -4,6 +4,7 @@ import SchoolRoundedIcon from '@mui/icons-material/SchoolRounded';
 import CelebrationRoundedIcon from '@mui/icons-material/CelebrationRounded';
 import '../admin/login.css';
 import authService from '../../services/authService';
+import { getInstitucionCache } from '../../services/institucionService';
 
 // Registro de estudiante con código de invitación del docente.
 // Al terminar muestra el PIN inicial (su fecha de nacimiento) y el código
@@ -126,7 +127,7 @@ export function RegistroEstudiante() {
                     )}
                 </div>
 
-                <span className="login-pie">Unidad Educativa Fiscal Clemencia Coronel de Pincay</span>
+                <span className="login-pie">{getInstitucionCache()?.nombre || 'GamificApp'}</span>
             </main>
         </div>
     );

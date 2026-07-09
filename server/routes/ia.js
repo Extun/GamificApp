@@ -154,7 +154,7 @@ const parsearQuiz = (texto = '') => {
 
 // ---- POST /api/ia/quiz ----
 // Body: { materia, tema, cantidad, existentes?: [enunciados ya usados] }
-router.post('/quiz', soloDocente, async (req, res, next) => {
+router.post('/quiz', soloDocente, async (req, res, _next) => {
     const materia = String(req.body?.materia || '').trim().slice(0, 60);
     const tema = String(req.body?.tema || '').trim().slice(0, 200);
     const cantidad = Math.min(Math.max(Number(req.body?.cantidad) || 3, 1), 10);

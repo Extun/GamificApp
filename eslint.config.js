@@ -18,4 +18,17 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
+  // El código del servidor corre en Node, no en navegador: sin esto,
+  // `process` y similares aparecen como no definidos.
+  {
+    files: ['server/**/*.js'],
+    languageOptions: {
+      globals: globals.node,
+    },
+    rules: {
+      // Los manejadores de error de Express exigen 4 argumentos aunque
+      // `next` no se use; el prefijo _ marca esa intención.
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    },
+  },
 ])

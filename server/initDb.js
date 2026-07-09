@@ -37,8 +37,10 @@ export const inicializarEsquema = async () => {
         // Estas dependen de la tabla `cursos` que el script acaba de crear.
         await migrarColumnasCursoId(conn);
         await migrarDatosSpec002(conn);
+        await migrarColumnasAdmins(conn);
         console.log('✅ Esquema verificado/creado en la base de datos.');
         await asegurarAdmin(conn);
+        await asegurarAdminPrincipal(conn);
     } finally {
         await conn.end();
     }
@@ -118,6 +120,35 @@ const migrarDatosSpec002 = async (conn) => {
     await conn.query(`UPDATE invitaciones_estudiante i JOIN cursos c
         ON TRIM(i.curso) = CONCAT(c.nombre, ' ', c.paralelo)
         SET i.curso_id = c.id WHERE i.curso_id IS NULL`);
+};
+
+// Módulo Administradores — roles de admin: es_principal distingue al
+// Administrador Principal (institución + administradores) del Administrador
+// operativo (docentes, estudiantes, cursos, materias, invitaciones).
+// `activo` permite desactivar cuentas de acceso sin borrarlas.
+const migrarColumnasAdmins = async (conn) => {
+    if (await faltaColumna(conn, 'usuarios', 'es_principal')) {
+        await conn.query(`ALTER TABLE usuarios
+            ADD COLUMN es_principal BOOLEAN NOT NULL DEFAULT FALSE,
+            ADD COLUMN activo       BOOLEAN NOT NULL DEFAULT TRUE`);
+        console.log('✅ Migración: columnas es_principal/activo agregadas a usuarios.');
+    }
+};
+
+// Invariante del sistema: SIEMPRE existe al menos un Administrador Principal
+// activo. Si no hay ninguno (primera migración o datos corruptos), se
+// promueve al admin activo más antiguo.
+const asegurarAdminPrincipal = async (conn) => {
+    const [[hay]] = await conn.query(
+        "SELECT COUNT(*) AS n FROM usuarios WHERE rol = 'admin' AND es_principal = TRUE AND activo = TRUE"
+    );
+    if (!hay.n) {
+        await conn.query(
+            `UPDATE usuarios SET es_principal = TRUE, activo = TRUE
+             WHERE rol = 'admin' ORDER BY id LIMIT 1`
+        );
+        console.log('✅ Migración: el admin más antiguo fue promovido a Administrador Principal.');
+    }
 };
 
 // Garantiza que exista la cuenta admin SIN claves públicas en el repositorio:

@@ -85,6 +85,11 @@ router.get('/', async (req, res, next) => {
 
     const condiciones = ["estado = 'publicado'"];
     const params = [];
+    // Los estudiantes no ven retos de materias desactivadas, ni siquiera
+    // pidiendo el materia_id directo (la UI oculta, el servidor protege).
+    if (req.user?.rol === 'estudiante') {
+        condiciones.push('materia_id IN (SELECT id FROM materias WHERE activa = TRUE)');
+    }
     if (req.query.materia_id !== undefined) {
         if (!esIdValido(materiaId)) {
             return res.status(400).json({ error: 'materia_id debe ser un entero positivo' });

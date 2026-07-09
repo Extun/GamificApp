@@ -99,6 +99,10 @@ export const getUsuario = () => {
 
 export const getRol = () => getUsuario()?.rol || null;
 
+// ¿La sesión es de un Administrador Principal? La UI solo oculta módulos
+// con esto: el servidor revalida el rol contra la BD en cada petición.
+export const esPrincipal = () => Boolean(getUsuario()?.es_principal);
+
 export const isAuthenticated = () => Boolean(getToken());
 
 // fetch con el token incluido. Si el servidor responde 401 (token expirado
@@ -126,6 +130,7 @@ const authService = {
     getToken,
     getUsuario,
     getRol,
+    esPrincipal,
     isAuthenticated,
     authFetch
 };
