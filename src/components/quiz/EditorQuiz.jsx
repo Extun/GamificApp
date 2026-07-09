@@ -22,7 +22,7 @@ const preguntaVacia = () => ({
 // Editor pedagógico del quiz. Recibe el array de preguntas y notifica cada cambio
 // con `onChange(nuevasPreguntas)`. El contenedor decide cuándo publicar.
 // Layout de acordeón: todas cerradas al abrir; solo una expandida a la vez.
-export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar, publicando }) {
+export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar, publicando, publicado }) {
     // Ninguna pregunta expandida al abrir el quiz (vista limpia de entrada).
     // Single-open: abrir una contrae automáticamente las demás.
     const [abierta, setAbierta] = useState(-1);
@@ -241,18 +241,22 @@ export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar,
 
             <div className="editor-publicar-barra">
                 <p className="editor-publicar-hint">
-                    {listaParaPublicar
-                        ? 'Todo listo. Al publicar, el quiz será visible para los estudiantes.'
-                        : 'Completa el enunciado y las 4 alternativas de cada pregunta para poder publicar.'}
+                    {publicado
+                        ? 'Este quiz ya está publicado. Si lo editas, podrás publicarlo como un quiz nuevo.'
+                        : listaParaPublicar
+                            ? `Todo listo: ${total} preguntas · recompensa de ${total * 100} XP. Al publicar, el quiz será visible para los estudiantes.`
+                            : 'Completa el enunciado y las 4 alternativas de cada pregunta para poder publicar.'}
                 </p>
                 <button
                     type="button"
                     className="editor-btn editor-btn-publicar"
                     onClick={onPublicar}
-                    disabled={!listaParaPublicar || publicando}
+                    disabled={!listaParaPublicar || publicando || publicado}
                 >
-                    <RocketLaunchRoundedIcon sx={{ fontSize: '1.15rem' }} />
-                    {publicando ? 'Publicando…' : 'Publicar quiz para estudiantes'}
+                    {publicado
+                        ? <CheckCircleRoundedIcon sx={{ fontSize: '1.15rem' }} />
+                        : <RocketLaunchRoundedIcon sx={{ fontSize: '1.15rem' }} />}
+                    {publicado ? 'Publicado' : publicando ? 'Publicando…' : 'Publicar quiz para estudiantes'}
                 </button>
             </div>
         </div>

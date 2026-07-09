@@ -30,20 +30,9 @@ import ExtensionRoundedIcon from '@mui/icons-material/ExtensionRounded';
 import gamificationService, { CATALOGO_LOGROS } from '../../services/gamificationService';
 import authService from '../../services/authService';
 import { obtenerMaterial } from '../../services/materialesService';
-import MATERIAS, { NOMBRES_MATERIAS } from '../../constants/materias';
+import { listarMaterias, uiMateria } from '../../services/materiasService';
+import { getInstitucionCache } from '../../services/institucionService';
 import { EmptyState } from '../../components/dashboard/DashboardWidgets';
-
-const materias = NOMBRES_MATERIAS;
-
-// Identidad visual de cada "mundo" (materia) en el Home del estudiante.
-// `tono` elige la paleta de la tarjeta en dashboardEstudiante.css.
-const MATERIA_UI = {
-    'Matemáticas': { emoji: '🔢', tono: 1 },
-    'Lenguaje': { emoji: '📖', tono: 2 },
-    'Ciencias Naturales': { emoji: '🌱', tono: 3 },
-    'Ciencias Sociales': { emoji: '🌎', tono: 4 },
-    'Educación Física': { emoji: '⚽', tono: 5 }
-};
 
 // Presentación (icono + color) por cada logro del catálogo del servicio.
 const LOGRO_UI = {
@@ -91,6 +80,18 @@ export function DashboardEstudiante() {
     // cuando el estudiante aún no tiene progreso registrado.
     const [retosDisponibles, setRetosDisponibles] = useState([]);
 
+    // Catálogo dinámico de materias (SPEC-002): los "mundos" del estudiante
+    // vienen de la BD (solo las activas), con su color e icono oficiales.
+    const [catalogoMaterias, setCatalogoMaterias] = useState([]);
+    useEffect(() => {
+        let vigente = true;
+        listarMaterias()
+            .then((lista) => { if (vigente) setCatalogoMaterias(lista); })
+            .catch(() => { /* sin red: el resto del panel sigue funcionando */ });
+        return () => { vigente = false; };
+    }, []);
+    const materias = catalogoMaterias.map((m) => m.nombre);
+
     // Identidad del estudiante en sesión: habilita la persistencia en MySQL.
     const estudianteId = gamificationService.getEstudianteId();
 
@@ -125,7 +126,7 @@ export function DashboardEstudiante() {
     // privado del docente para el rol estudiante.
     useEffect(() => {
         if (!materiaSeleccionada) return;
-        const materia = MATERIAS.find((m) => m.nombre === materiaSeleccionada);
+        const materia = catalogoMaterias.find((m) => m.nombre === materiaSeleccionada);
         if (!materia) return;
         let vigente = true;
         obtenerRetosPublicados({ materiaId: materia.id, tipo: 'quiz' })
@@ -137,7 +138,9 @@ export function DashboardEstudiante() {
         obtenerMaterial(materia.id)
             .then((lista) => { if (vigente) setArchivos(lista); });
         return () => { vigente = false; };
-    }, [materiaSeleccionada]);
+        // catalogoMaterias entra en las dependencias: al llegar el catálogo
+        // de la API se resuelve el id y recién ahí se cargan los retos.
+    }, [materiaSeleccionada, catalogoMaterias]);
 
     // Avance por reto ordenado del más reciente al más antiguo.
     const actividadReciente = useMemo(
@@ -154,7 +157,7 @@ export function DashboardEstudiante() {
         ? retosDisponibles[retosDisponibles.length - 1]
         : null;
     const materiaPrimerReto = primerRetoDisponible
-        ? MATERIAS.find((m) => m.id === primerRetoDisponible.materia_id)?.nombre
+        ? catalogoMaterias.find((m) => m.id === primerRetoDisponible.materia_id)?.nombre
         : null;
 
     const abrirMateria = (mat) => {
@@ -212,7 +215,10 @@ export function DashboardEstudiante() {
             <div className="sidebar-container">
                 <aside className="sidebar">
                     <div className="aside-content-options">
-                        <h2 style={{ pointerEvents: "none" }}>Unidad Educativa Fiscal Clemencia Coronel de Pincay</h2>
+                        {getInstitucionCache()?.logo_data && (
+                            <img className="sidebar-logo" src={getInstitucionCache().logo_data} alt="" />
+                        )}
+                        <h2 style={{ pointerEvents: "none" }}>{getInstitucionCache()?.nombre || 'Unidad Educativa Fiscal Clemencia Coronel de Pincay'}</h2>
                         <List>
                             <ListItem disablePadding>
                                 <ListItemButton className="nav-item" onClick={() => { setPagina(""); setMateriaSeleccionada(null); }}>
@@ -305,14 +311,15 @@ export function DashboardEstudiante() {
                                 <h2>Mis mundos</h2>
                                 <div className="home-mundos-grid">
                                     {materias.map((mat) => {
-                                        const ui = MATERIA_UI[mat] || { emoji: '📚', tono: 1 };
+                                        const ui = uiMateria(mat);
                                         return (
                                             <button
                                                 key={mat}
-                                                className={`home-mundo home-mundo-${ui.tono}`}
+                                                className="home-mundo"
+                                                style={ui.estilo}
                                                 onClick={() => irAMateria(mat)}
                                             >
-                                                <span className="home-mundo-emoji" aria-hidden="true">{ui.emoji}</span>
+                                                <span className="home-mundo-emoji" aria-hidden="true">{ui.icono}</span>
                                                 <span>{mat}</span>
                                             </button>
                                         );
@@ -344,14 +351,15 @@ export function DashboardEstudiante() {
                             </div>
                             <div className="home-mundos-grid">
                                 {materias.map((mat) => {
-                                    const ui = MATERIA_UI[mat] || { emoji: '📚', tono: 1 };
+                                    const ui = uiMateria(mat);
                                     return (
                                         <button
                                             key={mat}
-                                            className={`home-mundo home-mundo-${ui.tono}`}
+                                            className="home-mundo"
+                                            style={ui.estilo}
                                             onClick={() => abrirMateria(mat)}
                                         >
-                                            <span className="home-mundo-emoji" aria-hidden="true">{ui.emoji}</span>
+                                            <span className="home-mundo-emoji" aria-hidden="true">{ui.icono}</span>
                                             <span>{mat}</span>
                                         </button>
                                     );
@@ -366,10 +374,10 @@ export function DashboardEstudiante() {
                             <button className="back-btn" onClick={volver}>← Volver a mis mundos</button>
 
                             {(() => {
-                                const ui = MATERIA_UI[materiaSeleccionada] || { emoji: '📚', tono: 1 };
+                                const ui = uiMateria(materiaSeleccionada);
                                 return (
-                                    <header className={`materia-hero materia-hero-${ui.tono}`}>
-                                        <span className="materia-hero-emoji" aria-hidden="true">{ui.emoji}</span>
+                                    <header className="materia-hero" style={ui.estilo}>
+                                        <span className="materia-hero-emoji" aria-hidden="true">{ui.icono}</span>
                                         <div className="materia-hero-meta">
                                             <h1>{materiaSeleccionada}</h1>
                                             <p>¿Qué quieres hacer hoy en este mundo?</p>

@@ -21,6 +21,15 @@
     justify-content: space-between;
 }
 
+/* Logo institucional en la cabecera del sidebar (SPEC-002) */
+.sidebar-logo {
+    display: block;
+    max-height: 56px;
+    max-width: 70%;
+    object-fit: contain;
+    margin: 0 8px 12px;
+}
+
 .aside-content-options h2 {
     font-size: 1rem;
     line-height: 1.35;
@@ -1524,11 +1533,8 @@
     line-height: 1.35;
 }
 
-.home-doc-materia-1 { background: #e0f2fe; border-color: #bae6fd; }
 .home-doc-materia-2 { background: #fce7f3; border-color: #fbcfe8; }
-.home-doc-materia-3 { background: #dcfce7; border-color: #bbf7d0; }
 .home-doc-materia-4 { background: #fef3c7; border-color: #fde68a; }
-.home-doc-materia-5 { background: #ede9fe; border-color: #ddd6fe; }
 
 /* Mi aula: tarjeta-acceso amigable (espejo de home-logros) */
 .home-doc-aula {
@@ -1614,11 +1620,8 @@
 .materia-hero-meta h1 { margin: 0 0 4px; font-size: 1.7rem; }
 .materia-hero-meta p { margin: 0; color: var(--color-text-muted); font-size: 0.95rem; }
 
-.materia-hero-1 { background: #e0f2fe; border-color: #bae6fd; }
 .materia-hero-2 { background: #fce7f3; border-color: #fbcfe8; }
-.materia-hero-3 { background: #dcfce7; border-color: #bbf7d0; }
 .materia-hero-4 { background: #fef3c7; border-color: #fde68a; }
-.materia-hero-5 { background: #ede9fe; border-color: #ddd6fe; }
 
 /* Selector de tipo de actividad: el protagonista */
 .materia-crear {

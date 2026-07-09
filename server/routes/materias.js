@@ -3,12 +3,16 @@ import pool from '../db.js';
 
 const router = Router();
 
-// GET /api/materias — las 5 materias oficiales, en el mismo orden de IDs
-// que usa el frontend (src/constants/materias.js).
-router.get('/', async (_req, res, next) => {
+// GET /api/materias — catálogo dinámico (SPEC-002). El admin recibe todas
+// (gestiona también las desactivadas); docentes y estudiantes solo las
+// activas. `color` e `icono` pintan la identidad visual en el frontend.
+router.get('/', async (req, res, next) => {
     try {
+        const soloActivas = req.user?.rol !== 'admin';
         const [materias] = await pool.query(
-            'SELECT id, nombre FROM materias ORDER BY id'
+            `SELECT id, nombre, color, icono, activa FROM materias
+             ${soloActivas ? 'WHERE activa = TRUE' : ''}
+             ORDER BY id`
         );
         res.json(materias);
     } catch (err) {

@@ -6,7 +6,7 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import { EditorQuiz } from '../../components/quiz/EditorQuiz';
 import { publicarReto } from '../../services/retosService';
 import { authFetch } from '../../services/authService';
-import MATERIAS from '../../constants/materias';
+import { idPorNombre } from '../../services/materiasService';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -34,6 +34,7 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
     // cuando no se está editando nada.
     const [quizEdit, setQuizEdit] = useState(null);
     const [cargando, setCargando] = useState(false);
+    const [publicando, setPublicando] = useState(false);
     const [error, setError] = useState('');
     const [aviso, setAviso] = useState('');
     const [historialTodo, setHistorialTodo] = useState(leerHistorialTodo);
@@ -88,9 +89,11 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
         setQuizEdit((actual) => (actual?.id === id ? null : actual));
     };
 
-    // Sincroniza los cambios del editor con el estado y el historial.
+    // Sincroniza los cambios del editor con el estado y el historial. Si el
+    // quiz ya estaba publicado, editar lo convierte en un borrador nuevo (al
+    // publicarlo otra vez se crea otro reto, no se modifica el anterior).
     const actualizarPreguntas = (nuevasPreguntas) => {
-        const actualizado = { ...quizEdit, preguntas: nuevasPreguntas, cantidad: nuevasPreguntas.length };
+        const actualizado = { ...quizEdit, preguntas: nuevasPreguntas, cantidad: nuevasPreguntas.length, estado: 'borrador' };
         setQuizEdit(actualizado);
         actualizarEnHistorial(actualizado);
     };
@@ -99,11 +102,13 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
     // ven los estudiantes desde cualquier navegador/dispositivo. El historial
     // local queda solo como espacio de trabajo/borradores del docente.
     const publicarQuiz = async () => {
-        const materiaId = MATERIAS.find((m) => m.nombre === materia)?.id;
+        if (publicando || quizEdit?.estado === 'publicado') return;
+        const materiaId = idPorNombre(materia);
         if (!materiaId) {
             setError('No se reconoce la materia actual; no se puede publicar.');
             return;
         }
+        setPublicando(true);
         try {
             setError('');
             await publicarReto({
@@ -120,6 +125,8 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
             setTimeout(() => setAviso(''), 4000);
         } catch (err) {
             setError(`No se pudo publicar el quiz: ${err.message}`);
+        } finally {
+            setPublicando(false);
         }
     };
 
@@ -235,6 +242,8 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                     onChange={actualizarPreguntas}
                     onAgregarIA={agregarConIA}
                     onPublicar={publicarQuiz}
+                    publicando={publicando}
+                    publicado={quizEdit.estado === 'publicado'}
                 />
             )}
 

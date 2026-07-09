@@ -36,6 +36,27 @@ export const listarInvitaciones = () => pedir('/api/admin/invitaciones');
 export const eliminarInvitacion = (id) =>
     pedir(`/api/admin/invitaciones/${id}`, { method: 'DELETE' });
 
+// ---- Materias dinámicas (SPEC-002) ----
+export const crearMateria = (datos) =>
+    pedir('/api/admin/materias', { method: 'POST', body: JSON.stringify(datos) });
+export const actualizarMateria = (id, datos) =>
+    pedir(`/api/admin/materias/${id}`, { method: 'PUT', body: JSON.stringify(datos) });
+export const eliminarMateria = (id) =>
+    pedir(`/api/admin/materias/${id}`, { method: 'DELETE' });
+
+// ---- Cursos (SPEC-002) ----
+export const listarCursos = () => pedir('/api/admin/cursos');
+export const crearCurso = (datos) =>
+    pedir('/api/admin/cursos', { method: 'POST', body: JSON.stringify(datos) });
+export const actualizarCurso = (id, datos) =>
+    pedir(`/api/admin/cursos/${id}`, { method: 'PUT', body: JSON.stringify(datos) });
+export const eliminarCurso = (id) =>
+    pedir(`/api/admin/cursos/${id}`, { method: 'DELETE' });
+
+// ---- Institución (SPEC-002) ----
+export const actualizarInstitucion = (datos) =>
+    pedir('/api/admin/institucion', { method: 'PUT', body: JSON.stringify(datos) });
+
 export default {
     listarDocentes,
     crearDocente,
@@ -45,5 +66,13 @@ export default {
     resetearPinEstudiante,
     eliminarEstudiante,
     listarInvitaciones,
-    eliminarInvitacion
+    eliminarInvitacion,
+    crearMateria,
+    actualizarMateria,
+    eliminarMateria,
+    listarCursos,
+    crearCurso,
+    actualizarCurso,
+    eliminarCurso,
+    actualizarInstitucion
 };

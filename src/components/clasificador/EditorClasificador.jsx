@@ -5,7 +5,7 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import RocketLaunchRoundedIcon from '@mui/icons-material/RocketLaunchRounded';
 import CategoryRoundedIcon from '@mui/icons-material/CategoryRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
-import MATERIAS from '../../constants/materias';
+import { idPorNombre } from '../../services/materiasService';
 import { publicarReto } from '../../services/retosService';
 import { PUNTOS_POR_ACIERTO } from '../../services/gamificationService';
 import './editorClasificador.css';
@@ -32,10 +32,13 @@ export function EditorClasificador({ materia }) {
     // Texto en el input "nuevo elemento" de cada categoría, por id.
     const [nuevoElemento, setNuevoElemento] = useState({});
     const [publicando, setPublicando] = useState(false);
+    // Tras publicar, el botón queda bloqueado hasta que el docente edite algo:
+    // así un doble clic no crea el mismo juego dos veces.
+    const [publicado, setPublicado] = useState(false);
     const [aviso, setAviso] = useState('');
     const [error, setError] = useState('');
 
-    const materiaId = MATERIAS.find((m) => m.nombre === materia)?.id;
+    const materiaId = idPorNombre(materia);
     const totalElementos = categorias.reduce((n, c) => n + c.elementos.length, 0);
 
     // Regla mínima de publicación: título, 2+ categorías con nombre y al
@@ -46,12 +49,17 @@ export function EditorClasificador({ materia }) {
         categorias.every((c) => c.nombre.trim() && c.elementos.length >= 1);
 
     const editarCategoria = (id, cambio) => {
+        setPublicado(false);
         setCategorias((prev) => prev.map((c) => (c.id === id ? { ...c, ...cambio } : c)));
     };
 
-    const agregarCategoria = () => setCategorias((prev) => [...prev, categoriaVacia()]);
+    const agregarCategoria = () => {
+        setPublicado(false);
+        setCategorias((prev) => [...prev, categoriaVacia()]);
+    };
 
     const eliminarCategoria = (id) => {
+        setPublicado(false);
         setCategorias((prev) => (prev.length > 2 ? prev.filter((c) => c.id !== id) : prev));
     };
 
@@ -67,7 +75,7 @@ export function EditorClasificador({ materia }) {
     };
 
     const publicar = async () => {
-        if (!listoParaPublicar || publicando) return;
+        if (!listoParaPublicar || publicando || publicado) return;
         if (!materiaId) {
             setError('No se reconoce la materia actual; recarga la página.');
             return;
@@ -91,6 +99,7 @@ export function EditorClasificador({ materia }) {
                     }))
                 }
             });
+            setPublicado(true);
             setAviso('¡Juego publicado! Ya es visible para los estudiantes.');
             setTimeout(() => setAviso(''), 4000);
         } catch (err) {
@@ -118,7 +127,7 @@ export function EditorClasificador({ materia }) {
                 <input
                     type="text"
                     value={titulo}
-                    onChange={(e) => setTitulo(e.target.value)}
+                    onChange={(e) => { setPublicado(false); setTitulo(e.target.value); }}
                     placeholder="Ej. Animales acuáticos vs terrestres"
                 />
             </label>
@@ -196,7 +205,9 @@ export function EditorClasificador({ materia }) {
 
             <div className="clasificador-publicar-barra">
                 <p className="clasificador-publicar-hint">
-                    {listoParaPublicar
+                    {publicado
+                        ? 'Este juego ya está publicado. Si cambias algo, podrás publicarlo como un juego nuevo.'
+                        : listoParaPublicar
                         ? `Todo listo: ${categorias.length} categorías y ${totalElementos} elementos. Recompensa: ${totalElementos * PUNTOS_POR_ACIERTO} XP.`
                         : 'Escribe el título, nombra al menos 2 categorías y añade un elemento o más a cada una.'}
                 </p>
@@ -204,10 +215,12 @@ export function EditorClasificador({ materia }) {
                     type="button"
                     className="clasificador-btn-publicar"
                     onClick={publicar}
-                    disabled={!listoParaPublicar || publicando}
+                    disabled={!listoParaPublicar || publicando || publicado}
                 >
-                    <RocketLaunchRoundedIcon sx={{ fontSize: '1.15rem' }} />
-                    {publicando ? 'Publicando…' : 'Publicar juego para estudiantes'}
+                    {publicado
+                        ? <CheckCircleRoundedIcon sx={{ fontSize: '1.15rem' }} />
+                        : <RocketLaunchRoundedIcon sx={{ fontSize: '1.15rem' }} />}
+                    {publicado ? 'Publicado' : publicando ? 'Publicando…' : 'Publicar juego para estudiantes'}
                 </button>
             </div>
         </section>

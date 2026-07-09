@@ -30,12 +30,94 @@ export const inicializarEsquema = async () => {
     });
 
     try {
+        // Las columnas nuevas de `materias` deben existir ANTES del script:
+        // sus seeds (INSERT IGNORE ... color, icono) las referencian.
+        await migrarColumnasMaterias(conn);
         await conn.query(sql);
+        // Estas dependen de la tabla `cursos` que el script acaba de crear.
+        await migrarColumnasCursoId(conn);
+        await migrarDatosSpec002(conn);
         console.log('✅ Esquema verificado/creado en la base de datos.');
         await asegurarAdmin(conn);
     } finally {
         await conn.end();
     }
+};
+
+// ¿La columna ya existe en esta base? (MySQL 8 no soporta ADD COLUMN IF NOT
+// EXISTS, así que las migraciones se guardan con information_schema.)
+const faltaColumna = async (conn, tabla, columna) => {
+    const [[fila]] = await conn.query(
+        `SELECT COUNT(*) AS n FROM information_schema.columns
+         WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?`,
+        [tabla, columna]
+    );
+    return fila.n === 0;
+};
+
+// SPEC-002 §1.1 — materias dinámicas: color, icono y estado activa.
+const migrarColumnasMaterias = async (conn) => {
+    if (await faltaColumna(conn, 'materias', 'color')) {
+        await conn.query(`ALTER TABLE materias
+            ADD COLUMN color  VARCHAR(7) NOT NULL DEFAULT '#e0f2fe',
+            ADD COLUMN icono  VARCHAR(8) NOT NULL DEFAULT '📚',
+            ADD COLUMN activa BOOLEAN    NOT NULL DEFAULT TRUE`);
+        console.log('✅ Migración: columnas color/icono/activa agregadas a materias.');
+    }
+};
+
+// SPEC-002 §1.2 — relación al catálogo de cursos (el VARCHAR se conserva).
+const migrarColumnasCursoId = async (conn) => {
+    if (await faltaColumna(conn, 'estudiantes', 'curso_id')) {
+        await conn.query(`ALTER TABLE estudiantes
+            ADD COLUMN curso_id INT UNSIGNED NULL,
+            ADD CONSTRAINT fk_est_curso FOREIGN KEY (curso_id)
+                REFERENCES cursos (id) ON UPDATE CASCADE ON DELETE SET NULL`);
+        console.log('✅ Migración: curso_id agregado a estudiantes.');
+    }
+    if (await faltaColumna(conn, 'invitaciones_estudiante', 'curso_id')) {
+        await conn.query(`ALTER TABLE invitaciones_estudiante
+            ADD COLUMN curso_id INT UNSIGNED NULL,
+            ADD CONSTRAINT fk_inv_curso FOREIGN KEY (curso_id)
+                REFERENCES cursos (id) ON UPDATE CASCADE ON DELETE SET NULL`);
+        console.log('✅ Migración: curso_id agregado a invitaciones_estudiante.');
+    }
+};
+
+// Ajustes de datos, todos idempotentes (condiciones que solo aplican una vez).
+const migrarDatosSpec002 = async (conn) => {
+    // Rename conservador: mismo ID 2, ninguna relación se toca.
+    await conn.query(
+        "UPDATE materias SET nombre = 'Lengua y Literatura' WHERE id = 2 AND nombre = 'Lenguaje'"
+    );
+    // Identidad visual inicial solo donde sigue el valor por defecto.
+    const identidad = [
+        [1, '#e0f2fe', '🔢'], [2, '#fce7f3', '📖'], [3, '#dcfce7', '🌱'],
+        [4, '#fef3c7', '🌎'], [5, '#ede9fe', '⚽'], [6, '#ffe4e6', '🗣️']
+    ];
+    for (const [id, color, icono] of identidad) {
+        await conn.query(
+            "UPDATE materias SET color = ?, icono = ? WHERE id = ? AND icono = '📚'",
+            [color, icono, id]
+        );
+    }
+    // Backfill de cursos desde el texto libre existente ("2do A" => 2do / A).
+    // Solo textos con el patrón "nombre paralelo"; el resto queda con
+    // curso_id NULL y se corrige desde el panel.
+    await conn.query(`INSERT IGNORE INTO cursos (nombre, paralelo)
+        SELECT DISTINCT TRIM(SUBSTRING_INDEX(curso, ' ', 1)), TRIM(SUBSTRING_INDEX(curso, ' ', -1))
+        FROM estudiantes
+        WHERE curso LIKE '% %' AND TRIM(curso) <> ''`);
+    await conn.query(`INSERT IGNORE INTO cursos (nombre, paralelo)
+        SELECT DISTINCT TRIM(SUBSTRING_INDEX(curso, ' ', 1)), TRIM(SUBSTRING_INDEX(curso, ' ', -1))
+        FROM invitaciones_estudiante
+        WHERE curso LIKE '% %' AND TRIM(curso) <> ''`);
+    await conn.query(`UPDATE estudiantes e JOIN cursos c
+        ON TRIM(e.curso) = CONCAT(c.nombre, ' ', c.paralelo)
+        SET e.curso_id = c.id WHERE e.curso_id IS NULL`);
+    await conn.query(`UPDATE invitaciones_estudiante i JOIN cursos c
+        ON TRIM(i.curso) = CONCAT(c.nombre, ' ', c.paralelo)
+        SET i.curso_id = c.id WHERE i.curso_id IS NULL`);
 };
 
 // Garantiza que exista la cuenta admin SIN claves públicas en el repositorio:

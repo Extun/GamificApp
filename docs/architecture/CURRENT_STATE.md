@@ -2,7 +2,7 @@
 
 # Última actualización
 
-2026-07-07
+2026-07-09
 
 # Responsable
 
@@ -11,6 +11,15 @@ Fabrizio Zurita (Extun)
 ## 1. Resumen
 
 El **MVP está completo y en producción** (Vercel + Render + Aiven). Los tres roles funcionan de punta a punta. El trabajo actual es la **Épica 1: rediseño de la experiencia del estudiante**, cuya auditoría y primera spec ya existen pero **aún no se ha implementado nada** (el estudiante sigue usando el monolito `DashboardEstudiante.jsx`).
+
+> **SPEC-002 Fase 1 — Centro de Administración Institucional (2026-07-09, implementada en código; migración a Aiven PENDIENTE):**
+> - **Materias dinámicas:** catálogo en BD (`color`, `icono`, `activa`), CRUD admin (`/api/admin/materias`), módulo Materias en el panel admin. `src/constants/materias.js` **eliminado**; toda la app consume `src/services/materiasService.js` (caché memoria+localStorage, la API siempre pisa). Colores/emoji de los "mundos" de estudiante y docente vienen de la BD (style inline; las clases de tonos `-1..-5` se eliminaron del CSS).
+> - **Cursos:** tabla `cursos` + `curso_id` en `estudiantes`/`invitaciones_estudiante` (el VARCHAR `curso` se conserva denormalizado), CRUD admin + `GET /api/cursos` para docentes, módulo Cursos, y el docente elige el curso de un `<select>` al generar invitaciones (ya no texto libre).
+> - **Institución:** tabla singleton `institucion`, `GET /api/institucion` público + `PUT /api/admin/institucion`, módulo Institución (datos, logo con redimensionado en canvas y favicon autogenerado, colores con derivados, año lectivo, escala XP). `institucionService.iniciarInstitucion()` (main.jsx) inyecta colores en `:root` y aplica título/favicon; logo y nombre en Login y en los sidebars de los 3 paneles.
+> - **TablaPro** (`DashboardWidgets`): búsqueda en cliente + paginación (10/25/50/100), aplicada a Estudiantes, Invitaciones (pendientes e historial) y Cursos.
+> - **useAutoRefresh** (`src/hooks/`): polling 20 s en el panel admin, pausado con modal abierto y con la pestaña oculta.
+> - Migraciones versionadas en `database/migraciones/002-admin-center.sql` (+ reversa). `initDb.js` las aplica de forma idempotente al arrancar. **Falta el paso 7 de la spec: backup de Aiven + aplicar migración + deploy.**
+> - Editores (Quiz/Clasificador) con candado anti doble publicación (botón "Publicado" hasta editar algo).
 
 > Polish Sprint (2026-07-07/08): identidad visual unificada en Login, Home y materias de ambos roles (tarjetas pastel por materia, héroes con gradiente, pestañas píldora, tablas con acentos de la paleta). Nombre institucional actualizado a **Unidad Educativa Fiscal Clemencia Coronel de Pincay** en toda la UI. Sin cambios de lógica, APIs ni BD.
 
@@ -51,7 +60,7 @@ Insumos: `docs/audit/Auditoria-UX-Estudiante-v1.md` y `docs/specifications/SPEC-
 1. Libro de Calificaciones real (consume `GET /api/progreso/:id`, ya existente).
 2. Lógica de los 3 logros faltantes.
 3. ~~UI de edición de docente~~ ✅ Hecho (2026-07-09, rediseño panel admin).
-4. Unificar fuente de materias (consumir `GET /api/materias` en vez de la constante de `src/constants/`).
+4. ~~Unificar fuente de materias~~ ✅ Hecho (2026-07-09, SPEC-002 Fase 1).
 
 ## 5. Trabajo post-tesis (no tocar ahora)
 

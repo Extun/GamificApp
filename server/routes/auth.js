@@ -175,8 +175,8 @@ router.post('/registro-estudiante', async (req, res, next) => {
         const partes = nombreVisible.split(' ');
         const mitad = Math.ceil(partes.length / 2);
         const [fichaEst] = await conn.query(
-            'INSERT INTO estudiantes (nombres, apellidos, curso, fecha_nacimiento) VALUES (?, ?, ?, ?)',
-            [partes.slice(0, mitad).join(' '), partes.slice(mitad).join(' ') || '-', invitacion.curso, fecha_nacimiento]
+            'INSERT INTO estudiantes (nombres, apellidos, curso, curso_id, fecha_nacimiento) VALUES (?, ?, ?, ?, ?)',
+            [partes.slice(0, mitad).join(' '), partes.slice(mitad).join(' ') || '-', invitacion.curso, invitacion.curso_id ?? null, fecha_nacimiento]
         );
 
         const pinInicial = pinDesdeFecha(fecha_nacimiento);

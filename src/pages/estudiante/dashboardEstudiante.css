@@ -167,11 +167,8 @@
 .home-mundo:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
 .home-mundo-emoji { font-size: 2.2rem; }
 
-.home-mundo-1 { background: #e0f2fe; border-color: #bae6fd; }
 .home-mundo-2 { background: #fce7f3; border-color: #fbcfe8; }
-.home-mundo-3 { background: #dcfce7; border-color: #bbf7d0; }
 .home-mundo-4 { background: #fef3c7; border-color: #fde68a; }
-.home-mundo-5 { background: #ede9fe; border-color: #ddd6fe; }
 
 /* --- Tarjeta de premios --- */
 .home-logros {

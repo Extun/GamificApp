@@ -17,7 +17,8 @@ import TrendingUpRoundedIcon from '@mui/icons-material/TrendingUpRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import { FileChip, FilePreviewModal, getKind, formatSize, descargarArchivo } from '../../components/archivos/ArchivoChip';
 import { procesarPdf } from '../../services/pdfService';
-import MATERIAS from '../../constants/materias';
+import { listarMaterias, idPorNombre, uiMateria } from '../../services/materiasService';
+import { getInstitucionCache } from '../../services/institucionService';
 import { obtenerMaterial, subirMaterial, eliminarMaterial } from '../../services/materialesService';
 import authService from '../../services/authService';
 import docenteService from '../../services/docenteService';
@@ -31,17 +32,10 @@ import {
 // Etiquetas legibles de los tipos de reto publicables.
 const TIPO_RETO_LABEL = { quiz: 'Quiz', clasificador: 'Juego', mision: 'Misión' };
 
-// Identidad visual de cada materia en el Home del docente: el mismo
-// emoji y tono pastel que ven los estudiantes en sus "mundos".
-const MATERIA_UI = {
-    'Matemáticas': { emoji: '🔢', tono: 1 },
-    'Lenguaje': { emoji: '📖', tono: 2 },
-    'Ciencias Naturales': { emoji: '🌱', tono: 3 },
-    'Ciencias Sociales': { emoji: '🌎', tono: 4 },
-    'Educación Física': { emoji: '⚽', tono: 5 }
-};
-
-const materiaIdPorNombre = (nombre) => MATERIAS.find((m) => m.nombre === nombre)?.id;
+// El catálogo dinámico de materias (SPEC-002) vive en materiasService:
+// color e icono los define el admin. El id se resuelve desde su caché,
+// que este panel calienta al montar (ver efecto de misMaterias).
+const materiaIdPorNombre = (nombre) => idPorNombre(nombre);
 
 // Lee un File como dataURL (base64) para persistirlo y poder descargarlo luego.
 const leerComoDataUrl = (file) => new Promise((resolve, reject) => {
@@ -207,7 +201,12 @@ export function Dashboard() {
     // este panel muestra y permite editar (el servidor lo vuelve a validar).
     const [materias, setMaterias] = useState([]);
     useEffect(() => {
-        docenteService.misMaterias()
+        // Primero el catálogo global (calienta la caché de ids y colores del
+        // materiasService) y después las asignadas: cuando el panel pinta,
+        // todo lookup por nombre ya resuelve.
+        listarMaterias()
+            .catch(() => [])
+            .then(() => docenteService.misMaterias())
             .then((lista) => setMaterias(lista.map((m) => m.nombre)))
             .catch((err) => setErrorMaterial(`No se pudieron cargar tus materias: ${err.message}`));
     }, []);
@@ -216,18 +215,23 @@ export function Dashboard() {
     const [misEstudiantes, setMisEstudiantes] = useState([]);
     const [invitaciones, setInvitaciones] = useState([]);
     const [codigosNuevos, setCodigosNuevos] = useState([]);
-    const [invCurso, setInvCurso] = useState('');
+    // Cursos del catálogo institucional (SPEC-002): el docente ya no tipea
+    // el curso, lo elige de la lista que administra el admin.
+    const [cursos, setCursos] = useState([]);
+    const [invCursoId, setInvCursoId] = useState('');
     const [invCantidad, setInvCantidad] = useState(10);
     const [avisoOk, setAvisoOk] = useState('');
 
     const cargarEstudiantes = async () => {
         try {
-            const [est, inv] = await Promise.all([
+            const [est, inv, cur] = await Promise.all([
                 docenteService.misEstudiantes(),
-                docenteService.listarInvitaciones()
+                docenteService.listarInvitaciones(),
+                docenteService.listarCursos()
             ]);
             setMisEstudiantes(est);
             setInvitaciones(inv);
+            setCursos(cur);
         } catch (err) {
             setErrorMaterial(err.message);
         }
@@ -303,7 +307,11 @@ export function Dashboard() {
         e.preventDefault();
         try {
             setErrorMaterial('');
-            const data = await docenteService.generarInvitaciones(invCantidad, invCurso.trim());
+            if (!invCursoId) {
+                setErrorMaterial('Elige el curso de la lista antes de generar códigos.');
+                return;
+            }
+            const data = await docenteService.generarInvitaciones(invCantidad, Number(invCursoId));
             setCodigosNuevos(data.codigos);
             setAvisoOk(`${data.codigos.length} códigos generados para ${data.curso} (válidos ${data.dias_vigencia} días).`);
             await cargarEstudiantes();
@@ -392,7 +400,10 @@ export function Dashboard() {
             <div className ="sidebar-container">
                 <aside className="sidebar">
                 <div className="aside-content-options">
-                    <h2 style={{pointerEvents:"none"}}>Unidad Educativa Fiscal Clemencia Coronel de Pincay</h2>
+                    {getInstitucionCache()?.logo_data && (
+                        <img className="sidebar-logo" src={getInstitucionCache().logo_data} alt="" />
+                    )}
+                    <h2 style={{pointerEvents:"none"}}>{getInstitucionCache()?.nombre || 'Unidad Educativa Fiscal Clemencia Coronel de Pincay'}</h2>
                     <List>
                         <ListItem disablePadding>
                             <ListItemButton className="nav-item" onClick={() => setPagina("")}>
@@ -488,16 +499,17 @@ export function Dashboard() {
                                 <h2>Tus materias</h2>
                                 <div className="home-doc-materias-grid">
                                     {materias.map((mat) => {
-                                        const ui = MATERIA_UI[mat] || { emoji: '📚', tono: 1 };
+                                        const ui = uiMateria(mat);
                                         const retos = retosPorMateria[mat] || [];
                                         const cuenta = (tipo) => retos.filter((r) => r.tipo === tipo).length;
                                         return (
                                             <button
                                                 key={mat}
-                                                className={`home-doc-materia home-doc-materia-${ui.tono}`}
+                                                className="home-doc-materia"
+                                                style={ui.estilo}
                                                 onClick={() => irAMateria(mat)}
                                             >
-                                                <span className="home-doc-materia-emoji" aria-hidden="true">{ui.emoji}</span>
+                                                <span className="home-doc-materia-emoji" aria-hidden="true">{ui.icono}</span>
                                                 <span className="home-doc-materia-nombre">{mat}</span>
                                                 <span className="home-doc-materia-detalle">
                                                     {retos.length
@@ -565,15 +577,16 @@ export function Dashboard() {
 
                         <div className="home-doc-materias-grid">
                             {materias.map((mat) => {
-                                const ui = MATERIA_UI[mat] || { emoji: '📚', tono: 1 };
+                                const ui = uiMateria(mat);
                                 const retos = retosPorMateria[mat] || [];
                                 return (
                                     <button
                                         key={mat}
-                                        className={`home-doc-materia home-doc-materia-${ui.tono}`}
+                                        className="home-doc-materia"
+                                        style={ui.estilo}
                                         onClick={() => { setMateriaSeleccionada(mat); setSubVistaMateria('quiz'); }}
                                     >
-                                        <span className="home-doc-materia-emoji" aria-hidden="true">{ui.emoji}</span>
+                                        <span className="home-doc-materia-emoji" aria-hidden="true">{ui.icono}</span>
                                         <span className="home-doc-materia-nombre">{mat}</span>
                                         <span className="home-doc-materia-detalle">
                                             {retos.length
@@ -589,7 +602,7 @@ export function Dashboard() {
 
                 {/* MATERIA DETALLE */}
                 {pagina === "materias" && materiaSeleccionada && (() => {
-                    const ui = MATERIA_UI[materiaSeleccionada] || { emoji: '📚', tono: 1 };
+                    const ui = uiMateria(materiaSeleccionada);
                     const retosMateria = retosPorMateria[materiaSeleccionada] || [];
                     const archivosMateria = archivosPorMateria[materiaSeleccionada] || [];
                     return (
@@ -602,8 +615,8 @@ export function Dashboard() {
                         </button>
 
                         {/* Cabecera con la identidad pastel de la materia */}
-                        <header className={`materia-hero materia-hero-${ui.tono}`}>
-                            <span className="materia-hero-emoji" aria-hidden="true">{ui.emoji}</span>
+                        <header className="materia-hero" style={ui.estilo}>
+                            <span className="materia-hero-emoji" aria-hidden="true">{ui.icono}</span>
                             <div className="materia-hero-meta">
                                 <h1>{materiaSeleccionada}</h1>
                                 <p>
@@ -759,11 +772,16 @@ export function Dashboard() {
                                 <h3><VpnKeyRoundedIcon sx={{ fontSize: '1.1rem', verticalAlign: 'middle' }} /> Generar invitaciones</h3>
                             </div>
                             <form className="admin-form" onSubmit={handleGenerarInvitaciones}>
-                                <input
-                                    placeholder='Curso (ej: "2do A")'
-                                    value={invCurso}
-                                    onChange={(e) => setInvCurso(e.target.value)}
-                                />
+                                <select
+                                    value={invCursoId}
+                                    onChange={(e) => setInvCursoId(e.target.value)}
+                                    aria-label="Curso de los estudiantes"
+                                >
+                                    <option value="">Elige el curso…</option>
+                                    {cursos.map((c) => (
+                                        <option key={c.id} value={c.id}>{c.etiqueta}</option>
+                                    ))}
+                                </select>
                                 <input
                                     type="number"
                                     min="1"

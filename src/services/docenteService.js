@@ -16,10 +16,14 @@ const pedir = async (ruta, options = {}) => {
 // Materias asignadas por el admin: definen qué ve y edita este docente.
 export const misMaterias = () => pedir('/api/docente/mis-materias');
 
-export const generarInvitaciones = (cantidad, curso) =>
+// Cursos activos del catálogo institucional (SPEC-002): alimentan el
+// selector al generar invitaciones (el admin los gestiona en su panel).
+export const listarCursos = () => pedir('/api/cursos');
+
+export const generarInvitaciones = (cantidad, cursoId) =>
     pedir('/api/docente/invitaciones', {
         method: 'POST',
-        body: JSON.stringify({ cantidad, curso })
+        body: JSON.stringify({ cantidad, curso_id: cursoId })
     });
 export const listarInvitaciones = () => pedir('/api/docente/invitaciones');
 
@@ -27,4 +31,4 @@ export const misEstudiantes = () => pedir('/api/docente/mis-estudiantes');
 export const resetearPinEstudiante = (usuarioId) =>
     pedir(`/api/docente/estudiantes/${usuarioId}/resetear-pin`, { method: 'POST' });
 
-export default { misMaterias, generarInvitaciones, listarInvitaciones, misEstudiantes, resetearPinEstudiante };
+export default { misMaterias, listarCursos, generarInvitaciones, listarInvitaciones, misEstudiantes, resetearPinEstudiante };

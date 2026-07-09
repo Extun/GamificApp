@@ -8,12 +8,15 @@
     max-width: 480px;
 }
 
-.admin-form input {
+.admin-form input,
+.admin-form select {
     padding: 10px 14px;
     border: 1px solid #e2e8f0;
     border-radius: 10px;
     font-size: 0.95rem;
     font-family: inherit;
+    background: var(--color-surface, #fff);
+    color: var(--color-text, #1e293b);
 }
 
 .admin-materias-check {
@@ -330,7 +333,8 @@
     color: var(--color-text-muted);
 }
 
-.asistente-campo input {
+.asistente-campo input,
+.asistente-campo select {
     padding: 11px 14px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
@@ -341,7 +345,8 @@
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.asistente-campo input:focus {
+.asistente-campo input:focus,
+.asistente-campo select:focus {
     outline: none;
     border-color: var(--color-primary);
     box-shadow: 0 0 0 3px var(--color-primary-soft);
@@ -409,11 +414,8 @@
     border-radius: 50%;
 }
 
-.materia-pick-1 { background: #e0f2fe; } .materia-pick-1.is-activa { border-color: #38bdf8; }
 .materia-pick-2 { background: #fce7f3; } .materia-pick-2.is-activa { border-color: #f472b6; }
-.materia-pick-3 { background: #dcfce7; } .materia-pick-3.is-activa { border-color: #4ade80; }
 .materia-pick-4 { background: #fef3c7; } .materia-pick-4.is-activa { border-color: #fbbf24; }
-.materia-pick-5 { background: #ede9fe; } .materia-pick-5.is-activa { border-color: #a78bfa; }
 
 /* ===== Lista de docentes registrados ===== */
 .docente-lista {
@@ -483,11 +485,8 @@
     color: var(--color-text);
 }
 
-.docente-chip-1 { background: #e0f2fe; }
 .docente-chip-2 { background: #fce7f3; }
-.docente-chip-3 { background: #dcfce7; }
 .docente-chip-4 { background: #fef3c7; }
-.docente-chip-5 { background: #ede9fe; }
 
 .docente-sin-materias {
     font-size: 0.82rem;
@@ -620,6 +619,208 @@
 .preview-action:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+}
+
+/* ===== Módulo Materias (catálogo dinámico, SPEC-002) ===== */
+.materia-admin-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 14px;
+}
+
+.materia-admin-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 16px;
+    border: 2px solid transparent;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+.materia-admin-card.is-inactiva { opacity: 0.55; filter: grayscale(0.4); }
+
+.materia-admin-icono { font-size: 1.9rem; line-height: 1; }
+.materia-admin-nombre { font-size: 0.98rem; color: var(--color-text); }
+
+.materia-admin-estado {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.materia-admin-estado.is-activa { background: #dcfce7; color: #166534; }
+
+.materia-admin-acciones {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    width: 100%;
+}
+
+/* Formulario del modal de materia */
+.materia-form { display: flex; flex-direction: column; gap: 18px; }
+
+.materia-form-preview {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    font-size: 1.4rem;
+    border: 2px solid transparent;
+    border-radius: 12px;
+}
+
+.materia-form-opciones { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.materia-form-icono {
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    font-size: 1.3rem;
+    background: var(--color-surface);
+    border: 2px solid var(--color-border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.materia-form-icono:hover { transform: translateY(-2px); }
+.materia-form-icono.is-sel { border-color: var(--color-primary); background: var(--color-primary-soft); }
+
+.materia-form-color {
+    width: 34px;
+    height: 34px;
+    border: 2px solid rgba(0, 0, 0, 0.08);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.materia-form-color:hover { transform: scale(1.1); }
+.materia-form-color.is-sel { border-color: var(--color-primary-dark); transform: scale(1.12); }
+
+.materia-form-switch {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9rem;
+    color: var(--color-text);
+    cursor: pointer;
+    user-select: none;
+}
+
+.materia-form-switch input { accent-color: var(--color-primary); width: 18px; height: 18px; }
+
+/* ===== Módulo Cursos (SPEC-002) ===== */
+.curso-form-campos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 14px;
+}
+
+.curso-estado {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+.curso-estado.is-activo { background: #dcfce7; color: #166534; }
+
+/* ===== Módulo Institución (SPEC-002) ===== */
+.institucion-campos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+}
+
+.institucion-campo-ancho { grid-column: 1 / -1; }
+
+.institucion-logo-fila {
+    display: flex;
+    align-items: flex-start;
+    gap: 18px;
+    flex-wrap: wrap;
+}
+
+.institucion-logo-preview {
+    flex-shrink: 0;
+    width: 96px;
+    height: 96px;
+    display: grid;
+    place-items: center;
+    border: 2px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-alt, #f8fafc);
+    overflow: hidden;
+}
+
+.institucion-logo-preview img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.institucion-logo-acciones {
+    flex: 1;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.institucion-logo-acciones p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+}
+
+.institucion-btn-subir { cursor: pointer; }
+
+.institucion-error {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #dc2626;
+}
+
+.institucion-color-fila {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.institucion-color-fila input[type="color"] {
+    width: 52px;
+    height: 40px;
+    padding: 2px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    cursor: pointer;
+}
+
+.institucion-nota {
+    margin: 14px 0 0;
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+}
+
+.institucion-guardar {
+    display: flex;
+    justify-content: flex-end;
 }
 
 /* ===== Responsive ===== */

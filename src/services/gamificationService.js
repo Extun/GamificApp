@@ -89,12 +89,6 @@ const otorgarLogro = (obtenidos, nuevos, id) => {
     }
 };
 
-// Contador de actividades por tipo (p. ej. cuántos quizzes ha resuelto).
-const getActividades = (tipo) => {
-    const data = leer(KEY_ACTIVIDADES, {});
-    return Number(data?.[tipo]) || 0;
-};
-
 const registrarActividad = (tipo) => {
     const data = leer(KEY_ACTIVIDADES, {}) || {};
     const total = (Number(data[tipo]) || 0) + 1;

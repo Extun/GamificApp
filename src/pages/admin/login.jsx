@@ -1,4 +1,4 @@
-import { useState, useId } from 'react';
+import { useState, useEffect, useId } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
@@ -6,6 +6,7 @@ import SchoolRoundedIcon from '@mui/icons-material/SchoolRounded';
 import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
 import './login.css';
 import authService from '../../services/authService';
+import { getInstitucionCache, obtenerInstitucion } from '../../services/institucionService';
 
 // El rol NUNCA se elige aquí: lo determina el servidor según la cuenta y
 // viaja firmado dentro del JWT. Las pestañas solo cambian el formulario:
@@ -25,6 +26,17 @@ export function Login(){
     const [cargando, setCargando] = useState(false);
     const outlinedPasswordId = useId();
     const navigate = useNavigate();
+
+    // Identidad institucional (SPEC-002): logo y nombre en la cabecera y el
+    // pie. La caché pinta al instante; la API la refresca.
+    const [institucion, setInstitucion] = useState(getInstitucionCache());
+    useEffect(() => {
+        let vigente = true;
+        obtenerInstitucion()
+            .then((inst) => { if (vigente) setInstitucion(inst); })
+            .catch(() => { /* sin red: caché o valores por defecto */ });
+        return () => { vigente = false; };
+    }, []);
 
     const ejecutar = async (accion) => {
         setError("");
@@ -76,7 +88,9 @@ export function Login(){
 
             <main className="login-centro">
                 <div className="login-brand">
-                    <span className="login-brand-icon"><SchoolRoundedIcon /></span>
+                    {institucion?.logo_data
+                        ? <img className="login-brand-logo" src={institucion.logo_data} alt="" />
+                        : <span className="login-brand-icon"><SchoolRoundedIcon /></span>}
                     <span className="login-brand-nombre">GamificApp</span>
                 </div>
 
@@ -236,7 +250,7 @@ export function Login(){
                     )}
                 </div>
 
-                <span className="login-pie">Unidad Educativa Fiscal Clemencia Coronel de Pincay</span>
+                <span className="login-pie">{institucion?.nombre || 'Unidad Educativa Fiscal Clemencia Coronel de Pincay'}</span>
             </main>
         </div>
     )

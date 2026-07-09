@@ -21,10 +21,50 @@
 -- 1. TABLAS (forma final, con todas las columnas de las migraciones)
 -- ------------------------------------------------------------
 
+-- Materias dinámicas (SPEC-002): el admin las gestiona desde su panel.
+-- `color` e `icono` pintan la identidad visual; `activa = FALSE` la oculta
+-- de docentes y estudiantes sin romper sus retos/materiales asociados.
 CREATE TABLE IF NOT EXISTS materias (
     id          TINYINT UNSIGNED NOT NULL,
     nombre      VARCHAR(60)      NOT NULL UNIQUE,
+    color       VARCHAR(7)       NOT NULL DEFAULT '#e0f2fe',
+    icono       VARCHAR(8)       NOT NULL DEFAULT '📚',
+    activa      BOOLEAN          NOT NULL DEFAULT TRUE,
     PRIMARY KEY (id)
+) ENGINE = InnoDB;
+
+-- Catálogo de cursos (SPEC-002): solo el admin los crea; los docentes
+-- eligen de esta lista al generar invitaciones (adiós al texto libre).
+CREATE TABLE IF NOT EXISTS cursos (
+    id        INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    nombre    VARCHAR(20)  NOT NULL,
+    paralelo  VARCHAR(5)   NOT NULL,
+    nivel     VARCHAR(30)  NULL,
+    activo    BOOLEAN      NOT NULL DEFAULT TRUE,
+    creado_en TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_curso (nombre, paralelo)
+) ENGINE = InnoDB;
+
+-- Configuración institucional (SPEC-002): fila única (id = 1). El logo y
+-- el favicon viajan como data URL (mismo patrón base64 que `materiales`,
+-- necesario porque el filesystem de Render free es efímero).
+CREATE TABLE IF NOT EXISTS institucion (
+    id               TINYINT UNSIGNED NOT NULL DEFAULT 1,
+    nombre           VARCHAR(160) NOT NULL,
+    ciudad           VARCHAR(80)  NULL,
+    provincia        VARCHAR(80)  NULL,
+    pais             VARCHAR(80)  NULL,
+    logo_data        MEDIUMTEXT   NULL,
+    favicon_data     TEXT         NULL,
+    color_principal  VARCHAR(7)   NULL,
+    color_secundario VARCHAR(7)   NULL,
+    anio_lectivo     VARCHAR(20)  NULL,
+    xp_escala_max    INT UNSIGNED NOT NULL DEFAULT 1000,
+    config_json      JSON         NULL,
+    actualizado_en   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    CONSTRAINT chk_institucion_singleton CHECK (id = 1)
 ) ENGINE = InnoDB;
 
 CREATE TABLE IF NOT EXISTS estudiantes (
@@ -32,10 +72,15 @@ CREATE TABLE IF NOT EXISTS estudiantes (
     nombres          VARCHAR(80)  NOT NULL,
     apellidos        VARCHAR(80)  NOT NULL,
     curso            VARCHAR(20)  NOT NULL,
+    -- Relación al catálogo de cursos; el VARCHAR `curso` queda como
+    -- respaldo/visualización durante la transición (SPEC-002 §1.2).
+    curso_id         INT UNSIGNED NULL,
     fecha_nacimiento DATE         NULL,
     xp_total         INT UNSIGNED NOT NULL DEFAULT 0,
     creado_en        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
+    CONSTRAINT fk_est_curso FOREIGN KEY (curso_id) REFERENCES cursos (id)
+        ON UPDATE CASCADE ON DELETE SET NULL,
     INDEX idx_estudiantes_xp (xp_total DESC)
 ) ENGINE = InnoDB;
 
@@ -130,6 +175,7 @@ CREATE TABLE IF NOT EXISTS invitaciones_estudiante (
     codigo     VARCHAR(6)   NOT NULL UNIQUE,
     docente_id INT UNSIGNED NOT NULL,
     curso      VARCHAR(20)  NOT NULL,
+    curso_id   INT UNSIGNED NULL,
     estado     ENUM('pendiente','usado','expirado') NOT NULL DEFAULT 'pendiente',
     usuario_id INT UNSIGNED NULL,
     creado_en  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -139,6 +185,8 @@ CREATE TABLE IF NOT EXISTS invitaciones_estudiante (
         ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT fk_inv_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
         ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT fk_inv_curso FOREIGN KEY (curso_id) REFERENCES cursos (id)
+        ON UPDATE CASCADE ON DELETE SET NULL,
     INDEX idx_inv_docente (docente_id)
 ) ENGINE = InnoDB;
 
@@ -146,16 +194,22 @@ CREATE TABLE IF NOT EXISTS invitaciones_estudiante (
 -- 2. DATOS SEMILLA
 -- ------------------------------------------------------------
 
--- 5 materias oficiales (IDs fijos que referencian frontend y backend).
-INSERT INTO materias (id, nombre) VALUES
-    (1, 'Matemáticas'),
-    (2, 'Lenguaje'),
-    (3, 'Ciencias Naturales'),
-    (4, 'Ciencias Sociales'),
-    (5, 'Educación Física')
-ON DUPLICATE KEY UPDATE nombre = VALUES(nombre);
+-- Materias oficiales iniciales. INSERT IGNORE a propósito: las materias
+-- ahora se editan desde el panel del admin y este script NO debe pisar
+-- esos cambios en cada arranque (server/initDb.js lo ejecuta al iniciar).
+INSERT IGNORE INTO materias (id, nombre, color, icono) VALUES
+    (1, 'Matemáticas',         '#e0f2fe', '🔢'),
+    (2, 'Lengua y Literatura', '#fce7f3', '📖'),
+    (3, 'Ciencias Naturales',  '#dcfce7', '🌱'),
+    (4, 'Ciencias Sociales',   '#fef3c7', '🌎'),
+    (5, 'Educación Física',    '#ede9fe', '⚽'),
+    (6, 'Inglés',              '#ffe4e6', '🗣️');
+
+-- Fila única de configuración institucional (editable desde el panel).
+INSERT IGNORE INTO institucion (id, nombre, ciudad, provincia, pais)
+VALUES (1, 'Unidad Educativa Fiscal Clemencia Coronel de Pincay', 'Guayaquil', 'Guayas', 'Ecuador');
 
 -- ------------------------------------------------------------
 -- 3. VERIFICACIÓN
 -- ------------------------------------------------------------
-SELECT id, nombre FROM materias ORDER BY id;
+SELECT id, nombre, color, icono, activa FROM materias ORDER BY id;

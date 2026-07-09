@@ -40,8 +40,8 @@ export async function procesarPdf(file) {
         // PNG conserva el texto nítido sin artefactos de compresión JPEG.
         thumbnail = canvas.toDataURL('image/png');
     } catch {
-        // Si falla el render de la miniatura, conservamos al menos el conteo de páginas.
-        thumbnail = null;
+        // Si falla el render de la miniatura, conservamos al menos el conteo
+        // de páginas (thumbnail queda en null).
     }
 
     await pdf.destroy();

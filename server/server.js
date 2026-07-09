@@ -14,6 +14,8 @@ import progresoRouter from './routes/progreso.js';
 import retosRouter from './routes/retos.js';
 import rankingRouter from './routes/ranking.js';
 import iaRouter from './routes/ia.js';
+import institucionRouter from './routes/institucion.js';
+import cursosRouter from './routes/cursos.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -77,6 +79,9 @@ app.use(express.json({ limit: '25mb' }));
 app.get('/api/health', (_req, res) =>
     res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() }));
 app.use('/api/auth', limitarAuth, authRouter);
+// Identidad institucional (nombre, logo, colores): el Login la necesita
+// antes de que exista sesión, por eso va antes del muro de autenticación.
+app.use('/api/institucion', institucionRouter);
 
 // ---- A partir de aquí, TODA la API exige un JWT válido ----
 app.use('/api', autenticar);
@@ -88,6 +93,7 @@ app.use('/api/materias', materiasRouter);
 app.use('/api/progreso', progresoRouter);
 app.use('/api/retos', retosRouter);
 app.use('/api/ranking', rankingRouter);
+app.use('/api/cursos', cursosRouter);
 app.use('/api/ia', iaRouter);
 
 // Manejador central de errores: nunca filtra detalles internos al cliente.

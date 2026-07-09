@@ -5,7 +5,7 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import PublishRoundedIcon from '@mui/icons-material/PublishRounded';
 import { publicarReto } from '../../services/retosService';
 import { authFetch } from '../../services/authService';
-import MATERIAS from '../../constants/materias';
+import { idPorNombre } from '../../services/materiasService';
 import '../../components/mision/misionNarrativa.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -66,7 +66,7 @@ export function GeneradorMision({ materia = 'la materia' }) {
     // Publica en la BD (tabla `retos`, tipo 'mision'): visible al instante
     // para los estudiantes en la pestaña Misiones de la materia.
     const handlePublicar = async () => {
-        const materiaId = MATERIAS.find((m) => m.nombre === materia)?.id;
+        const materiaId = idPorNombre(materia);
         if (!materiaId) {
             setError('No se reconoce la materia actual; no se puede publicar.');
             return;
@@ -101,12 +101,12 @@ export function GeneradorMision({ materia = 'la materia' }) {
 
             <form className="quiz-form" onSubmit={handleGenerar}>
                 <label className="quiz-field">
-                    <span>Tema matemático</span>
+                    <span>Tema de la lección</span>
                     <input
                         type="text"
                         value={tema}
                         onChange={(e) => setTema(e.target.value)}
-                        placeholder="Ej. Sumas con llevadas hasta 100"
+                        placeholder="Ej. Sumas hasta 100, los animales vertebrados…"
                     />
                 </label>
 

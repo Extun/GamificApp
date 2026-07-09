@@ -15,12 +15,14 @@ const DIAS_VIGENCIA_INVITACION = 7;
 // El admin ve todas (no tiene asignaciones propias).
 router.get('/mis-materias', async (req, res, next) => {
     try {
+        // Solo materias activas: si el admin desactiva una, desaparece del
+        // panel del docente sin perder la asignación ni el contenido.
         const [materias] = req.user.rol === 'admin'
-            ? await pool.query('SELECT id, nombre FROM materias ORDER BY id')
+            ? await pool.query('SELECT id, nombre, color, icono FROM materias WHERE activa = TRUE ORDER BY id')
             : await pool.query(
-                `SELECT m.id, m.nombre FROM materias m
+                `SELECT m.id, m.nombre, m.color, m.icono FROM materias m
                  JOIN docente_materia dm ON dm.materia_id = m.id
-                 WHERE dm.docente_id = ? ORDER BY m.id`,
+                 WHERE dm.docente_id = ? AND m.activa = TRUE ORDER BY m.id`,
                 [req.user.id]
             );
         res.json(materias);
@@ -34,8 +36,19 @@ router.get('/mis-materias', async (req, res, next) => {
 router.post('/invitaciones', async (req, res, next) => {
     try {
         const cantidad = Math.min(Math.max(Number(req.body?.cantidad) || 1, 1), 40);
-        const curso = String(req.body?.curso || '').trim();
-        if (!curso) return res.status(400).json({ error: 'Indica el curso (p. ej. "2do A")' });
+        // SPEC-002: el curso se elige del catálogo (curso_id). Se acepta
+        // también el texto libre `curso` por compatibilidad transitoria.
+        let curso = String(req.body?.curso || '').trim();
+        let cursoId = Number(req.body?.curso_id) || null;
+        if (cursoId) {
+            const [[filaCurso]] = await pool.query(
+                'SELECT CONCAT(nombre, " ", paralelo) AS etiqueta FROM cursos WHERE id = ? AND activo = TRUE',
+                [cursoId]
+            );
+            if (!filaCurso) return res.status(400).json({ error: 'Curso no encontrado o inactivo' });
+            curso = filaCurso.etiqueta;
+        }
+        if (!curso) return res.status(400).json({ error: 'Elige el curso de la lista' });
 
         const codigos = [];
         for (let i = 0; i < cantidad; i++) {
@@ -44,9 +57,9 @@ router.post('/invitaciones', async (req, res, next) => {
                 const codigo = generarCodigo(6);
                 try {
                     await pool.query(
-                        `INSERT INTO invitaciones_estudiante (codigo, docente_id, curso, expira_en)
-                         VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))`,
-                        [codigo, req.user.id, curso, DIAS_VIGENCIA_INVITACION]
+                        `INSERT INTO invitaciones_estudiante (codigo, docente_id, curso, curso_id, expira_en)
+                         VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))`,
+                        [codigo, req.user.id, curso, cursoId, DIAS_VIGENCIA_INVITACION]
                     );
                     codigos.push(codigo);
                     break;

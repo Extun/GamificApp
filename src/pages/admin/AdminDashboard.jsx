@@ -14,45 +14,45 @@ import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import HistoryRoundedIcon from '@mui/icons-material/HistoryRounded';
 import PersonAddAlt1RoundedIcon from '@mui/icons-material/PersonAddAlt1Rounded';
+import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
+import Diversity3RoundedIcon from '@mui/icons-material/Diversity3Rounded';
+import ApartmentRoundedIcon from '@mui/icons-material/ApartmentRounded';
 import { List, ListItem, ListItemIcon, ListItemButton, ListItemText } from '@mui/material';
-import MATERIAS from '../../constants/materias';
 import authService from '../../services/authService';
 import adminService from '../../services/adminService';
+import { listarMaterias, estiloMateria } from '../../services/materiasService';
+import { getInstitucionCache } from '../../services/institucionService';
+import useAutoRefresh from '../../hooks/useAutoRefresh';
+import ModuloMaterias from './modulos/ModuloMaterias';
+import ModuloCursos from './modulos/ModuloCursos';
+import ModuloInstitucion from './modulos/ModuloInstitucion';
 import {
     DashboardHeader,
     StatCard,
     SectionCard,
     EmptyState,
-    formatearFecha
+    formatearFecha,
+    TablaPro
 } from '../../components/dashboard/DashboardWidgets';
 
-// Emoji y tono pastel por materia: la misma identidad que ven estudiantes
-// y docentes en sus "mundos" (ver MATERIA_UI en dashboard.jsx).
-const MATERIA_UI = {
-    'Matemáticas': { emoji: '🔢', tono: 1 },
-    'Lenguaje': { emoji: '📖', tono: 2 },
-    'Ciencias Naturales': { emoji: '🌱', tono: 3 },
-    'Ciencias Sociales': { emoji: '🌎', tono: 4 },
-    'Educación Física': { emoji: '⚽', tono: 5 }
-};
-
-// Selector de materias como tarjetas pastel (se usa en el asistente de
-// creación de docentes y en el modal de edición de materias).
-function SelectorMaterias({ seleccion, onToggle }) {
+// Selector de materias como tarjetas pastel (asistente de creación de
+// docentes y modal de edición). El catálogo viene de la BD (SPEC-002):
+// color e icono son los que definió el admin en el módulo Materias.
+function SelectorMaterias({ materias, seleccion, onToggle }) {
     return (
         <div className="materia-pick-grid">
-            {MATERIAS.map((m) => {
-                const ui = MATERIA_UI[m.nombre] || { emoji: '📚', tono: 1 };
+            {materias.map((m) => {
                 const activa = seleccion.includes(m.id);
                 return (
                     <button
                         type="button"
                         key={m.id}
-                        className={`materia-pick materia-pick-${ui.tono} ${activa ? 'is-activa' : ''}`}
+                        className={`materia-pick ${activa ? 'is-activa' : ''}`}
+                        style={estiloMateria(m)}
                         aria-pressed={activa}
                         onClick={() => onToggle(m.id)}
                     >
-                        <span className="materia-pick-emoji" aria-hidden="true">{ui.emoji}</span>
+                        <span className="materia-pick-emoji" aria-hidden="true">{m.icono}</span>
                         <span className="materia-pick-nombre">{m.nombre}</span>
                         {activa && <TaskAltRoundedIcon className="materia-pick-check" />}
                     </button>
@@ -62,16 +62,17 @@ function SelectorMaterias({ seleccion, onToggle }) {
     );
 }
 
-// Chips de solo lectura con las materias de un docente.
-function ChipsMaterias({ materias }) {
+// Chips de solo lectura con las materias de un docente. `catalogo` aporta
+// el color/icono actual de cada materia asignada.
+function ChipsMaterias({ materias, catalogo }) {
     if (!materias.length) return <span className="docente-sin-materias">Sin materias asignadas</span>;
     return (
         <div className="docente-chips">
             {materias.map((m) => {
-                const ui = MATERIA_UI[m.nombre] || { emoji: '📚', tono: 1 };
+                const info = catalogo.find((c) => c.id === m.id);
                 return (
-                    <span key={m.id} className={`docente-chip docente-chip-${ui.tono}`}>
-                        <span aria-hidden="true">{ui.emoji}</span> {m.nombre}
+                    <span key={m.id} className="docente-chip" style={{ background: info?.color || '#e0f2fe' }}>
+                        <span aria-hidden="true">{info?.icono || '📚'}</span> {m.nombre}
                     </span>
                 );
             })}
@@ -88,6 +89,10 @@ export function AdminDashboard() {
     const [docentes, setDocentes] = useState([]);
     const [estudiantes, setEstudiantes] = useState([]);
     const [invitaciones, setInvitaciones] = useState([]);
+    // Catálogo dinámico completo (el admin también ve las desactivadas).
+    const [materias, setMaterias] = useState([]);
+    // Cursos con conteos de estudiantes y docentes (SPEC-002).
+    const [cursos, setCursos] = useState([]);
     const [error, setError] = useState('');
     const [avisoOk, setAvisoOk] = useState('');
 
@@ -104,20 +109,29 @@ export function AdminDashboard() {
     const cargar = async () => {
         try {
             setError('');
-            const [d, e, i] = await Promise.all([
+            const [d, e, i, m, c] = await Promise.all([
                 adminService.listarDocentes(),
                 adminService.listarEstudiantes(),
-                adminService.listarInvitaciones()
+                adminService.listarInvitaciones(),
+                listarMaterias(),
+                adminService.listarCursos()
             ]);
             setDocentes(d);
             setEstudiantes(e);
             setInvitaciones(i);
+            setMaterias(m);
+            setCursos(c);
         } catch (err) {
             setError(err.message);
         }
     };
 
     useEffect(() => { cargar(); }, []);
+
+    // Refresco automático (SPEC-002): el panel se mantiene al día sin F5.
+    // Se pausa con el modal de materias del docente abierto para no pisar
+    // la edición en curso.
+    useAutoRefresh(cargar, 20000, Boolean(docenteEditando));
 
     const ejecutar = async (accion, mensajeOk) => {
         try {
@@ -208,13 +222,19 @@ export function AdminDashboard() {
             <div className="sidebar-container">
                 <aside className="sidebar">
                     <div className="aside-content-options">
+                        {getInstitucionCache()?.logo_data && (
+                            <img className="sidebar-logo" src={getInstitucionCache().logo_data} alt="" />
+                        )}
                         <h2 style={{ pointerEvents: 'none' }}>GamificApp · Administración</h2>
                         <List>
                             {[
                                 { id: 'inicio', label: 'Inicio', Icon: HomeFilledIcon },
                                 { id: 'docentes', label: 'Docentes', Icon: SchoolRoundedIcon },
                                 { id: 'estudiantes', label: 'Estudiantes', Icon: GroupsRoundedIcon },
-                                { id: 'invitaciones', label: 'Invitaciones', Icon: VpnKeyRoundedIcon }
+                                { id: 'materias', label: 'Materias', Icon: MenuBookRoundedIcon },
+                                { id: 'cursos', label: 'Cursos', Icon: Diversity3RoundedIcon },
+                                { id: 'invitaciones', label: 'Invitaciones', Icon: VpnKeyRoundedIcon },
+                                { id: 'institucion', label: 'Institución', Icon: ApartmentRoundedIcon }
                             ].map(({ id, label, Icon }) => (
                                 <ListItem disablePadding key={id}>
                                     <ListItemButton
@@ -391,7 +411,11 @@ export function AdminDashboard() {
                                                     <p>Toca las materias para seleccionarlas. Podrás cambiarlas después.</p>
                                                 </div>
                                             </div>
-                                            <SelectorMaterias seleccion={materiasSel} onToggle={toggleMateria} />
+                                            <SelectorMaterias
+                                                materias={materias.filter((m) => m.activa)}
+                                                seleccion={materiasSel}
+                                                onToggle={toggleMateria}
+                                            />
                                         </div>
 
                                         <div className="asistente-pie">
@@ -422,7 +446,7 @@ export function AdminDashboard() {
                                                     </span>
                                                     <div className="docente-info">
                                                         <strong>{d.username}</strong>
-                                                        <ChipsMaterias materias={d.materias} />
+                                                        <ChipsMaterias materias={d.materias} catalogo={materias} />
                                                     </div>
                                                     <div className="docente-acciones">
                                                         <button
@@ -475,14 +499,13 @@ export function AdminDashboard() {
                                     tag={estudiantes.length ? `${estudiantes.length}` : undefined}
                                 >
                                     {estudiantes.length ? (
-                                        <div className="tabla-scroll">
-                                            <table className="admin-tabla admin-tabla-moderna">
-                                                <thead>
-                                                    <tr><th>Estudiante</th><th>Curso</th><th>XP</th><th>Cód. emergencia</th><th>Acciones</th></tr>
-                                                </thead>
-                                                <tbody>
-                                                    {estudiantes.map((e) => (
-                                                        <tr key={e.usuario_id}>
+                                        <TablaPro
+                                            filas={estudiantes}
+                                            buscar={(e) => `${e.nombre_completo} ${e.curso}`}
+                                            placeholderBusqueda="Buscar por nombre o curso…"
+                                            cabecera={<tr><th>Estudiante</th><th>Curso</th><th>XP</th><th>Cód. emergencia</th><th>Acciones</th></tr>}
+                                            renderFila={(e) => (
+                                                <tr key={e.usuario_id}>
                                                             <td>
                                                                 <div className="estudiante-celda">
                                                                     <span className="estudiante-avatar" aria-hidden="true">
@@ -521,10 +544,8 @@ export function AdminDashboard() {
                                                                 </div>
                                                             </td>
                                                         </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                            )}
+                                        />
                                     ) : (
                                         <EmptyState
                                             Icon={GroupsRoundedIcon}
@@ -534,6 +555,39 @@ export function AdminDashboard() {
                                         />
                                     )}
                                 </SectionCard>
+                            </div>
+                        )}
+
+                        {/* MATERIAS — catálogo dinámico (SPEC-002). */}
+                        {pagina === 'materias' && (
+                            <div className="dash-secciones">
+                                <DashboardHeader
+                                    titulo="Materias"
+                                    subtitulo="El catálogo oficial de la institución. Docentes y estudiantes ven estas materias con el color e icono que definas aquí."
+                                />
+                                <ModuloMaterias materias={materias} ejecutar={ejecutar} />
+                            </div>
+                        )}
+
+                        {/* CURSOS — catálogo de cursos y paralelos (SPEC-002). */}
+                        {pagina === 'cursos' && (
+                            <div className="dash-secciones">
+                                <DashboardHeader
+                                    titulo="Cursos"
+                                    subtitulo="Los cursos y paralelos de la institución. Los docentes eligen de esta lista al generar códigos de invitación."
+                                />
+                                <ModuloCursos cursos={cursos} ejecutar={ejecutar} />
+                            </div>
+                        )}
+
+                        {/* INSTITUCIÓN — configuración global (SPEC-002). */}
+                        {pagina === 'institucion' && (
+                            <div className="dash-secciones">
+                                <DashboardHeader
+                                    titulo="Institución"
+                                    subtitulo="El nombre, logo y colores de la institución. Se aplican a toda la app al guardar."
+                                />
+                                <ModuloInstitucion ejecutar={ejecutar} />
                             </div>
                         )}
 
@@ -551,14 +605,13 @@ export function AdminDashboard() {
                                     tag={invitacionesSinUsar.length ? `${invitacionesSinUsar.length}` : undefined}
                                 >
                                     {invitacionesSinUsar.length ? (
-                                        <div className="tabla-scroll">
-                                            <table className="admin-tabla admin-tabla-moderna">
-                                                <thead>
-                                                    <tr><th>Código</th><th>Docente</th><th>Curso</th><th>Estado</th><th>Expira</th><th>Acciones</th></tr>
-                                                </thead>
-                                                <tbody>
-                                                    {invitacionesSinUsar.map((i) => (
-                                                        <tr key={i.id}>
+                                        <TablaPro
+                                            filas={invitacionesSinUsar}
+                                            buscar={(i) => `${i.codigo} ${i.docente} ${i.curso} ${i.estado}`}
+                                            placeholderBusqueda="Buscar por código, docente o curso…"
+                                            cabecera={<tr><th>Código</th><th>Docente</th><th>Curso</th><th>Estado</th><th>Expira</th><th>Acciones</th></tr>}
+                                            renderFila={(i) => (
+                                                <tr key={i.id}>
                                                             <td><code>{i.codigo}</code></td>
                                                             <td>{i.docente}</td>
                                                             <td><span className="curso-chip">{i.curso}</span></td>
@@ -581,10 +634,8 @@ export function AdminDashboard() {
                                                                 </div>
                                                             </td>
                                                         </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                            )}
+                                        />
                                     ) : (
                                         <EmptyState
                                             Icon={VpnKeyRoundedIcon}
@@ -600,24 +651,21 @@ export function AdminDashboard() {
                                     tag={invitacionesUsadas.length ? `${invitacionesUsadas.length}` : undefined}
                                 >
                                     {invitacionesUsadas.length ? (
-                                        <div className="tabla-scroll">
-                                            <table className="admin-tabla admin-tabla-moderna">
-                                                <thead>
-                                                    <tr><th>Código</th><th>Docente</th><th>Curso</th><th>Estudiante</th><th>Fecha de uso</th></tr>
-                                                </thead>
-                                                <tbody>
-                                                    {invitacionesUsadas.map((i) => (
-                                                        <tr key={i.id}>
-                                                            <td><code>{i.codigo}</code></td>
-                                                            <td>{i.docente}</td>
-                                                            <td><span className="curso-chip">{i.curso}</span></td>
-                                                            <td>{i.usado_por || '—'}</td>
-                                                            <td>{i.usado_en ? formatearFecha(i.usado_en) : '—'}</td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                        <TablaPro
+                                            filas={invitacionesUsadas}
+                                            buscar={(i) => `${i.codigo} ${i.docente} ${i.curso} ${i.usado_por || ''}`}
+                                            placeholderBusqueda="Buscar por código, docente, curso o estudiante…"
+                                            cabecera={<tr><th>Código</th><th>Docente</th><th>Curso</th><th>Estudiante</th><th>Fecha de uso</th></tr>}
+                                            renderFila={(i) => (
+                                                <tr key={i.id}>
+                                                    <td><code>{i.codigo}</code></td>
+                                                    <td>{i.docente}</td>
+                                                    <td><span className="curso-chip">{i.curso}</span></td>
+                                                    <td>{i.usado_por || '—'}</td>
+                                                    <td>{i.usado_en ? formatearFecha(i.usado_en) : '—'}</td>
+                                                </tr>
+                                            )}
+                                        />
                                     ) : (
                                         <EmptyState
                                             Icon={HistoryRoundedIcon}
@@ -654,7 +702,11 @@ export function AdminDashboard() {
                             <p className="modal-materias-ayuda">
                                 Toca una materia para agregarla o quitarla. El docente solo verá las materias seleccionadas.
                             </p>
-                            <SelectorMaterias seleccion={materiasEdicion} onToggle={toggleMateriaEdicion} />
+                            <SelectorMaterias
+                                materias={materias.filter((m) => m.activa)}
+                                seleccion={materiasEdicion}
+                                onToggle={toggleMateriaEdicion}
+                            />
                         </div>
                         <div className="preview-foot">
                             <button
