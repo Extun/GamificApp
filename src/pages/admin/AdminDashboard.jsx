@@ -18,11 +18,11 @@ import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
 import Diversity3RoundedIcon from '@mui/icons-material/Diversity3Rounded';
 import ApartmentRoundedIcon from '@mui/icons-material/ApartmentRounded';
 import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
-import { List, ListItem, ListItemIcon, ListItemButton, ListItemText } from '@mui/material';
 import authService from '../../services/authService';
 import adminService from '../../services/adminService';
 import { listarMaterias, estiloMateria } from '../../services/materiasService';
 import { getInstitucionCache } from '../../services/institucionService';
+import { SidebarLayout } from '../../components/dashboard/SidebarLayout';
 import useAutoRefresh from '../../hooks/useAutoRefresh';
 import ModuloMaterias from './modulos/ModuloMaterias';
 import ModuloCursos from './modulos/ModuloCursos';
@@ -226,58 +226,28 @@ export function AdminDashboard() {
     const nombreAdmin = authService.getUsuario()?.username || 'admin';
 
     return (
-        <div className="dashboard">
-            <div className="sidebar-container">
-                <aside className="sidebar">
-                    <div className="aside-content-options">
-                        {getInstitucionCache()?.logo_data && (
-                            <img className="sidebar-logo" src={getInstitucionCache().logo_data} alt="" />
-                        )}
-                        <h2 style={{ pointerEvents: 'none' }}>GamificApp · Administración</h2>
-                        <List>
-                            {[
-                                { id: 'inicio', label: 'Inicio', Icon: HomeFilledIcon },
-                                { id: 'docentes', label: 'Docentes', Icon: SchoolRoundedIcon },
-                                { id: 'estudiantes', label: 'Estudiantes', Icon: GroupsRoundedIcon },
-                                { id: 'materias', label: 'Materias', Icon: MenuBookRoundedIcon },
-                                { id: 'cursos', label: 'Cursos', Icon: Diversity3RoundedIcon },
-                                { id: 'invitaciones', label: 'Invitaciones', Icon: VpnKeyRoundedIcon },
-                                // Solo el Administrador Principal gestiona
-                                // administradores e institución (el servidor
-                                // rechaza igual las peticiones de los demás).
-                                ...(esPrincipal ? [
-                                    { id: 'administradores', label: 'Administradores', Icon: AdminPanelSettingsRoundedIcon },
-                                    { id: 'institucion', label: 'Institución', Icon: ApartmentRoundedIcon }
-                                ] : [])
-                            ].map(({ id, label, Icon }) => (
-                                <ListItem disablePadding key={id}>
-                                    <ListItemButton
-                                        className={`nav-item ${pagina === id ? 'nav-item-activo' : ''}`}
-                                        onClick={() => setPagina(id)}
-                                    >
-                                        <ListItemIcon className="nav-icon"><Icon sx={{ fontSize: '1.3rem' }} /></ListItemIcon>
-                                        <ListItemText primary={label} />
-                                    </ListItemButton>
-                                </ListItem>
-                            ))}
-                        </List>
-                    </div>
-                    <div className="aside-bottom">
-                        <div className="aside-content-user">
-                            <div className="user-avatar">A</div>
-                            <div className="user-meta">
-                                <span className="user-name">Administrador</span>
-                                <span className="email-user-account">{nombreAdmin}</span>
-                            </div>
-                        </div>
-                        <button className="logout-btn" onClick={cerrarSesion}>
-                            <LogoutRoundedIcon sx={{ fontSize: '1.1rem' }} />
-                            Cerrar sesión
-                        </button>
-                    </div>
-                </aside>
-
-                <main className="contenido">
+        <SidebarLayout
+            titulo="GamificApp · Administración"
+            items={[
+                { id: 'inicio', label: 'Inicio', Icon: HomeFilledIcon },
+                { id: 'docentes', label: 'Docentes', Icon: SchoolRoundedIcon },
+                { id: 'estudiantes', label: 'Estudiantes', Icon: GroupsRoundedIcon },
+                { id: 'materias', label: 'Materias', Icon: MenuBookRoundedIcon },
+                { id: 'cursos', label: 'Cursos', Icon: Diversity3RoundedIcon },
+                { id: 'invitaciones', label: 'Invitaciones', Icon: VpnKeyRoundedIcon },
+                // Solo el Administrador Principal gestiona
+                // administradores e institución (el servidor
+                // rechaza igual las peticiones de los demás).
+                ...(esPrincipal ? [
+                    { id: 'administradores', label: 'Administradores', Icon: AdminPanelSettingsRoundedIcon },
+                    { id: 'institucion', label: 'Institución', Icon: ApartmentRoundedIcon }
+                ] : [])
+            ].map((item) => ({ ...item, activo: pagina === item.id, onClick: () => setPagina(item.id) }))}
+            usuario={{ inicial: 'A', nombre: 'Administrador', detalle: nombreAdmin }}
+            accionesFooter={[
+                { label: 'Cerrar sesión', Icon: LogoutRoundedIcon, onClick: cerrarSesion }
+            ]}
+        >
                     <div className="admin-vista">
                         {error && (
                             <div className="aviso-migracion" role="alert">
@@ -702,8 +672,6 @@ export function AdminDashboard() {
                             </div>
                         )}
                     </div>
-                </main>
-            </div>
 
             {/* Modal para editar las materias de un docente sin recrearlo. */}
             {docenteEditando && (
@@ -755,6 +723,6 @@ export function AdminDashboard() {
                     </div>
                 </div>
             )}
-        </div>
+        </SidebarLayout>
     );
 }

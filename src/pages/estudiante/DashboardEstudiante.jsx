@@ -13,13 +13,7 @@ import WorkspacePremiumRoundedIcon from '@mui/icons-material/WorkspacePremiumRou
 import LockRoundedIcon from '@mui/icons-material/LockRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import RocketLaunchRoundedIcon from '@mui/icons-material/RocketLaunchRounded';
-import {
-    List,
-    ListItem,
-    ListItemIcon,
-    ListItemButton,
-    ListItemText
-} from '@mui/material';
+import { SidebarLayout } from '../../components/dashboard/SidebarLayout';
 import { FileChip, FilePreviewModal, descargarArchivo } from '../../components/archivos/ArchivoChip';
 import { QuizInteractivo } from '../../components/quiz/QuizInteractivo';
 import { JuegoDragAndDrop } from '../../components/clasificador/JuegoDragAndDrop';
@@ -211,55 +205,27 @@ export function DashboardEstudiante() {
     };
 
     return (
-        <div className="dashboard">
-            <div className="sidebar-container">
-                <aside className="sidebar">
-                    <div className="aside-content-options">
-                        {getInstitucionCache()?.logo_data && (
-                            <img className="sidebar-logo" src={getInstitucionCache().logo_data} alt="" />
-                        )}
-                        <h2 style={{ pointerEvents: "none" }}>{getInstitucionCache()?.nombre || 'Unidad Educativa Fiscal Clemencia Coronel de Pincay'}</h2>
-                        <List>
-                            <ListItem disablePadding>
-                                <ListItemButton className="nav-item" onClick={() => { setPagina(""); setMateriaSeleccionada(null); }}>
-                                    <ListItemIcon className="nav-icon"><HomeFilledIcon sx={{ fontSize: "1.3rem" }} /></ListItemIcon>
-                                    <ListItemText primary="Inicio" />
-                                </ListItemButton>
-                            </ListItem>
-                            <ListItem disablePadding>
-                                <ListItemButton className="nav-item" onClick={() => { setPagina("materias"); setMateriaSeleccionada(null); }}>
-                                    <ListItemIcon className="nav-icon"><MenuBookIcon sx={{ fontSize: "1.3rem" }} /></ListItemIcon>
-                                    <ListItemText primary="Mis Mundos" />
-                                </ListItemButton>
-                            </ListItem>
-                            <ListItem disablePadding>
-                                <ListItemButton className="nav-item" onClick={() => { setPagina("logros"); setMateriaSeleccionada(null); }}>
-                                    <ListItemIcon className="nav-icon"><EmojiEventsRoundedIcon sx={{ fontSize: "1.3rem" }} /></ListItemIcon>
-                                    <ListItemText primary="Mis Premios" />
-                                </ListItemButton>
-                            </ListItem>
-                        </List>
-                    </div>
-                    <div className="aside-bottom">
-                        <div className="aside-content-user">
-                            <div className="user-avatar">{nombreEstudiante.charAt(0).toUpperCase()}</div>
-                            <div className="user-meta">
-                                <span className="user-name">{nombreEstudiante}</span>
-                                <span className="email-user-account">Estudiante</span>
-                            </div>
-                        </div>
-                        <button className="logout-btn" onClick={handleCambiarPin}>
-                            <LockRoundedIcon sx={{ fontSize: "1.1rem" }} />
-                            Cambiar mi PIN
-                        </button>
-                        <button className="logout-btn" onClick={cerrarSesion}>
-                            <LogoutRoundedIcon sx={{ fontSize: "1.1rem" }} />
-                            Cerrar sesión
-                        </button>
-                    </div>
-                </aside>
-
-                <main className="contenido">
+        <SidebarLayout
+            titulo={getInstitucionCache()?.nombre || 'Unidad Educativa Fiscal Clemencia Coronel de Pincay'}
+            items={[
+                { id: '', label: 'Inicio', Icon: HomeFilledIcon },
+                { id: 'materias', label: 'Mis Mundos', Icon: MenuBookIcon },
+                { id: 'logros', label: 'Mis Premios', Icon: EmojiEventsRoundedIcon }
+            ].map((item) => ({
+                ...item,
+                activo: pagina === item.id,
+                onClick: () => { setPagina(item.id); setMateriaSeleccionada(null); }
+            }))}
+            usuario={{
+                inicial: nombreEstudiante.charAt(0).toUpperCase(),
+                nombre: nombreEstudiante,
+                detalle: 'Estudiante'
+            }}
+            accionesFooter={[
+                { label: 'Cambiar mi PIN', Icon: LockRoundedIcon, onClick: handleCambiarPin },
+                { label: 'Cerrar sesión', Icon: LogoutRoundedIcon, onClick: cerrarSesion }
+            ]}
+        >
 
                     {/* INICIO — responde una sola pregunta: "¿qué hago ahora?".
                         Saludo + nivel visual → acción principal → mundos → logros. */}
@@ -581,14 +547,11 @@ export function DashboardEstudiante() {
                         </>
                     )}
 
-                </main>
-            </div>
-
             <FilePreviewModal
                 archivo={archivoPreview}
                 onClose={() => setArchivoPreview(null)}
                 onDownload={descargarArchivo}
             />
-        </div>
+        </SidebarLayout>
     );
 }

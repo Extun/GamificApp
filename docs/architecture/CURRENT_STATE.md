@@ -30,6 +30,8 @@ El **MVP está completo y en producción** (Vercel + Render + Aiven). Los tres r
 > - Invariantes en servidor: no se puede quitar el rol, desactivar ni eliminar al último Principal activo (409); nadie puede eliminarse a sí mismo.
 > - Frontend: `ModuloAdministradores` (TablaPro + ModalPanel, chips de rol/estado, "(tú)" en la cuenta propia), entradas "Administradores" e "Institución" del sidebar visibles solo para el Principal (la UI oculta, el servidor protege).
 
+> **Sidebar unificado (2026-07-09):** los tres paneles (Admin, Docente, Estudiante) usan el componente base `src/components/dashboard/SidebarLayout.jsx` (header con logo institucional + nombre, navegación `flex:1` con scroll propio, footer sticky con usuario y acciones siempre visible). El sidebar ocupa `100dvh`; el único scroll vertical del panel vive en `.contenido` (flex + sticky, sin `position: fixed`). En ≤760px pasa a barra superior con navegación horizontal. Estilos compartidos en `dashboard.css` (`.sidebar-header/.sidebar-nav/.sidebar-footer`, `.nav-item-activo` ahora global). Sin cambios de lógica, APIs ni BD.
+
 > Polish Sprint (2026-07-07/08): identidad visual unificada en Login, Home y materias de ambos roles (tarjetas pastel por materia, héroes con gradiente, pestañas píldora, tablas con acentos de la paleta). Nombre institucional actualizado a **Unidad Educativa Fiscal Clemencia Coronel de Pincay** en toda la UI. Sin cambios de lógica, APIs ni BD.
 
 ## 2. Módulos implementados (verificado contra el código)

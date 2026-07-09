@@ -49,15 +49,8 @@ import { GeneradorQuiz } from './GeneradorQuiz';
 import { GeneradorMision } from './GeneradorMision';
 import { EditorClasificador } from '../../components/clasificador/EditorClasificador';
 import { LibroCalificaciones } from '../../components/dashboard/LibroCalificaciones';
-import {
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemButton,
-  ListItemText,
-  Grid,
-  Card
-} from '@mui/material';
+import { Grid, Card } from '@mui/material';
+import { SidebarLayout } from '../../components/dashboard/SidebarLayout';
 
 function WidgetsRendimiento({ materia, topEstudiantes, retosPublicados, siguientePaso, onAccion }) {
     return (
@@ -395,56 +388,22 @@ export function Dashboard() {
     };
 
     return (
-        <div className="dashboard">
-
-            <div className ="sidebar-container">
-                <aside className="sidebar">
-                <div className="aside-content-options">
-                    {getInstitucionCache()?.logo_data && (
-                        <img className="sidebar-logo" src={getInstitucionCache().logo_data} alt="" />
-                    )}
-                    <h2 style={{pointerEvents:"none"}}>{getInstitucionCache()?.nombre || 'Unidad Educativa Fiscal Clemencia Coronel de Pincay'}</h2>
-                    <List>
-                        <ListItem disablePadding>
-                            <ListItemButton className="nav-item" onClick={() => setPagina("")}>
-                                <ListItemIcon className="nav-icon">
-                                <HomeFilledIcon sx={{ fontSize: "1.3rem" }} />
-                            </ListItemIcon>
-                            <ListItemText primary="Inicio" />
-                            </ListItemButton>
-                        </ListItem>
-                        <ListItem disablePadding>
-                            <ListItemButton className="nav-item" onClick={() => setPagina("materias")}>
-                                <ListItemIcon className="nav-icon">
-                                <MenuBookIcon sx={{ fontSize: "1.3rem" }} />
-                            </ListItemIcon>
-                            <ListItemText primary="Materias" />
-                                </ListItemButton>
-                        </ListItem>
-                        <ListItem disablePadding>
-                            <ListItemButton className="nav-item" onClick={() => setPagina("estudiantes")}>
-                                <ListItemIcon className="nav-icon">
-                                <GroupsRoundedIcon sx={{ fontSize: "1.3rem" }} />
-                            </ListItemIcon>
-                            <ListItemText primary="Mis Estudiantes" />
-                            </ListItemButton>
-                        </ListItem>
-                    </List>
-                </div>
-                <div className="aside-content-user">
-                    <div className="user-avatar">D</div>
-                    <div className="user-meta">
-                        <span className="user-name">Docente</span>
-                        <span className='email-user-account'>{authService.getUsuario()?.username}</span>
-                    </div>
-                </div>
-                <button className="logout-btn" onClick={cerrarSesion}>
-                    <LogoutRoundedIcon sx={{ fontSize: "1.1rem" }} />
-                    Cerrar sesión
-                </button>
-            </aside>
-
-            <main className="contenido">
+        <SidebarLayout
+            titulo={getInstitucionCache()?.nombre || 'Unidad Educativa Fiscal Clemencia Coronel de Pincay'}
+            items={[
+                { id: '', label: 'Inicio', Icon: HomeFilledIcon },
+                { id: 'materias', label: 'Materias', Icon: MenuBookIcon },
+                { id: 'estudiantes', label: 'Mis Estudiantes', Icon: GroupsRoundedIcon }
+            ].map((item) => ({
+                ...item,
+                activo: pagina === item.id,
+                onClick: () => { setPagina(item.id); setMateriaSeleccionada(null); }
+            }))}
+            usuario={{ inicial: 'D', nombre: 'Docente', detalle: authService.getUsuario()?.username }}
+            accionesFooter={[
+                { label: 'Cerrar sesión', Icon: LogoutRoundedIcon, onClick: cerrarSesion }
+            ]}
+        >
 
                 {/* HOME — orden RFC-004: bienvenida → continuar trabajando →
                     mi aula → contenido → actividad reciente. Solo datos reales. */}
@@ -854,15 +813,12 @@ export function Dashboard() {
                     </div>
                 )}
 
-            </main>
-            </div>
-
             <FilePreviewModal
                 archivo={archivoPreview}
                 onClose={() => setArchivoPreview(null)}
                 onDownload={descargarArchivo}
                 onDelete={(a) => handleEliminarArchivo(materiaSeleccionada, a.id)}
             />
-        </div>
+        </SidebarLayout>
     );
 }
