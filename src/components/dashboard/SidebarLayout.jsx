@@ -9,7 +9,10 @@ import { getInstitucionCache } from '../../services/institucionService';
  * El scroll del panel ocurre únicamente dentro de <main class="contenido">.
  *
  * - titulo: texto bajo el logo institucional.
- * - items: [{ id, label, Icon, activo, onClick }] para la navegación.
+ * - items: [{ id, label, Icon, activo, onClick, grupo? }] para la navegación.
+ *   `grupo` (SPEC-003) es opcional: los ítems consecutivos con el mismo
+ *   grupo se encabezan con su rótulo y un separador. Sin grupo, el sidebar
+ *   se ve exactamente igual que antes (Docente y Estudiante no cambian).
  * - usuario: { inicial, nombre, detalle } mostrado en el footer.
  * - accionesFooter: [{ label, Icon, onClick }] botones bajo el usuario
  *   (p. ej. "Cerrar sesión").
@@ -30,19 +33,25 @@ export function SidebarLayout({ titulo, items, usuario, accionesFooter = [], chi
 
                     <nav className="sidebar-nav" aria-label="Secciones del panel">
                         <List>
-                            {items.map(({ id, label, Icon, activo, onClick }) => (
-                                <ListItem disablePadding key={id}>
-                                    <ListItemButton
-                                        className={`nav-item ${activo ? 'nav-item-activo' : ''}`}
-                                        onClick={onClick}
-                                    >
-                                        <ListItemIcon className="nav-icon">
-                                            <Icon sx={{ fontSize: '1.3rem' }} />
-                                        </ListItemIcon>
-                                        <ListItemText primary={label} />
-                                    </ListItemButton>
-                                </ListItem>
-                            ))}
+                            {items.map(({ id, label, Icon, activo, onClick, grupo }, indice) => {
+                                const nuevoGrupo = grupo && grupo !== items[indice - 1]?.grupo;
+                                return (
+                                    <ListItem disablePadding key={id} className="nav-item-wrap">
+                                        {nuevoGrupo && (
+                                            <span className="sidebar-grupo" aria-hidden="true">{grupo}</span>
+                                        )}
+                                        <ListItemButton
+                                            className={`nav-item ${activo ? 'nav-item-activo' : ''}`}
+                                            onClick={onClick}
+                                        >
+                                            <ListItemIcon className="nav-icon">
+                                                <Icon sx={{ fontSize: '1.3rem' }} />
+                                            </ListItemIcon>
+                                            <ListItemText primary={label} />
+                                        </ListItemButton>
+                                    </ListItem>
+                                );
+                            })}
                         </List>
                     </nav>
 

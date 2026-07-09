@@ -12,7 +12,7 @@ router.get('/', soloDocente, async (_req, res, next) => {
         const [cursos] = await pool.query(
             `SELECT id, nombre, paralelo, nivel,
                     CONCAT(nombre, ' ', paralelo) AS etiqueta
-             FROM cursos WHERE activo = TRUE
+             FROM cursos WHERE activo = TRUE AND eliminado_en IS NULL
              ORDER BY nombre, paralelo`
         );
         res.json(cursos);

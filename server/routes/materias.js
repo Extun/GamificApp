@@ -8,10 +8,12 @@ const router = Router();
 // activas. `color` e `icono` pintan la identidad visual en el frontend.
 router.get('/', async (req, res, next) => {
     try {
+        // Las materias en la Papelera (SPEC-003) no se listan para nadie;
+        // solo aparecen en el módulo Papelera del admin.
         const soloActivas = req.user?.rol !== 'admin';
         const [materias] = await pool.query(
             `SELECT id, nombre, color, icono, activa FROM materias
-             ${soloActivas ? 'WHERE activa = TRUE' : ''}
+             WHERE eliminado_en IS NULL ${soloActivas ? 'AND activa = TRUE' : ''}
              ORDER BY id`
         );
         res.json(materias);

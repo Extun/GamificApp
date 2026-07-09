@@ -6,7 +6,7 @@ Roadmap de GamificApp: fases, backlog priorizado, dependencias y riesgos. El est
 
 # Última actualización
 
-2026-07-07 (consolidación documental)
+2026-07-09 (SPEC-003 implementada: sprint final del panel de administración)
 
 # Responsable
 
@@ -20,6 +20,7 @@ Fabrizio Zurita (Extun)
 | 1 | Fundamentos v2 | Auditoría de navegación, inventario funcional, blueprint (en `docs/archive/fundamentos/`) | ✅ Hecho |
 | 2 | Dashboards reales | Reorganización de los 3 dashboards, componentes compartidos, cero datos ficticios | ✅ Hecho |
 | 3 | DevOS documental | Sistema documental — **cerrado y simplificado** en la consolidación 2026-07-07 (START_HERE + 4 docs vivos) | ✅ Hecho |
+| 3.5 | Centro de Administración (SPEC-002 + SPEC-003) | Materias/cursos/institución dinámicos, TablaPro, roles y permisos de admin, auditoría, papelera, sidebar agrupado | ✅ Hecho en código (2026-07-09) — **pendiente: backup Aiven + migraciones 002-004 + deploy** |
 | 4 | **Épica 1: Experiencia del estudiante** | Rediseño completo del lado del niño en 5 specs (ver §2) | 🟡 En curso (auditoría y SPEC-001 redactadas; nada implementado) |
 | 5 | Módulos incompletos | Libro de Calificaciones, 3 logros faltantes, UI de edición de docente | ⚪ Pendiente (antes de la defensa, si hay tiempo) |
 | 6 | Post-tesis | Multi-institución, archivos fuera de la BD, fallback de IA, memoria del asistente | ⚪ Futuro |

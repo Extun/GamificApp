@@ -4,6 +4,7 @@
 import { Router } from 'express';
 import pool from '../db.js';
 import { soloDocente, puedeGestionarMateria } from '../middleware/auth.js';
+import { registrarAuditoria } from '../lib/auditoria.js';
 
 // mergeParams: el router se monta en /api/materias/:id/material.
 const router = Router({ mergeParams: true });
@@ -24,7 +25,7 @@ router.get('/', async (req, res, next) => {
         // ni siquiera con el ID directo (la UI oculta, el servidor protege).
         if (req.user?.rol === 'estudiante') {
             const [[materia]] = await pool.query(
-                'SELECT activa FROM materias WHERE id = ?',
+                'SELECT activa FROM materias WHERE id = ? AND eliminado_en IS NULL',
                 [materiaId]
             );
             if (!materia || !materia.activa) {
@@ -82,6 +83,13 @@ router.post('/', soloDocente, async (req, res, next) => {
         );
 
         const [[fila]] = await pool.query('SELECT * FROM materiales WHERE id = ?', [resultado.insertId]);
+        const [[infoMateria]] = await pool.query('SELECT nombre FROM materias WHERE id = ?', [materiaId]);
+        registrarAuditoria({
+            usuario: req.user, accion: 'subio-material',
+            descripcion: `Subió el material "${fila.nombre}"`,
+            materia: infoMateria?.nombre || null,
+            detalle: { archivo: fila.nombre, tipo: fila.kind, privado: Boolean(fila.is_private) }
+        });
         res.status(201).json(fila);
     } catch (err) {
         next(err);
@@ -96,6 +104,10 @@ router.delete('/:materialId', soloDocente, async (req, res, next) => {
         if (!await puedeGestionarMateria(req.user, materiaId)) {
             return res.status(403).json({ error: 'No tienes asignada esta materia' });
         }
+        const [[previo]] = await pool.query(
+            'SELECT nombre FROM materiales WHERE id = ? AND materia_id = ?',
+            [materialId, materiaId]
+        );
         const [resultado] = await pool.query(
             'DELETE FROM materiales WHERE id = ? AND materia_id = ?',
             [materialId, materiaId]
@@ -103,6 +115,13 @@ router.delete('/:materialId', soloDocente, async (req, res, next) => {
         if (resultado.affectedRows === 0) {
             return res.status(404).json({ error: 'Material no encontrado' });
         }
+        const [[infoMateria]] = await pool.query('SELECT nombre FROM materias WHERE id = ?', [materiaId]);
+        registrarAuditoria({
+            usuario: req.user, accion: 'elimino-material',
+            descripcion: `Eliminó el material "${previo?.nombre || materialId}"`,
+            materia: infoMateria?.nombre || null,
+            detalle: previo ? { archivo: previo.nombre } : null
+        });
         res.json({ ok: true });
     } catch (err) {
         next(err);

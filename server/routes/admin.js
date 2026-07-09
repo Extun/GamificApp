@@ -3,18 +3,26 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import pool from '../db.js';
-import { soloAdmin, soloAdminPrincipal } from '../middleware/auth.js';
+import {
+    soloAdmin, conPermiso, esPrincipalEnBD,
+    PERMISOS_VALIDOS, permisosEfectivos
+} from '../middleware/auth.js';
 import { resetearPinADefault } from '../lib/estudiantes.js';
+import { registrarAuditoria } from '../lib/auditoria.js';
 
 const router = Router();
 router.use(soloAdmin);
+
+// Atajo: registra en auditoría una acción de este admin (fire-and-forget).
+const auditar = (req, accion, descripcion, detalle = null, materia = null) =>
+    registrarAuditoria({ usuario: req.user, accion, descripcion, detalle, materia });
 
 const USERNAME_VALIDO = /^[a-z0-9][a-z0-9._-]{2,49}$/;
 
 // ---- DOCENTES ----
 
 // GET /api/admin/docentes — cada docente con sus materias asignadas.
-router.get('/docentes', async (_req, res, next) => {
+router.get('/docentes', conPermiso('docentes'), async (_req, res, next) => {
     try {
         const [filas] = await pool.query(
             `SELECT u.id, u.username, u.creado_en,
@@ -25,7 +33,7 @@ router.get('/docentes', async (_req, res, next) => {
              FROM usuarios u
              LEFT JOIN docente_materia dm ON dm.docente_id = u.id
              LEFT JOIN materias m ON m.id = dm.materia_id
-             WHERE u.rol = 'docente'
+             WHERE u.rol = 'docente' AND u.eliminado_en IS NULL
              GROUP BY u.id
              ORDER BY u.username`
         );
@@ -42,7 +50,7 @@ router.get('/docentes', async (_req, res, next) => {
 
 // POST /api/admin/docentes — crea un docente y le asigna sus materias.
 // Body: { username, password, materia_ids: [1, 3] }
-router.post('/docentes', async (req, res, next) => {
+router.post('/docentes', conPermiso('docentes'), async (req, res, next) => {
     const conn = await pool.getConnection();
     try {
         const username = String(req.body?.username || '').trim().toLowerCase();
@@ -68,6 +76,7 @@ router.post('/docentes', async (req, res, next) => {
             );
         }
         await conn.commit();
+        auditar(req, 'creo-docente', `Creó la cuenta del docente "${username}"`, { docente: username, materia_ids: materiaIds });
         res.status(201).json({ id: creado.insertId, username, rol: 'docente', materia_ids: materiaIds });
     } catch (err) {
         await conn.rollback().catch(() => {});
@@ -82,12 +91,12 @@ router.post('/docentes', async (req, res, next) => {
 
 // PUT /api/admin/docentes/:id — cambia contraseña y/o materias asignadas.
 // Body: { password?, materia_ids? }
-router.put('/docentes/:id', async (req, res, next) => {
+router.put('/docentes/:id', conPermiso('docentes'), async (req, res, next) => {
     const conn = await pool.getConnection();
     try {
         const docenteId = Number(req.params.id);
         const [[docente]] = await conn.query(
-            "SELECT id FROM usuarios WHERE id = ? AND rol = 'docente'", [docenteId]
+            "SELECT id, username FROM usuarios WHERE id = ? AND rol = 'docente' AND eliminado_en IS NULL", [docenteId]
         );
         if (!docente) return res.status(404).json({ error: 'Docente no encontrado' });
 
@@ -112,6 +121,11 @@ router.put('/docentes/:id', async (req, res, next) => {
             }
         }
         await conn.commit();
+        auditar(req, 'edito-docente', `Actualizó la cuenta del docente "${docente.username}"`, {
+            docente: docente.username,
+            cambio_password: Boolean(req.body?.password),
+            materia_ids: Array.isArray(req.body?.materia_ids) ? req.body.materia_ids : undefined
+        });
         res.json({ ok: true });
     } catch (err) {
         await conn.rollback().catch(() => {});
@@ -121,15 +135,22 @@ router.put('/docentes/:id', async (req, res, next) => {
     }
 });
 
-// DELETE /api/admin/docentes/:id — sus asignaciones e invitaciones caen en
-// cascada; el material y los retos que publicó permanecen.
-router.delete('/docentes/:id', async (req, res, next) => {
+// DELETE /api/admin/docentes/:id — pasa a la Papelera (SPEC-003): la cuenta
+// se marca como eliminada (no puede iniciar sesión ni aparece en listados),
+// pero sus materias asignadas, invitaciones, retos y material permanecen
+// intactos para poder restaurarla exactamente como estaba.
+router.delete('/docentes/:id', conPermiso('docentes'), async (req, res, next) => {
     try {
-        const [resultado] = await pool.query(
-            "DELETE FROM usuarios WHERE id = ? AND rol = 'docente'",
+        const [[docente]] = await pool.query(
+            "SELECT username FROM usuarios WHERE id = ? AND rol = 'docente' AND eliminado_en IS NULL",
             [Number(req.params.id)]
         );
-        if (!resultado.affectedRows) return res.status(404).json({ error: 'Docente no encontrado' });
+        if (!docente) return res.status(404).json({ error: 'Docente no encontrado' });
+        await pool.query(
+            'UPDATE usuarios SET eliminado_en = NOW(), eliminado_por = ? WHERE id = ?',
+            [req.user.username, Number(req.params.id)]
+        );
+        auditar(req, 'elimino-docente', `Envió a la papelera al docente "${docente.username}"`, { docente: docente.username });
         res.json({ ok: true });
     } catch (err) {
         next(err);
@@ -139,7 +160,7 @@ router.delete('/docentes/:id', async (req, res, next) => {
 // ---- ESTUDIANTES ----
 
 // GET /api/admin/estudiantes — todos, con su curso, XP y estado de bloqueo.
-router.get('/estudiantes', async (_req, res, next) => {
+router.get('/estudiantes', conPermiso('estudiantes'), async (_req, res, next) => {
     try {
         const [filas] = await pool.query(
             `SELECT u.id AS usuario_id, u.nombre_completo, u.codigo_emergencia,
@@ -147,7 +168,7 @@ router.get('/estudiantes', async (_req, res, next) => {
                     e.id AS estudiante_id, e.curso, e.xp_total, e.fecha_nacimiento, e.creado_en
              FROM usuarios u
              JOIN estudiantes e ON e.id = u.estudiante_id
-             WHERE u.rol = 'estudiante'
+             WHERE u.rol = 'estudiante' AND u.eliminado_en IS NULL
              ORDER BY e.curso, u.nombre_completo`
         );
         res.json(filas);
@@ -157,30 +178,37 @@ router.get('/estudiantes', async (_req, res, next) => {
 });
 
 // POST /api/admin/estudiantes/:usuarioId/resetear-pin
-router.post('/estudiantes/:usuarioId/resetear-pin', async (req, res, next) => {
+router.post('/estudiantes/:usuarioId/resetear-pin', conPermiso('estudiantes'), async (req, res, next) => {
     try {
-        const pin = await resetearPinADefault(Number(req.params.usuarioId));
+        const [[cuenta]] = await pool.query(
+            "SELECT nombre_completo FROM usuarios WHERE id = ? AND rol = 'estudiante'",
+            [Number(req.params.usuarioId)]
+        );
+        const pin = cuenta ? await resetearPinADefault(Number(req.params.usuarioId)) : null;
         if (!pin) return res.status(404).json({ error: 'Estudiante no encontrado' });
+        auditar(req, 'reseteo-pin', `Restableció el PIN de "${cuenta.nombre_completo}"`, { estudiante: cuenta.nombre_completo });
         res.json({ ok: true, pin, mensaje: `PIN restablecido a su fecha de nacimiento: ${pin}` });
     } catch (err) {
         next(err);
     }
 });
 
-// DELETE /api/admin/estudiantes/:usuarioId — elimina cuenta Y ficha con su
-// progreso (acción irreversible, pensada para bajas o registros de prueba).
-router.delete('/estudiantes/:usuarioId', async (req, res, next) => {
+// DELETE /api/admin/estudiantes/:usuarioId — pasa a la Papelera (SPEC-003):
+// la cuenta se marca como eliminada; la ficha con su XP y progreso queda
+// intacta, así la restauración lo devuelve exactamente como estaba.
+router.delete('/estudiantes/:usuarioId', conPermiso('estudiantes'), async (req, res, next) => {
     try {
         const usuarioId = Number(req.params.usuarioId);
         const [[cuenta]] = await pool.query(
-            "SELECT estudiante_id FROM usuarios WHERE id = ? AND rol = 'estudiante'", [usuarioId]
+            "SELECT nombre_completo FROM usuarios WHERE id = ? AND rol = 'estudiante' AND eliminado_en IS NULL",
+            [usuarioId]
         );
         if (!cuenta) return res.status(404).json({ error: 'Estudiante no encontrado' });
-
-        await pool.query('DELETE FROM usuarios WHERE id = ?', [usuarioId]);
-        if (cuenta.estudiante_id) {
-            await pool.query('DELETE FROM estudiantes WHERE id = ?', [cuenta.estudiante_id]);
-        }
+        await pool.query(
+            'UPDATE usuarios SET eliminado_en = NOW(), eliminado_por = ? WHERE id = ?',
+            [req.user.username, usuarioId]
+        );
+        auditar(req, 'elimino-estudiante', `Envió a la papelera al estudiante "${cuenta.nombre_completo}"`, { estudiante: cuenta.nombre_completo });
         res.json({ ok: true });
     } catch (err) {
         next(err);
@@ -188,7 +216,7 @@ router.delete('/estudiantes/:usuarioId', async (req, res, next) => {
 });
 
 // GET /api/admin/invitaciones — visión global de todos los códigos.
-router.get('/invitaciones', async (_req, res, next) => {
+router.get('/invitaciones', conPermiso('invitaciones'), async (_req, res, next) => {
     try {
         await pool.query(
             "UPDATE invitaciones_estudiante SET estado = 'expirado' WHERE estado = 'pendiente' AND expira_en < NOW()"
@@ -212,10 +240,10 @@ router.get('/invitaciones', async (_req, res, next) => {
 
 // DELETE /api/admin/invitaciones/:id — solo códigos no utilizados
 // (pendientes o expirados); el historial de usados es intocable.
-router.delete('/invitaciones/:id', async (req, res, next) => {
+router.delete('/invitaciones/:id', conPermiso('invitaciones'), async (req, res, next) => {
     try {
         const [[inv]] = await pool.query(
-            'SELECT estado FROM invitaciones_estudiante WHERE id = ?',
+            'SELECT codigo, curso, estado FROM invitaciones_estudiante WHERE id = ?',
             [Number(req.params.id)]
         );
         if (!inv) return res.status(404).json({ error: 'Invitación no encontrada' });
@@ -223,6 +251,7 @@ router.delete('/invitaciones/:id', async (req, res, next) => {
             return res.status(409).json({ error: 'No se puede eliminar una invitación ya utilizada' });
         }
         await pool.query('DELETE FROM invitaciones_estudiante WHERE id = ?', [Number(req.params.id)]);
+        auditar(req, 'elimino-invitacion', `Eliminó la invitación "${inv.codigo}" (${inv.curso})`, { codigo: inv.codigo, curso: inv.curso, estado: inv.estado });
         res.json({ ok: true });
     } catch (err) {
         next(err);
@@ -243,7 +272,7 @@ const validarMateria = (body) => {
 };
 
 // POST /api/admin/materias — crea una materia nueva.
-router.post('/materias', async (req, res, next) => {
+router.post('/materias', conPermiso('materias'), async (req, res, next) => {
     try {
         const datos = validarMateria(req.body);
         if (datos.error) return res.status(400).json({ error: datos.error });
@@ -256,6 +285,7 @@ router.post('/materias', async (req, res, next) => {
             'INSERT INTO materias (id, nombre, color, icono) VALUES (?, ?, ?, ?)',
             [siguiente, datos.nombre, datos.color, datos.icono]
         );
+        auditar(req, 'creo-materia', `Creó la materia "${datos.nombre}"`, { materia: datos.nombre }, datos.nombre);
         res.status(201).json({ id: siguiente, ...datos });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
@@ -266,17 +296,18 @@ router.post('/materias', async (req, res, next) => {
 });
 
 // PUT /api/admin/materias/:id — edita nombre, color, icono y/o estado.
-router.put('/materias/:id', async (req, res, next) => {
+router.put('/materias/:id', conPermiso('materias'), async (req, res, next) => {
     try {
         const id = Number(req.params.id);
         const datos = validarMateria(req.body);
         if (datos.error) return res.status(400).json({ error: datos.error });
         const activa = req.body?.activa === undefined ? true : Boolean(req.body.activa);
         const [resultado] = await pool.query(
-            'UPDATE materias SET nombre = ?, color = ?, icono = ?, activa = ? WHERE id = ?',
+            'UPDATE materias SET nombre = ?, color = ?, icono = ?, activa = ? WHERE id = ? AND eliminado_en IS NULL',
             [datos.nombre, datos.color, datos.icono, activa, id]
         );
         if (!resultado.affectedRows) return res.status(404).json({ error: 'Materia no encontrada' });
+        auditar(req, 'edito-materia', `Editó la materia "${datos.nombre}"`, { materia: datos.nombre, activa }, datos.nombre);
         res.json({ ok: true });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
@@ -286,24 +317,22 @@ router.put('/materias/:id', async (req, res, next) => {
     }
 });
 
-// DELETE /api/admin/materias/:id — solo si la materia está vacía (sin retos,
-// material ni docentes). Si tiene contenido, la opción correcta es desactivarla.
-router.delete('/materias/:id', async (req, res, next) => {
+// DELETE /api/admin/materias/:id — pasa a la Papelera (SPEC-003): la materia
+// desaparece de docentes y estudiantes, pero sus retos, material y
+// asignaciones quedan intactos para restaurarla tal cual. Las validaciones
+// de integridad se aplican en la eliminación DEFINITIVA desde la Papelera.
+router.delete('/materias/:id', conPermiso('materias'), async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        const [[uso]] = await pool.query(
-            `SELECT (SELECT COUNT(*) FROM retos WHERE materia_id = ?) AS retos,
-                    (SELECT COUNT(*) FROM materiales WHERE materia_id = ?) AS materiales,
-                    (SELECT COUNT(*) FROM docente_materia WHERE materia_id = ?) AS docentes`,
-            [id, id, id]
+        const [[materia]] = await pool.query(
+            'SELECT nombre FROM materias WHERE id = ? AND eliminado_en IS NULL', [id]
         );
-        if (uso.retos || uso.materiales || uso.docentes) {
-            return res.status(409).json({
-                error: 'La materia tiene contenido o docentes asignados. Desactívala en su lugar.'
-            });
-        }
-        const [resultado] = await pool.query('DELETE FROM materias WHERE id = ?', [id]);
-        if (!resultado.affectedRows) return res.status(404).json({ error: 'Materia no encontrada' });
+        if (!materia) return res.status(404).json({ error: 'Materia no encontrada' });
+        await pool.query(
+            'UPDATE materias SET eliminado_en = NOW(), eliminado_por = ? WHERE id = ?',
+            [req.user.username, id]
+        );
+        auditar(req, 'elimino-materia', `Envió a la papelera la materia "${materia.nombre}"`, { materia: materia.nombre }, materia.nombre);
         res.json({ ok: true });
     } catch (err) {
         next(err);
@@ -328,7 +357,7 @@ const validarCurso = (body) => {
 
 // GET /api/admin/cursos — todos, con conteos reales de estudiantes y
 // docentes (docentes = emisores distintos de invitaciones del curso).
-router.get('/cursos', async (_req, res, next) => {
+router.get('/cursos', conPermiso('cursos'), async (_req, res, next) => {
     try {
         const [cursos] = await pool.query(
             `SELECT c.id, c.nombre, c.paralelo, c.nivel, c.activo, c.creado_en,
@@ -337,6 +366,7 @@ router.get('/cursos', async (_req, res, next) => {
                     (SELECT COUNT(DISTINCT i.docente_id) FROM invitaciones_estudiante i
                      WHERE i.curso_id = c.id) AS docentes
              FROM cursos c
+             WHERE c.eliminado_en IS NULL
              ORDER BY c.nombre, c.paralelo`
         );
         res.json(cursos);
@@ -346,7 +376,7 @@ router.get('/cursos', async (_req, res, next) => {
 });
 
 // POST /api/admin/cursos
-router.post('/cursos', async (req, res, next) => {
+router.post('/cursos', conPermiso('cursos'), async (req, res, next) => {
     try {
         const datos = validarCurso(req.body);
         if (datos.error) return res.status(400).json({ error: datos.error });
@@ -354,6 +384,7 @@ router.post('/cursos', async (req, res, next) => {
             'INSERT INTO cursos (nombre, paralelo, nivel) VALUES (?, ?, ?)',
             [datos.nombre, datos.paralelo, datos.nivel]
         );
+        auditar(req, 'creo-curso', `Creó el curso "${datos.nombre} ${datos.paralelo}"`, { curso: `${datos.nombre} ${datos.paralelo}`, nivel: datos.nivel });
         res.status(201).json({ id: creado.insertId, ...datos });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
@@ -364,7 +395,7 @@ router.post('/cursos', async (req, res, next) => {
 });
 
 // PUT /api/admin/cursos/:id — edita datos y/o activa/desactiva.
-router.put('/cursos/:id', async (req, res, next) => {
+router.put('/cursos/:id', conPermiso('cursos'), async (req, res, next) => {
     try {
         const id = Number(req.params.id);
         const datos = validarCurso(req.body);
@@ -377,7 +408,7 @@ router.put('/cursos/:id', async (req, res, next) => {
             await conn.beginTransaction();
             const [resultado] = await conn.query(
                 `UPDATE cursos SET nombre = ?, paralelo = ?, nivel = ?, activo = ?
-                 WHERE id = ?`,
+                 WHERE id = ? AND eliminado_en IS NULL`,
                 [datos.nombre, datos.paralelo, datos.nivel, activo, id]
             );
             if (!resultado.affectedRows) {
@@ -399,6 +430,7 @@ router.put('/cursos/:id', async (req, res, next) => {
         } finally {
             conn.release();
         }
+        auditar(req, 'edito-curso', `Editó el curso "${datos.nombre} ${datos.paralelo}"`, { curso: `${datos.nombre} ${datos.paralelo}`, activo });
         res.json({ ok: true });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
@@ -408,64 +440,69 @@ router.put('/cursos/:id', async (req, res, next) => {
     }
 });
 
-// DELETE /api/admin/cursos/:id — solo cursos sin estudiantes.
-router.delete('/cursos/:id', async (req, res, next) => {
+// DELETE /api/admin/cursos/:id — pasa a la Papelera (SPEC-003). Los
+// estudiantes conservan su curso_id (la fila sigue existiendo); las
+// validaciones de integridad se aplican al eliminarlo DEFINITIVAMENTE.
+router.delete('/cursos/:id', conPermiso('cursos'), async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        const [[uso]] = await pool.query(
-            `SELECT (SELECT COUNT(*) FROM estudiantes WHERE curso_id = ?) AS estudiantes,
-                    (SELECT COUNT(*) FROM invitaciones_estudiante
-                     WHERE curso_id = ? AND estado = 'pendiente' AND expira_en >= NOW()) AS pendientes`,
-            [id, id]
+        const [[curso]] = await pool.query(
+            "SELECT CONCAT(nombre, ' ', paralelo) AS etiqueta FROM cursos WHERE id = ? AND eliminado_en IS NULL",
+            [id]
         );
-        if (uso.estudiantes) {
-            return res.status(409).json({
-                error: 'El curso tiene estudiantes. Desactívalo en su lugar.'
-            });
-        }
-        if (uso.pendientes) {
-            return res.status(409).json({
-                error: 'El curso tiene invitaciones pendientes. Desactívalo o espera a que expiren.'
-            });
-        }
-        const [resultado] = await pool.query('DELETE FROM cursos WHERE id = ?', [id]);
-        if (!resultado.affectedRows) return res.status(404).json({ error: 'Curso no encontrado' });
+        if (!curso) return res.status(404).json({ error: 'Curso no encontrado' });
+        await pool.query(
+            'UPDATE cursos SET eliminado_en = NOW(), eliminado_por = ? WHERE id = ?',
+            [req.user.username, id]
+        );
+        auditar(req, 'elimino-curso', `Envió a la papelera el curso "${curso.etiqueta}"`, { curso: curso.etiqueta });
         res.json({ ok: true });
     } catch (err) {
         next(err);
     }
 });
 
-// ---- ADMINISTRADORES (roles de admin: solo el Administrador Principal) ----
+// ---- ADMINISTRADORES (SPEC-003: permiso 'administradores') ----
+// Lo ESTRUCTURAL (dar/quitar es_principal, repartir permisos, tocar cuentas
+// Principal) sigue exigiendo ser Administrador Principal: un admin con el
+// permiso 'administradores' solo gestiona cuentas operativas.
 
 // ¿Cuántos Administradores Principales activos quedarían sin contar a `id`?
 // Sostiene el invariante: nunca puede quedar el sistema sin uno.
 const otrosPrincipalesActivos = async (conn, id) => {
     const [[fila]] = await conn.query(
         `SELECT COUNT(*) AS n FROM usuarios
-         WHERE rol = 'admin' AND es_principal = TRUE AND activo = TRUE AND id <> ?`,
+         WHERE rol = 'admin' AND es_principal = TRUE AND activo = TRUE
+           AND eliminado_en IS NULL AND id <> ?`,
         [id]
     );
     return fila.n;
 };
 
-// GET /api/admin/administradores — todos los admins con su rol y estado.
-router.get('/administradores', soloAdminPrincipal, async (_req, res, next) => {
+// Valida y limpia la lista de permisos que envía el cliente.
+const limpiarPermisos = (valor) => {
+    if (!Array.isArray(valor)) return null;
+    return valor.filter((p) => PERMISOS_VALIDOS.includes(p));
+};
+
+// GET /api/admin/administradores — todos los admins con rol, estado y permisos.
+router.get('/administradores', conPermiso('administradores'), async (_req, res, next) => {
     try {
         const [filas] = await pool.query(
-            `SELECT id, username, es_principal, activo, creado_en
-             FROM usuarios WHERE rol = 'admin'
+            `SELECT id, username, es_principal, activo, permisos, creado_en
+             FROM usuarios WHERE rol = 'admin' AND eliminado_en IS NULL
              ORDER BY es_principal DESC, username`
         );
-        res.json(filas);
+        res.json(filas.map((f) => ({ ...f, permisos: permisosEfectivos(f) })));
     } catch (err) {
         next(err);
     }
 });
 
-// POST /api/admin/administradores — crea un admin (principal u operativo).
-// Body: { username, password, es_principal? }
-router.post('/administradores', soloAdminPrincipal, async (req, res, next) => {
+// POST /api/admin/administradores — crea un admin.
+// Body: { username, password, es_principal?, permisos? }
+// Crear Principales o asignar permisos requiere ser Principal.
+router.post('/administradores', conPermiso('administradores'), async (req, res, next) => {
     try {
         const username = String(req.body?.username || '').trim().toLowerCase();
         const password = String(req.body?.password || '');
@@ -475,10 +512,19 @@ router.post('/administradores', soloAdminPrincipal, async (req, res, next) => {
         if (password.length < 8) {
             return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
         }
+        const permisos = limpiarPermisos(req.body?.permisos);
+        if ((req.body?.es_principal || permisos) && !(await esPrincipalEnBD(req.user.id))) {
+            return res.status(403).json({ error: 'Solo el Administrador Principal puede asignar roles o permisos.' });
+        }
         const [creado] = await pool.query(
-            "INSERT INTO usuarios (username, password_hash, rol, es_principal) VALUES (?, ?, 'admin', ?)",
-            [username, bcrypt.hashSync(password, 10), Boolean(req.body?.es_principal)]
+            "INSERT INTO usuarios (username, password_hash, rol, es_principal, permisos) VALUES (?, ?, 'admin', ?, ?)",
+            [username, bcrypt.hashSync(password, 10), Boolean(req.body?.es_principal), permisos ? JSON.stringify(permisos) : null]
         );
+        auditar(req, 'creo-administrador', `Creó la cuenta de administrador "${username}"`, {
+            administrador: username,
+            es_principal: Boolean(req.body?.es_principal),
+            permisos: permisos ?? 'operativos por defecto'
+        });
         res.status(201).json({ id: creado.insertId, username, rol: 'admin' });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
@@ -488,21 +534,29 @@ router.post('/administradores', soloAdminPrincipal, async (req, res, next) => {
     }
 });
 
-// PUT /api/admin/administradores/:id — contraseña, rol y/o estado.
-// Body: { password?, es_principal?, activo? }
-// Regla: el cambio no puede dejar al sistema sin un Principal activo.
-router.put('/administradores/:id', soloAdminPrincipal, async (req, res, next) => {
+// PUT /api/admin/administradores/:id — contraseña, rol, estado y/o permisos.
+// Body: { password?, es_principal?, activo?, permisos? }
+// Reglas: no puede quedar el sistema sin un Principal activo; tocar cuentas
+// Principal, el rol o los permisos exige ser Principal.
+router.put('/administradores/:id', conPermiso('administradores'), async (req, res, next) => {
     const conn = await pool.getConnection();
     try {
         const id = Number(req.params.id);
         await conn.beginTransaction();
         const [[objetivo]] = await conn.query(
-            "SELECT id, es_principal, activo FROM usuarios WHERE id = ? AND rol = 'admin' FOR UPDATE",
+            "SELECT id, username, es_principal, activo FROM usuarios WHERE id = ? AND rol = 'admin' AND eliminado_en IS NULL FOR UPDATE",
             [id]
         );
         if (!objetivo) {
             await conn.rollback();
             return res.status(404).json({ error: 'Administrador no encontrado' });
+        }
+
+        const permisos = limpiarPermisos(req.body?.permisos);
+        const cambiaEstructura = req.body?.es_principal !== undefined || req.body?.permisos !== undefined;
+        if ((objetivo.es_principal || cambiaEstructura) && !(await esPrincipalEnBD(req.user.id))) {
+            await conn.rollback();
+            return res.status(403).json({ error: 'Solo el Administrador Principal puede modificar roles, permisos o cuentas Principal.' });
         }
 
         const esPrincipal = req.body?.es_principal === undefined
@@ -532,11 +586,22 @@ router.put('/administradores/:id', soloAdminPrincipal, async (req, res, next) =>
                 [bcrypt.hashSync(String(req.body.password), 10), id]
             );
         }
+        if (req.body?.permisos !== undefined) {
+            await conn.query('UPDATE usuarios SET permisos = ? WHERE id = ?',
+                [permisos ? JSON.stringify(permisos) : null, id]);
+        }
         await conn.query(
             'UPDATE usuarios SET es_principal = ?, activo = ? WHERE id = ?',
             [esPrincipal, activo, id]
         );
         await conn.commit();
+        auditar(req, 'edito-administrador', `Actualizó la cuenta de administrador "${objetivo.username}"`, {
+            administrador: objetivo.username,
+            es_principal: esPrincipal,
+            activo,
+            cambio_password: Boolean(req.body?.password),
+            permisos: req.body?.permisos !== undefined ? permisos : undefined
+        });
         res.json({ ok: true });
     } catch (err) {
         await conn.rollback().catch(() => {});
@@ -546,9 +611,10 @@ router.put('/administradores/:id', soloAdminPrincipal, async (req, res, next) =>
     }
 });
 
-// DELETE /api/admin/administradores/:id — baja definitiva.
-// No puedes eliminarte a ti mismo ni al último Principal activo.
-router.delete('/administradores/:id', soloAdminPrincipal, async (req, res, next) => {
+// DELETE /api/admin/administradores/:id — pasa a la Papelera (SPEC-003).
+// No puedes eliminarte a ti mismo ni al último Principal activo; eliminar
+// una cuenta Principal exige ser Principal.
+router.delete('/administradores/:id', conPermiso('administradores'), async (req, res, next) => {
     const conn = await pool.getConnection();
     try {
         const id = Number(req.params.id);
@@ -557,12 +623,16 @@ router.delete('/administradores/:id', soloAdminPrincipal, async (req, res, next)
         }
         await conn.beginTransaction();
         const [[objetivo]] = await conn.query(
-            "SELECT id, es_principal, activo FROM usuarios WHERE id = ? AND rol = 'admin' FOR UPDATE",
+            "SELECT id, username, es_principal, activo FROM usuarios WHERE id = ? AND rol = 'admin' AND eliminado_en IS NULL FOR UPDATE",
             [id]
         );
         if (!objetivo) {
             await conn.rollback();
             return res.status(404).json({ error: 'Administrador no encontrado' });
+        }
+        if (objetivo.es_principal && !(await esPrincipalEnBD(req.user.id))) {
+            await conn.rollback();
+            return res.status(403).json({ error: 'Solo el Administrador Principal puede eliminar cuentas Principal.' });
         }
         if (objetivo.es_principal && objetivo.activo && !(await otrosPrincipalesActivos(conn, id))) {
             await conn.rollback();
@@ -570,8 +640,12 @@ router.delete('/administradores/:id', soloAdminPrincipal, async (req, res, next)
                 error: 'Es el último Administrador Principal activo: promueve a otro antes de eliminarlo.'
             });
         }
-        await conn.query('DELETE FROM usuarios WHERE id = ?', [id]);
+        await conn.query(
+            'UPDATE usuarios SET eliminado_en = NOW(), eliminado_por = ? WHERE id = ?',
+            [req.user.username, id]
+        );
         await conn.commit();
+        auditar(req, 'elimino-administrador', `Envió a la papelera al administrador "${objetivo.username}"`, { administrador: objetivo.username });
         res.json({ ok: true });
     } catch (err) {
         await conn.rollback().catch(() => {});
@@ -598,8 +672,8 @@ const validarImagen = (dataUrl, maxKB) => {
 };
 
 // PUT /api/admin/institucion — actualiza la configuración institucional.
-// Solo el Administrador Principal puede modificarla.
-router.put('/institucion', soloAdminPrincipal, async (req, res, next) => {
+// Requiere el permiso 'institucion' (el Principal lo tiene siempre).
+router.put('/institucion', conPermiso('institucion'), async (req, res, next) => {
     try {
         const nombre = String(req.body?.nombre || '').trim();
         if (nombre.length < 3 || nombre.length > 160) {
@@ -637,6 +711,193 @@ router.put('/institucion', soloAdminPrincipal, async (req, res, next) => {
                 Number.isFinite(xpMax) && xpMax > 0 ? Math.floor(xpMax) : 1000
             ]
         );
+        auditar(req, 'edito-institucion', `Actualizó la configuración institucional ("${nombre}")`, { nombre });
+        res.json({ ok: true });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// ---- AUDITORÍA (SPEC-003) ----
+
+// GET /api/admin/auditoria?rol=&limite= — últimos eventos registrados.
+router.get('/auditoria', conPermiso('auditoria'), async (req, res, next) => {
+    try {
+        const limite = Math.min(Math.max(Number(req.query.limite) || 500, 1), 1000);
+        const rol = ['admin', 'docente', 'estudiante'].includes(req.query.rol) ? req.query.rol : null;
+        const [filas] = await pool.query(
+            `SELECT id, usuario_id, rol, nombre, accion, descripcion, materia, detalle_json, creado_en
+             FROM auditoria ${rol ? 'WHERE rol = ?' : ''}
+             ORDER BY creado_en DESC, id DESC LIMIT ?`,
+            rol ? [rol, limite] : [limite]
+        );
+        res.json(filas);
+    } catch (err) {
+        // Pre-migración 004: sin tabla aún no hay historial (lista vacía).
+        if (err.code === 'ER_NO_SUCH_TABLE') return res.json([]);
+        next(err);
+    }
+});
+
+// GET /api/admin/auditoria/reciente — últimos 5 eventos para el widget
+// "Actividad reciente" del Inicio. Accesible a cualquier admin (es el
+// resumen del panel, no el historial completo).
+router.get('/auditoria/reciente', async (_req, res, next) => {
+    try {
+        const [filas] = await pool.query(
+            `SELECT id, rol, nombre, accion, descripcion, materia, creado_en
+             FROM auditoria ORDER BY creado_en DESC, id DESC LIMIT 5`
+        );
+        res.json(filas);
+    } catch (err) {
+        if (err.code === 'ER_NO_SUCH_TABLE') return res.json([]);
+        next(err);
+    }
+});
+
+// ---- PAPELERA (SPEC-003: soft-delete y restauración) ----
+// Tipos soportados y cómo se materializa cada uno.
+const TIPOS_PAPELERA = ['docente', 'estudiante', 'administrador', 'materia', 'curso'];
+
+// GET /api/admin/papelera — todos los elementos eliminados, unificados.
+router.get('/papelera', conPermiso('papelera'), async (_req, res, next) => {
+    try {
+        const [usuarios] = await pool.query(
+            `SELECT id, COALESCE(nombre_completo, username) AS nombre,
+                    CASE rol WHEN 'docente' THEN 'docente'
+                             WHEN 'estudiante' THEN 'estudiante'
+                             ELSE 'administrador' END AS tipo,
+                    eliminado_en, eliminado_por
+             FROM usuarios WHERE eliminado_en IS NOT NULL`
+        );
+        const [materias] = await pool.query(
+            `SELECT id, nombre, 'materia' AS tipo, eliminado_en, eliminado_por
+             FROM materias WHERE eliminado_en IS NOT NULL`
+        );
+        const [cursos] = await pool.query(
+            `SELECT id, CONCAT(nombre, ' ', paralelo) AS nombre, 'curso' AS tipo,
+                    eliminado_en, eliminado_por
+             FROM cursos WHERE eliminado_en IS NOT NULL`
+        );
+        const todos = [...usuarios, ...materias, ...cursos]
+            .sort((a, b) => new Date(b.eliminado_en) - new Date(a.eliminado_en));
+        res.json(todos);
+    } catch (err) {
+        if (err.code === 'ER_BAD_FIELD_ERROR') return res.json([]); // pre-migración
+        next(err);
+    }
+});
+
+// POST /api/admin/papelera/:tipo/:id/restaurar — quita la marca de eliminado.
+// La fila nunca se tocó, así que todo vuelve exactamente como estaba.
+router.post('/papelera/:tipo/:id/restaurar', conPermiso('papelera'), async (req, res, next) => {
+    try {
+        const tipo = req.params.tipo;
+        const id = Number(req.params.id);
+        if (!TIPOS_PAPELERA.includes(tipo)) return res.status(400).json({ error: 'Tipo inválido' });
+
+        if (tipo === 'materia' || tipo === 'curso') {
+            const tabla = tipo === 'materia' ? 'materias' : 'cursos';
+            const [[fila]] = await pool.query(
+                `SELECT ${tipo === 'curso' ? "CONCAT(nombre, ' ', paralelo)" : 'nombre'} AS nombre
+                 FROM ${tabla} WHERE id = ? AND eliminado_en IS NOT NULL`, [id]
+            );
+            if (!fila) return res.status(404).json({ error: 'Elemento no encontrado en la papelera' });
+            // Un homónimo creado después chocaría con el UNIQUE al volver a
+            // usarse: se avisa de forma amigable en lugar de fallar en seco.
+            const [duplicados] = tipo === 'materia'
+                ? await pool.query('SELECT 1 FROM materias WHERE nombre = ? AND id <> ? AND eliminado_en IS NULL', [fila.nombre, id])
+                : await pool.query(
+                    `SELECT 1 FROM cursos c JOIN cursos original ON original.id = ?
+                     WHERE c.nombre = original.nombre AND c.paralelo = original.paralelo
+                       AND c.id <> original.id AND c.eliminado_en IS NULL`, [id]
+                );
+            if (duplicados.length) {
+                return res.status(409).json({
+                    error: `No se puede restaurar: ya existe ${tipo === 'materia' ? 'una materia' : 'un curso'} con el mismo nombre. Renómbralo o elimínalo primero.`
+                });
+            }
+            await pool.query(`UPDATE ${tabla} SET eliminado_en = NULL, eliminado_por = NULL WHERE id = ?`, [id]);
+            auditar(req, `restauro-${tipo}`, `Restauró ${tipo === 'materia' ? 'la materia' : 'el curso'} "${fila.nombre}" desde la papelera`, { [tipo]: fila.nombre });
+            return res.json({ ok: true });
+        }
+
+        // Cuentas (docente/estudiante/administrador): el username sigue
+        // reservado mientras la fila existe, así que siempre puede volver.
+        const rolEsperado = tipo === 'administrador' ? 'admin' : tipo;
+        const [[cuenta]] = await pool.query(
+            'SELECT COALESCE(nombre_completo, username) AS nombre FROM usuarios WHERE id = ? AND rol = ? AND eliminado_en IS NOT NULL',
+            [id, rolEsperado]
+        );
+        if (!cuenta) return res.status(404).json({ error: 'Elemento no encontrado en la papelera' });
+        await pool.query('UPDATE usuarios SET eliminado_en = NULL, eliminado_por = NULL WHERE id = ?', [id]);
+        auditar(req, `restauro-${tipo}`, `Restauró al ${tipo} "${cuenta.nombre}" desde la papelera`, { [tipo]: cuenta.nombre });
+        res.json({ ok: true });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// DELETE /api/admin/papelera/:tipo/:id — eliminación DEFINITIVA. Aquí sí se
+// aplican las validaciones de integridad (nunca se borra en silencio algo
+// que dejaría datos huérfanos): mensajes 409 amigables.
+router.delete('/papelera/:tipo/:id', conPermiso('papelera'), async (req, res, next) => {
+    try {
+        const tipo = req.params.tipo;
+        const id = Number(req.params.id);
+        if (!TIPOS_PAPELERA.includes(tipo)) return res.status(400).json({ error: 'Tipo inválido' });
+
+        if (tipo === 'materia') {
+            const [[materia]] = await pool.query(
+                'SELECT nombre FROM materias WHERE id = ? AND eliminado_en IS NOT NULL', [id]
+            );
+            if (!materia) return res.status(404).json({ error: 'Elemento no encontrado en la papelera' });
+            const [[uso]] = await pool.query(
+                `SELECT (SELECT COUNT(*) FROM retos WHERE materia_id = ?) AS retos,
+                        (SELECT COUNT(*) FROM materiales WHERE materia_id = ?) AS materiales,
+                        (SELECT COUNT(*) FROM docente_materia WHERE materia_id = ?) AS docentes`,
+                [id, id, id]
+            );
+            if (uso.retos || uso.materiales || uso.docentes) {
+                return res.status(409).json({
+                    error: 'La materia tiene retos, material o docentes asignados: eliminarla borraría ese contenido. Restáurala y vacíala primero, o déjala en la papelera.'
+                });
+            }
+            await pool.query('DELETE FROM materias WHERE id = ?', [id]);
+            auditar(req, 'purgo-materia', `Eliminó definitivamente la materia "${materia.nombre}"`, { materia: materia.nombre });
+            return res.json({ ok: true });
+        }
+
+        if (tipo === 'curso') {
+            const [[curso]] = await pool.query(
+                "SELECT CONCAT(nombre, ' ', paralelo) AS etiqueta FROM cursos WHERE id = ? AND eliminado_en IS NOT NULL", [id]
+            );
+            if (!curso) return res.status(404).json({ error: 'Elemento no encontrado en la papelera' });
+            const [[uso]] = await pool.query(
+                'SELECT (SELECT COUNT(*) FROM estudiantes WHERE curso_id = ?) AS estudiantes', [id]
+            );
+            if (uso.estudiantes) {
+                return res.status(409).json({
+                    error: 'El curso tiene estudiantes vinculados: elimínalo definitivamente solo cuando ya no queden estudiantes en él.'
+                });
+            }
+            await pool.query('DELETE FROM cursos WHERE id = ?', [id]);
+            auditar(req, 'purgo-curso', `Eliminó definitivamente el curso "${curso.etiqueta}"`, { curso: curso.etiqueta });
+            return res.json({ ok: true });
+        }
+
+        const rolEsperado = tipo === 'administrador' ? 'admin' : tipo;
+        const [[cuenta]] = await pool.query(
+            'SELECT id, estudiante_id, COALESCE(nombre_completo, username) AS nombre FROM usuarios WHERE id = ? AND rol = ? AND eliminado_en IS NOT NULL',
+            [id, rolEsperado]
+        );
+        if (!cuenta) return res.status(404).json({ error: 'Elemento no encontrado en la papelera' });
+        // Estudiante: aquí sí desaparece la ficha con su progreso (cascada).
+        await pool.query('DELETE FROM usuarios WHERE id = ?', [id]);
+        if (tipo === 'estudiante' && cuenta.estudiante_id) {
+            await pool.query('DELETE FROM estudiantes WHERE id = ?', [cuenta.estudiante_id]);
+        }
+        auditar(req, `purgo-${tipo}`, `Eliminó definitivamente al ${tipo} "${cuenta.nombre}"`, { [tipo]: cuenta.nombre });
         res.json({ ok: true });
     } catch (err) {
         next(err);

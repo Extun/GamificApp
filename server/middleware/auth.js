@@ -51,6 +51,79 @@ export const soloAdmin = (req, res, next) => {
     next();
 };
 
+// ---- Permisos entre administradores (SPEC-003) ----
+// Claves simples por módulo del panel. El Administrador Principal SIEMPRE
+// tiene todas; los demás solo las guardadas en usuarios.permisos (JSON).
+// permisos = NULL significa "conjunto operativo por defecto": así los admins
+// creados antes de la migración conservan exactamente lo que podían hacer.
+export const PERMISOS_VALIDOS = [
+    'docentes', 'estudiantes', 'materias', 'cursos',       // Gestión Académica
+    'institucion', 'invitaciones',                         // Gestión Institucional
+    'administradores', 'auditoria', 'papelera'             // Seguridad
+];
+export const PERMISOS_OPERATIVOS = ['docentes', 'estudiantes', 'materias', 'cursos', 'invitaciones'];
+
+// mysql2 devuelve las columnas JSON ya parseadas, pero se normaliza igual.
+const parsearPermisos = (valor) => {
+    if (Array.isArray(valor)) return valor;
+    if (typeof valor === 'string') {
+        try { return JSON.parse(valor); } catch { return null; }
+    }
+    return null;
+};
+
+// Permisos efectivos de una fila de `usuarios` (rol admin).
+export const permisosEfectivos = (fila) => {
+    if (fila?.es_principal) return [...PERMISOS_VALIDOS];
+    const propios = parsearPermisos(fila?.permisos);
+    return Array.isArray(propios)
+        ? propios.filter((p) => PERMISOS_VALIDOS.includes(p))
+        : [...PERMISOS_OPERATIVOS];
+};
+
+// Middleware por clave: verifica contra la BD (no contra el token) para que
+// quitar un permiso surta efecto inmediato aunque la sesión siga abierta.
+export const conPermiso = (clave) => async (req, res, next) => {
+    if (req.user?.rol !== 'admin') {
+        return res.status(403).json({ error: 'Solo un administrador puede realizar esta acción' });
+    }
+    try {
+        const [[fila]] = await pool.query(
+            'SELECT es_principal, activo, permisos FROM usuarios WHERE id = ? AND eliminado_en IS NULL',
+            [req.user.id]
+        );
+        if (!fila || !fila.activo) {
+            return res.status(403).json({ error: 'Tu cuenta de administrador no está activa' });
+        }
+        if (!permisosEfectivos(fila).includes(clave)) {
+            return res.status(403).json({ error: 'No tienes permiso para esta sección. Pídeselo al Administrador Principal.' });
+        }
+        next();
+    } catch (err) {
+        // Deploy a medias (columnas aún sin migrar): comportamiento previo —
+        // todo admin tiene lo operativo; institución/administradores exigen
+        // Principal (lo resuelve soloAdminPrincipal en esas rutas).
+        if (err.code === 'ER_BAD_FIELD_ERROR') {
+            if (PERMISOS_OPERATIVOS.includes(clave)) return next();
+            return soloAdminPrincipal(req, res, next);
+        }
+        next(err);
+    }
+};
+
+// ¿La sesión corresponde a un Administrador Principal activo (según BD)?
+export const esPrincipalEnBD = async (userId) => {
+    try {
+        const [[fila]] = await pool.query(
+            'SELECT es_principal, activo FROM usuarios WHERE id = ?', [userId]
+        );
+        return Boolean(fila?.es_principal && fila.activo);
+    } catch (err) {
+        if (err.code === 'ER_BAD_FIELD_ERROR') return true; // pre-migración 003
+        throw err;
+    }
+};
+
 // Solo el Administrador Principal (institución y gestión de administradores).
 // Se verifica contra la BD (no contra el token) para que promover/degradar
 // o desactivar surta efecto inmediato aunque la sesión siga abierta.

@@ -73,6 +73,25 @@
     border-bottom: 1px solid var(--color-border);
 }
 
+/* Grupos del sidebar (SPEC-003): rótulo + separador sobre el primer ítem
+   de cada categoría. El <li> pasa a columna para apilar rótulo y botón. */
+.nav-item-wrap {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.sidebar-grupo {
+    display: block;
+    margin: 12px 8px 4px;
+    padding-top: 10px;
+    border-top: 1px solid var(--color-border);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
 .nav-item {
     border-radius: var(--radius-sm) !important;
     margin-bottom: 4px;
@@ -1090,6 +1109,9 @@
         padding: 0;
     }
     .sidebar-nav .nav-item { margin-bottom: 0; }
+    /* En la barra superior móvil los grupos no caben: solo los ítems. */
+    .sidebar-nav .sidebar-grupo { display: none; }
+    .sidebar-nav .nav-item-wrap { width: auto; }
     .sidebar-footer {
         position: static;
         flex-direction: row;

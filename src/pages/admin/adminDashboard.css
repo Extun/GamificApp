@@ -862,3 +862,165 @@
     .asistente-pie .quiz-generar-btn { justify-content: center; }
     .docente-acciones { width: 100%; justify-content: flex-end; }
 }
+
+/* ===== Módulo Auditoría (SPEC-003) ===== */
+.auditoria-nulo {
+    font-size: 0.8rem;
+    font-style: italic;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+
+.auditoria-descripcion { max-width: 380px; }
+
+.auditoria-fecha { white-space: nowrap; color: var(--color-text-muted); }
+
+.auditoria-btn-detalles {
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-primary-dark);
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.auditoria-btn-detalles:hover {
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary);
+}
+
+/* Modal "Más detalles": pares etiqueta/valor de lo realmente registrado */
+.auditoria-detalle {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0;
+}
+
+.auditoria-detalle > div {
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed var(--color-border);
+}
+
+.auditoria-detalle dt {
+    flex: 0 0 130px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: capitalize;
+    color: var(--color-text-muted);
+}
+
+.auditoria-detalle dd {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--color-text);
+    overflow-wrap: anywhere;
+}
+
+/* ===== Módulo Papelera (SPEC-003) ===== */
+.papelera-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.papelera-tab {
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.papelera-tab:hover { background: var(--color-primary-soft); color: var(--color-primary-dark); }
+
+.papelera-tab.is-activa {
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary);
+    color: var(--color-primary-dark);
+}
+
+.papelera-tipo {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #475569;
+    white-space: nowrap;
+}
+
+.papelera-tipo-docente       { background: #e0f2fe; color: #075985; }
+.papelera-tipo-estudiante    { background: #dcfce7; color: #166534; }
+.papelera-tipo-curso         { background: #fef3c7; color: #92400e; }
+.papelera-tipo-materia       { background: #fce7f3; color: #9d174d; }
+.papelera-tipo-administrador { background: #ede9fe; color: #5b21b6; }
+
+.papelera-acciones { flex-wrap: nowrap; }
+
+.papelera-btn-restaurar {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+/* ===== Permisos por administrador (SPEC-003) ===== */
+.permisos-resumen {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+
+.permisos-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.permisos-grupo {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px 12px;
+    margin: 0;
+}
+
+.permisos-grupo legend {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    padding: 0 6px;
+}
+
+.permisos-lista {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 6px 14px;
+}
+
+.permiso-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88rem;
+    color: var(--color-text);
+    cursor: pointer;
+}
+
+.permiso-item input { accent-color: var(--color-primary); }

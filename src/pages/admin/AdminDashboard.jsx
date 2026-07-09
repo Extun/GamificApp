@@ -18,6 +18,8 @@ import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
 import Diversity3RoundedIcon from '@mui/icons-material/Diversity3Rounded';
 import ApartmentRoundedIcon from '@mui/icons-material/ApartmentRounded';
 import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
+import HistoryEduRoundedIcon from '@mui/icons-material/HistoryEduRounded';
+import DeleteSweepRoundedIcon from '@mui/icons-material/DeleteSweepRounded';
 import authService from '../../services/authService';
 import adminService from '../../services/adminService';
 import { listarMaterias, estiloMateria } from '../../services/materiasService';
@@ -28,6 +30,8 @@ import ModuloMaterias from './modulos/ModuloMaterias';
 import ModuloCursos from './modulos/ModuloCursos';
 import ModuloInstitucion from './modulos/ModuloInstitucion';
 import ModuloAdministradores from './modulos/ModuloAdministradores';
+import ModuloAuditoria from './modulos/ModuloAuditoria';
+import ModuloPapelera from './modulos/ModuloPapelera';
 import {
     DashboardHeader,
     StatCard,
@@ -82,6 +86,13 @@ function ChipsMaterias({ materias, catalogo }) {
     );
 }
 
+// Icono de la actividad reciente según quién hizo la acción (auditoría).
+const ICONO_ROL = {
+    docente: SchoolRoundedIcon,
+    estudiante: GroupsRoundedIcon,
+    admin: AdminPanelSettingsRoundedIcon
+};
+
 // Panel exclusivo del rol 'admin': alta/baja de docentes con sus materias
 // asignadas (ahora también editables), gestión de estudiantes (reset de PIN,
 // bajas) y monitoreo de los códigos de invitación de toda la institución.
@@ -95,10 +106,14 @@ export function AdminDashboard() {
     const [materias, setMaterias] = useState([]);
     // Cursos con conteos de estudiantes y docentes (SPEC-002).
     const [cursos, setCursos] = useState([]);
-    // Cuentas de administrador (solo las carga y ve el Principal; la UI
-    // oculta, el servidor protege).
-    const esPrincipal = authService.esPrincipal();
+    // Permisos de la sesión (SPEC-003): la UI solo oculta módulos con esto;
+    // el servidor revalida el permiso en cada endpoint.
+    const puede = authService.tienePermiso;
     const [administradores, setAdministradores] = useState([]);
+    // Auditoría y Papelera (SPEC-003).
+    const [auditoria, setAuditoria] = useState([]);
+    const [papelera, setPapelera] = useState([]);
+    const [actividadReciente, setActividadReciente] = useState([]);
     const [error, setError] = useState('');
     const [avisoOk, setAvisoOk] = useState('');
 
@@ -115,13 +130,18 @@ export function AdminDashboard() {
     const cargar = async () => {
         try {
             setError('');
-            const [d, e, i, m, c, a] = await Promise.all([
-                adminService.listarDocentes(),
-                adminService.listarEstudiantes(),
-                adminService.listarInvitaciones(),
+            // Cada lista se pide solo si la sesión tiene ese permiso (la UI
+            // oculta; el servidor rechazaría igual las peticiones de más).
+            const [d, e, i, m, c, a, au, p, rec] = await Promise.all([
+                puede('docentes') ? adminService.listarDocentes() : Promise.resolve([]),
+                puede('estudiantes') ? adminService.listarEstudiantes() : Promise.resolve([]),
+                puede('invitaciones') ? adminService.listarInvitaciones() : Promise.resolve([]),
                 listarMaterias(),
-                adminService.listarCursos(),
-                esPrincipal ? adminService.listarAdministradores() : Promise.resolve([])
+                puede('cursos') ? adminService.listarCursos() : Promise.resolve([]),
+                puede('administradores') ? adminService.listarAdministradores() : Promise.resolve([]),
+                puede('auditoria') ? adminService.listarAuditoria() : Promise.resolve([]),
+                puede('papelera') ? adminService.listarPapelera() : Promise.resolve([]),
+                adminService.auditoriaReciente().catch(() => [])
             ]);
             setDocentes(d);
             setEstudiantes(e);
@@ -129,6 +149,9 @@ export function AdminDashboard() {
             setMaterias(m);
             setCursos(c);
             setAdministradores(a);
+            setAuditoria(au);
+            setPapelera(p);
+            setActividadReciente(rec);
         } catch (err) {
             setError(err.message);
         }
@@ -193,29 +216,16 @@ export function AdminDashboard() {
         navigate('/');
     };
 
-    // Altas recientes de la institución (docentes y estudiantes traen su
-    // `creado_en` real desde la API). Sin datos inventados: si no hay
-    // registros, la sección muestra su estado vacío.
-    const actividadReciente = useMemo(() => {
-        const eventos = [
-            ...docentes.map((d) => ({
-                id: `docente-${d.id}`,
-                fecha: d.creado_en,
-                titulo: d.username,
-                detalle: 'Nuevo docente',
-                Icon: SchoolRoundedIcon
-            })),
-            ...estudiantes.map((e) => ({
-                id: `estudiante-${e.usuario_id}`,
-                fecha: e.creado_en,
-                titulo: e.nombre_completo,
-                detalle: `Nuevo estudiante · ${e.curso}`,
-                Icon: GroupsRoundedIcon
-            }))
-        ].filter((ev) => ev.fecha);
-        eventos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-        return eventos.slice(0, 8);
-    }, [docentes, estudiantes]);
+    // Actividad reciente del Inicio (SPEC-003): los últimos 5 eventos REALES
+    // de la tabla de auditoría (misma fuente que el módulo Auditoría, sin
+    // duplicar lógica). Sin datos inventados: vacío ⇒ EmptyState.
+    const eventosInicio = useMemo(() => actividadReciente.map((ev) => ({
+        id: ev.id,
+        fecha: ev.creado_en,
+        titulo: ev.nombre,
+        detalle: ev.materia ? `${ev.descripcion} · ${ev.materia}` : ev.descripcion,
+        Icon: ICONO_ROL[ev.rol] || TaskAltRoundedIcon
+    })), [actividadReciente]);
 
     // Invitaciones divididas por estado: pendientes/expiradas (gestionables)
     // vs. utilizadas (historial de solo lectura).
@@ -229,20 +239,22 @@ export function AdminDashboard() {
         <SidebarLayout
             titulo="GamificApp · Administración"
             items={[
+                // Sidebar agrupado (SPEC-003). Cada módulo se muestra solo si
+                // la sesión tiene su permiso (el servidor revalida en cada
+                // endpoint: la UI oculta, nunca protege).
                 { id: 'inicio', label: 'Inicio', Icon: HomeFilledIcon },
-                { id: 'docentes', label: 'Docentes', Icon: SchoolRoundedIcon },
-                { id: 'estudiantes', label: 'Estudiantes', Icon: GroupsRoundedIcon },
-                { id: 'materias', label: 'Materias', Icon: MenuBookRoundedIcon },
-                { id: 'cursos', label: 'Cursos', Icon: Diversity3RoundedIcon },
-                { id: 'invitaciones', label: 'Invitaciones', Icon: VpnKeyRoundedIcon },
-                // Solo el Administrador Principal gestiona
-                // administradores e institución (el servidor
-                // rechaza igual las peticiones de los demás).
-                ...(esPrincipal ? [
-                    { id: 'administradores', label: 'Administradores', Icon: AdminPanelSettingsRoundedIcon },
-                    { id: 'institucion', label: 'Institución', Icon: ApartmentRoundedIcon }
-                ] : [])
-            ].map((item) => ({ ...item, activo: pagina === item.id, onClick: () => setPagina(item.id) }))}
+                { id: 'docentes', label: 'Docentes', Icon: SchoolRoundedIcon, grupo: 'Gestión Académica', permiso: 'docentes' },
+                { id: 'estudiantes', label: 'Estudiantes', Icon: GroupsRoundedIcon, grupo: 'Gestión Académica', permiso: 'estudiantes' },
+                { id: 'materias', label: 'Materias', Icon: MenuBookRoundedIcon, grupo: 'Gestión Académica', permiso: 'materias' },
+                { id: 'cursos', label: 'Cursos', Icon: Diversity3RoundedIcon, grupo: 'Gestión Académica', permiso: 'cursos' },
+                { id: 'invitaciones', label: 'Invitaciones', Icon: VpnKeyRoundedIcon, grupo: 'Gestión Institucional', permiso: 'invitaciones' },
+                { id: 'institucion', label: 'Institución', Icon: ApartmentRoundedIcon, grupo: 'Gestión Institucional', permiso: 'institucion' },
+                { id: 'administradores', label: 'Administradores', Icon: AdminPanelSettingsRoundedIcon, grupo: 'Seguridad', permiso: 'administradores' },
+                { id: 'auditoria', label: 'Auditoría', Icon: HistoryEduRoundedIcon, grupo: 'Seguridad', permiso: 'auditoria' },
+                { id: 'papelera', label: 'Papelera', Icon: DeleteSweepRoundedIcon, grupo: 'Seguridad', permiso: 'papelera' }
+            ]
+                .filter((item) => !item.permiso || puede(item.permiso))
+                .map((item) => ({ ...item, activo: pagina === item.id, onClick: () => setPagina(item.id) }))}
             usuario={{ inicial: 'A', nombre: 'Administrador', detalle: nombreAdmin }}
             accionesFooter={[
                 { label: 'Cerrar sesión', Icon: LogoutRoundedIcon, onClick: cerrarSesion }
@@ -274,58 +286,72 @@ export function AdminDashboard() {
                                 </header>
 
                                 <div className="stats-row">
-                                    <StatCard
-                                        Icon={SchoolRoundedIcon}
-                                        valor={docentes.length}
-                                        etiqueta={docentes.length === 1 ? 'Docente registrado' : 'Docentes registrados'}
-                                        tono="primary"
-                                    />
-                                    <StatCard
-                                        Icon={GroupsRoundedIcon}
-                                        valor={estudiantes.length}
-                                        etiqueta={estudiantes.length === 1 ? 'Estudiante registrado' : 'Estudiantes registrados'}
-                                        tono="accent"
-                                    />
-                                    <StatCard
-                                        Icon={VpnKeyRoundedIcon}
-                                        valor={invitacionesPendientes}
-                                        etiqueta="Invitaciones pendientes"
-                                        tono="fire"
-                                    />
+                                    {puede('docentes') && (
+                                        <StatCard
+                                            Icon={SchoolRoundedIcon}
+                                            valor={docentes.length}
+                                            etiqueta={docentes.length === 1 ? 'Docente registrado' : 'Docentes registrados'}
+                                            tono="primary"
+                                        />
+                                    )}
+                                    {puede('estudiantes') && (
+                                        <StatCard
+                                            Icon={GroupsRoundedIcon}
+                                            valor={estudiantes.length}
+                                            etiqueta={estudiantes.length === 1 ? 'Estudiante registrado' : 'Estudiantes registrados'}
+                                            tono="accent"
+                                        />
+                                    )}
+                                    {puede('invitaciones') && (
+                                        <StatCard
+                                            Icon={VpnKeyRoundedIcon}
+                                            valor={invitacionesPendientes}
+                                            etiqueta="Invitaciones pendientes"
+                                            tono="fire"
+                                        />
+                                    )}
                                 </div>
 
                                 <div className="admin-accesos-grid">
-                                    <button type="button" className="admin-acceso" onClick={() => setPagina('docentes')}>
-                                        <span className="admin-acceso-icono is-primary"><SchoolRoundedIcon /></span>
-                                        <span className="admin-acceso-texto">
-                                            <strong>Docentes</strong>
-                                            <span>Crea cuentas y asigna sus materias.</span>
-                                        </span>
-                                    </button>
-                                    <button type="button" className="admin-acceso" onClick={() => setPagina('estudiantes')}>
-                                        <span className="admin-acceso-icono is-accent"><GroupsRoundedIcon /></span>
-                                        <span className="admin-acceso-texto">
-                                            <strong>Estudiantes</strong>
-                                            <span>Restablece PINs o da de baja cuentas.</span>
-                                        </span>
-                                    </button>
-                                    <button type="button" className="admin-acceso" onClick={() => setPagina('invitaciones')}>
-                                        <span className="admin-acceso-icono is-fire"><VpnKeyRoundedIcon /></span>
-                                        <span className="admin-acceso-texto">
-                                            <strong>Invitaciones</strong>
-                                            <span>Revisa los códigos emitidos y su uso.</span>
-                                        </span>
-                                    </button>
+                                    {puede('docentes') && (
+                                        <button type="button" className="admin-acceso" onClick={() => setPagina('docentes')}>
+                                            <span className="admin-acceso-icono is-primary"><SchoolRoundedIcon /></span>
+                                            <span className="admin-acceso-texto">
+                                                <strong>Docentes</strong>
+                                                <span>Crea cuentas y asigna sus materias.</span>
+                                            </span>
+                                        </button>
+                                    )}
+                                    {puede('estudiantes') && (
+                                        <button type="button" className="admin-acceso" onClick={() => setPagina('estudiantes')}>
+                                            <span className="admin-acceso-icono is-accent"><GroupsRoundedIcon /></span>
+                                            <span className="admin-acceso-texto">
+                                                <strong>Estudiantes</strong>
+                                                <span>Restablece PINs o da de baja cuentas.</span>
+                                            </span>
+                                        </button>
+                                    )}
+                                    {puede('invitaciones') && (
+                                        <button type="button" className="admin-acceso" onClick={() => setPagina('invitaciones')}>
+                                            <span className="admin-acceso-icono is-fire"><VpnKeyRoundedIcon /></span>
+                                            <span className="admin-acceso-texto">
+                                                <strong>Invitaciones</strong>
+                                                <span>Revisa los códigos emitidos y su uso.</span>
+                                            </span>
+                                        </button>
+                                    )}
                                 </div>
 
+                                {/* Actividad reciente (SPEC-003): últimos 5
+                                    eventos reales de la auditoría. */}
                                 <SectionCard
                                     titulo="Actividad reciente"
                                     Icon={TaskAltRoundedIcon}
-                                    tag={actividadReciente.length ? `${actividadReciente.length} registros` : undefined}
+                                    tag={eventosInicio.length ? `${eventosInicio.length} registros` : undefined}
                                 >
-                                    {actividadReciente.length ? (
+                                    {eventosInicio.length ? (
                                         <ul className="actividad-lista">
-                                            {actividadReciente.map((ev) => (
+                                            {eventosInicio.map((ev) => (
                                                 <li key={ev.id} className="actividad-item">
                                                     <span className="actividad-icono"><ev.Icon /></span>
                                                     <div className="actividad-meta">
@@ -339,9 +365,8 @@ export function AdminDashboard() {
                                     ) : (
                                         <EmptyState
                                             Icon={TaskAltRoundedIcon}
-                                            titulo="Sin registros todavía"
-                                            mensaje="Cuando se creen docentes o se registren estudiantes, sus altas aparecerán aquí."
-                                            accion={{ label: 'Crear el primer docente', onClick: () => setPagina('docentes') }}
+                                            titulo="Sin actividad registrada todavía"
+                                            mensaje="Cuando docentes, estudiantes o administradores realicen acciones en la plataforma, los últimos movimientos aparecerán aquí."
                                         />
                                     )}
                                 </SectionCard>
@@ -564,8 +589,8 @@ export function AdminDashboard() {
                             </div>
                         )}
 
-                        {/* ADMINISTRADORES — roles de admin (solo el Principal). */}
-                        {pagina === 'administradores' && esPrincipal && (
+                        {/* ADMINISTRADORES — roles y permisos de admin. */}
+                        {pagina === 'administradores' && puede('administradores') && (
                             <div className="dash-secciones">
                                 <DashboardHeader
                                     titulo="Administradores"
@@ -576,13 +601,35 @@ export function AdminDashboard() {
                         )}
 
                         {/* INSTITUCIÓN — configuración global (SPEC-002). */}
-                        {pagina === 'institucion' && esPrincipal && (
+                        {pagina === 'institucion' && puede('institucion') && (
                             <div className="dash-secciones">
                                 <DashboardHeader
                                     titulo="Institución"
                                     subtitulo="El nombre, logo y colores de la institución. Se aplican a toda la app al guardar."
                                 />
                                 <ModuloInstitucion ejecutar={ejecutar} />
+                            </div>
+                        )}
+
+                        {/* AUDITORÍA — historial real de acciones (SPEC-003). */}
+                        {pagina === 'auditoria' && puede('auditoria') && (
+                            <div className="dash-secciones">
+                                <DashboardHeader
+                                    titulo="Auditoría"
+                                    subtitulo="El registro de lo que sucede en la plataforma: qué hicieron los docentes, los estudiantes y los administradores, y cuándo."
+                                />
+                                <ModuloAuditoria eventos={auditoria} />
+                            </div>
+                        )}
+
+                        {/* PAPELERA — eliminados restaurables (SPEC-003). */}
+                        {pagina === 'papelera' && puede('papelera') && (
+                            <div className="dash-secciones">
+                                <DashboardHeader
+                                    titulo="Papelera"
+                                    subtitulo="Lo que se elimina llega aquí primero. Puedes restaurarlo tal como estaba o eliminarlo definitivamente."
+                                />
+                                <ModuloPapelera elementos={papelera} ejecutar={ejecutar} />
                             </div>
                         )}
 

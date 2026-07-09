@@ -14,7 +14,8 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import pool from '../db.js';
-import { firmarToken, autenticar } from '../middleware/auth.js';
+import { firmarToken, autenticar, permisosEfectivos } from '../middleware/auth.js';
+import { registrarAuditoria } from '../lib/auditoria.js';
 
 const router = Router();
 
@@ -69,6 +70,9 @@ const respuestaSesion = (res, usuario, extra = {}) =>
             nombre_completo: usuario.nombre_completo,
             rol: usuario.rol,
             es_principal: Boolean(usuario.es_principal),
+            // Permisos efectivos del admin (SPEC-003): la UI solo oculta
+            // módulos con esto; el servidor revalida en cada endpoint.
+            permisos: usuario.rol === 'admin' ? permisosEfectivos(usuario) : undefined,
             estudiante_id: usuario.estudiante_id
         },
         ...extra
@@ -95,7 +99,10 @@ router.post('/login', async (req, res, next) => {
                 "SELECT * FROM usuarios WHERE username = ? AND rol IN ('docente','admin')",
                 [String(username).trim().toLowerCase()]
             );
-        const usuario = filas[0];
+        // Cuentas en la Papelera (SPEC-003): se tratan como inexistentes.
+        // El chequeo es en JS (SELECT *) para tolerar la columna ausente
+        // en un deploy a medias.
+        const usuario = filas[0]?.eliminado_en ? undefined : filas[0];
 
         if (usuario && estaBloqueado(usuario)) {
             return res.status(429).json({
@@ -129,6 +136,14 @@ router.post('/login', async (req, res, next) => {
         }
 
         await limpiarFallos(usuario.id);
+        // Auditoría (SPEC-003): los inicios de sesión de estudiantes se
+        // registran para la tarjeta "Actividad Estudiantes".
+        if (usuario.rol === 'estudiante') {
+            registrarAuditoria({
+                usuario, accion: 'inicio-sesion',
+                descripcion: `Inició sesión`
+            });
+        }
         return respuestaSesion(res, usuario);
     } catch (err) {
         next(err);
@@ -208,6 +223,11 @@ router.post('/registro-estudiante', async (req, res, next) => {
             rol: 'estudiante',
             estudiante_id: fichaEst.insertId
         };
+        registrarAuditoria({
+            usuario, accion: 'se-registro',
+            descripcion: `Se registró con un código de invitación`,
+            detalle: { curso: invitacion.curso, codigo: invitacion.codigo }
+        });
         res.status(201).json({
             token: firmarToken(usuario),
             usuario,
@@ -239,7 +259,8 @@ router.post('/emergencia', async (req, res, next) => {
              WHERE u.username = ? AND u.codigo_emergencia = ? AND u.rol = 'estudiante'`,
             [normalizarNombre(nombre), String(codigo_emergencia).trim().toUpperCase()]
         );
-        const usuario = filas[0];
+        // Cuentas en la Papelera se tratan como inexistentes (SPEC-003).
+        const usuario = filas[0]?.eliminado_en ? undefined : filas[0];
         if (!usuario) {
             return res.status(401).json({ error: 'Nombre o código de emergencia incorrectos' });
         }
@@ -255,6 +276,10 @@ router.post('/emergencia', async (req, res, next) => {
                 [bcrypt.hashSync(pinInicial, 10), usuario.id]);
             aviso = 'Tu PIN volvió a ser tu fecha de nacimiento (día-mes-año).';
         }
+        registrarAuditoria({
+            usuario, accion: 'acceso-emergencia',
+            descripcion: `Entró con su código de emergencia (el PIN volvió al de nacimiento)`
+        });
         return respuestaSesion(res, usuario, { aviso });
     } catch (err) {
         next(err);
@@ -279,6 +304,11 @@ router.put('/cambiar-pin', autenticar, async (req, res, next) => {
 
         await pool.query('UPDATE usuarios SET pin_hash = ? WHERE id = ?',
             [bcrypt.hashSync(String(pin_nuevo), 10), req.user.id]);
+        registrarAuditoria({
+            usuario: { id: usuario.id, rol: 'estudiante', nombre_completo: usuario.nombre_completo, username: usuario.username },
+            accion: 'cambio-pin',
+            descripcion: `Cambió su PIN`
+        });
         res.json({ ok: true, mensaje: 'PIN actualizado. Úsalo desde tu próximo ingreso.' });
     } catch (err) {
         next(err);

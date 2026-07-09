@@ -21,6 +21,12 @@ router.get('/', async (req, res, next) => {
                     e.xp_total,
                     RANK() OVER (ORDER BY e.xp_total DESC) AS posicion
              FROM estudiantes e
+             -- Los estudiantes cuya cuenta está en la Papelera (SPEC-003)
+             -- no compiten en el ranking mientras estén eliminados.
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM usuarios u
+                 WHERE u.estudiante_id = e.id AND u.eliminado_en IS NOT NULL
+             )
              ORDER BY e.xp_total DESC, e.apellidos, e.nombres
              LIMIT ?`,
             [limite]

@@ -13,7 +13,17 @@ import authService from '../../../services/authService';
 import adminService from '../../../services/adminService';
 import { SectionCard, EmptyState, ModalPanel, TablaPro, formatearFecha } from '../../../components/dashboard/DashboardWidgets';
 
-const FORM_VACIO = { username: '', password: '', es_principal: false, activo: true };
+// Permisos por administrador (SPEC-003), agrupados como en el sidebar.
+// El Principal los tiene todos siempre; solo el Principal puede repartirlos
+// (la UI lo oculta a los demás y el servidor lo revalida).
+const GRUPOS_PERMISOS = [
+    { nombre: 'Gestión Académica', claves: [['docentes', 'Docentes'], ['estudiantes', 'Estudiantes'], ['materias', 'Materias'], ['cursos', 'Cursos']] },
+    { nombre: 'Gestión Institucional', claves: [['invitaciones', 'Invitaciones'], ['institucion', 'Institución']] },
+    { nombre: 'Seguridad', claves: [['administradores', 'Administradores'], ['auditoria', 'Auditoría'], ['papelera', 'Papelera']] }
+];
+const PERMISOS_OPERATIVOS = ['docentes', 'estudiantes', 'materias', 'cursos', 'invitaciones'];
+
+const FORM_VACIO = { username: '', password: '', es_principal: false, activo: true, permisos: PERMISOS_OPERATIVOS };
 
 export function ModuloAdministradores({ administradores, ejecutar }) {
     // `editando`: null = cerrado, 'nuevo' = crear, objeto = editar existente.
@@ -21,6 +31,7 @@ export function ModuloAdministradores({ administradores, ejecutar }) {
     const [form, setForm] = useState(FORM_VACIO);
 
     const yo = authService.getUsuario()?.id;
+    const soyPrincipal = authService.esPrincipal();
 
     const abrirNuevo = () => {
         setForm(FORM_VACIO);
@@ -32,24 +43,37 @@ export function ModuloAdministradores({ administradores, ejecutar }) {
             username: a.username,
             password: '',
             es_principal: Boolean(a.es_principal),
-            activo: Boolean(a.activo)
+            activo: Boolean(a.activo),
+            permisos: Array.isArray(a.permisos) ? a.permisos : PERMISOS_OPERATIVOS
         });
         setEditando(a);
     };
 
+    const togglePermiso = (clave) =>
+        setForm((prev) => ({
+            ...prev,
+            permisos: prev.permisos.includes(clave)
+                ? prev.permisos.filter((p) => p !== clave)
+                : [...prev.permisos, clave]
+        }));
+
     const guardar = () => {
         const esNuevo = editando === 'nuevo';
+        // Solo el Principal envía permisos/rol; el servidor lo revalida igual.
+        const camposPrincipal = soyPrincipal
+            ? { es_principal: form.es_principal, ...(form.es_principal ? {} : { permisos: form.permisos }) }
+            : {};
         ejecutar(async () => {
             if (esNuevo) {
                 await adminService.crearAdministrador({
                     username: form.username,
                     password: form.password,
-                    es_principal: form.es_principal
+                    ...camposPrincipal
                 });
             } else {
                 await adminService.actualizarAdministrador(editando.id, {
                     ...(form.password ? { password: form.password } : {}),
-                    es_principal: form.es_principal,
+                    ...camposPrincipal,
                     activo: form.activo
                 });
             }
@@ -84,7 +108,7 @@ export function ModuloAdministradores({ administradores, ejecutar }) {
                         filas={administradores}
                         buscar={(a) => `${a.username} ${a.es_principal ? 'principal' : 'administrador'}`}
                         placeholderBusqueda="Buscar por usuario o rol…"
-                        cabecera={<tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Creado</th><th>Acciones</th></tr>}
+                        cabecera={<tr><th>Usuario</th><th>Rol</th><th>Permisos</th><th>Estado</th><th>Creado</th><th>Acciones</th></tr>}
                         renderFila={(a) => (
                             <tr key={a.id}>
                                 <td>
@@ -101,6 +125,13 @@ export function ModuloAdministradores({ administradores, ejecutar }) {
                                 <td>
                                     <span className={`rol-chip ${a.es_principal ? 'is-principal' : ''}`}>
                                         {a.es_principal ? 'Principal' : 'Administrador'}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span className="permisos-resumen">
+                                        {a.es_principal
+                                            ? 'Todos'
+                                            : `${(a.permisos || []).length} de 9`}
                                     </span>
                                 </td>
                                 <td>
@@ -202,14 +233,43 @@ export function ModuloAdministradores({ administradores, ejecutar }) {
                             />
                         </label>
 
-                        <label className="materia-form-switch">
-                            <input
-                                type="checkbox"
-                                checked={form.es_principal}
-                                onChange={(e) => setForm({ ...form, es_principal: e.target.checked })}
-                            />
-                            Administrador Principal (puede gestionar la institución y a los demás administradores)
-                        </label>
+                        {soyPrincipal && (
+                            <label className="materia-form-switch">
+                                <input
+                                    type="checkbox"
+                                    checked={form.es_principal}
+                                    onChange={(e) => setForm({ ...form, es_principal: e.target.checked })}
+                                />
+                                Administrador Principal (tiene TODOS los permisos, siempre)
+                            </label>
+                        )}
+
+                        {/* Permisos por módulo (SPEC-003): solo el Principal
+                            los reparte, y solo para cuentas no-Principal. */}
+                        {soyPrincipal && !form.es_principal && (
+                            <div className="permisos-editor">
+                                <p className="modal-materias-ayuda" style={{ margin: '0 0 4px' }}>
+                                    Marca las secciones del panel que esta cuenta podrá usar:
+                                </p>
+                                {GRUPOS_PERMISOS.map((grupo) => (
+                                    <fieldset key={grupo.nombre} className="permisos-grupo">
+                                        <legend>{grupo.nombre}</legend>
+                                        <div className="permisos-lista">
+                                            {grupo.claves.map(([clave, etiqueta]) => (
+                                                <label key={clave} className="permiso-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={form.permisos.includes(clave)}
+                                                        onChange={() => togglePermiso(clave)}
+                                                    />
+                                                    {etiqueta}
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </fieldset>
+                                ))}
+                            </div>
+                        )}
 
                         {editando !== 'nuevo' && (
                             <label className="materia-form-switch">

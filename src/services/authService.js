@@ -103,6 +103,19 @@ export const getRol = () => getUsuario()?.rol || null;
 // con esto: el servidor revalida el rol contra la BD en cada petición.
 export const esPrincipal = () => Boolean(getUsuario()?.es_principal);
 
+// ¿La sesión de admin tiene este permiso (SPEC-003)? La UI solo oculta
+// módulos con esto: el servidor revalida el permiso en cada endpoint.
+// Sesiones viejas (sin `permisos` guardados) caen al comportamiento previo:
+// operación diaria sí; institución/administradores solo el Principal.
+const PERMISOS_LEGADO = ['docentes', 'estudiantes', 'materias', 'cursos', 'invitaciones'];
+export const tienePermiso = (clave) => {
+    const usuario = getUsuario();
+    if (usuario?.rol !== 'admin') return false;
+    if (usuario.es_principal) return true;
+    const permisos = Array.isArray(usuario.permisos) ? usuario.permisos : PERMISOS_LEGADO;
+    return permisos.includes(clave);
+};
+
 export const isAuthenticated = () => Boolean(getToken());
 
 // fetch con el token incluido. Si el servidor responde 401 (token expirado
@@ -131,6 +144,7 @@ const authService = {
     getUsuario,
     getRol,
     esPrincipal,
+    tienePermiso,
     isAuthenticated,
     authFetch
 };

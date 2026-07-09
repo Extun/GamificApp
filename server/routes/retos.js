@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../db.js';
 import { soloDocente, puedeGestionarMateria } from '../middleware/auth.js';
+import { registrarAuditoria } from '../lib/auditoria.js';
 
 const router = Router();
 
@@ -88,7 +89,7 @@ router.get('/', async (req, res, next) => {
     // Los estudiantes no ven retos de materias desactivadas, ni siquiera
     // pidiendo el materia_id directo (la UI oculta, el servidor protege).
     if (req.user?.rol === 'estudiante') {
-        condiciones.push('materia_id IN (SELECT id FROM materias WHERE activa = TRUE)');
+        condiciones.push('materia_id IN (SELECT id FROM materias WHERE activa = TRUE AND eliminado_en IS NULL)');
     }
     if (req.query.materia_id !== undefined) {
         if (!esIdValido(materiaId)) {
@@ -179,6 +180,17 @@ router.post('/', soloDocente, async (req, res, next) => {
             retoId = creado.insertId;
         }
 
+        // Auditoría (SPEC-003): quién creó/editó qué actividad y de qué materia.
+        const [[infoMateria]] = await pool.query('SELECT nombre FROM materias WHERE id = ?', [materiaId]);
+        const NOMBRE_TIPO = { quiz: 'el quiz', clasificador: 'el clasificador', mision: 'la misión' };
+        const etiquetaTipo = NOMBRE_TIPO[tipo] || `la actividad (${tipo})`;
+        registrarAuditoria({
+            usuario: req.user,
+            accion: existente ? `edito-${tipo}` : `creo-${tipo}`,
+            descripcion: `${existente ? 'Editó y volvió a publicar' : 'Publicó'} ${etiquetaTipo} "${titulo}"`,
+            materia: infoMateria?.nombre || null,
+            detalle: { titulo, tipo, xp_recompensa: xp, materia: infoMateria?.nombre }
+        });
         res.status(existente ? 200 : 201).json({
             id: retoId,
             materia_id: materiaId,

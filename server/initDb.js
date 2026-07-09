@@ -38,6 +38,7 @@ export const inicializarEsquema = async () => {
         await migrarColumnasCursoId(conn);
         await migrarDatosSpec002(conn);
         await migrarColumnasAdmins(conn);
+        await migrarFase2Admin(conn);
         console.log('✅ Esquema verificado/creado en la base de datos.');
         await asegurarAdmin(conn);
         await asegurarAdminPrincipal(conn);
@@ -135,17 +136,49 @@ const migrarColumnasAdmins = async (conn) => {
     }
 };
 
+// SPEC-003 (migración 004) — Fase 2 del panel admin: permisos por
+// administrador (JSON), papelera (soft-delete con eliminado_en/eliminado_por)
+// y tabla de auditoría de acciones.
+const migrarFase2Admin = async (conn) => {
+    if (await faltaColumna(conn, 'usuarios', 'permisos')) {
+        await conn.query('ALTER TABLE usuarios ADD COLUMN permisos JSON NULL');
+        console.log('✅ Migración: columna permisos agregada a usuarios.');
+    }
+    for (const tabla of ['usuarios', 'materias', 'cursos']) {
+        if (await faltaColumna(conn, tabla, 'eliminado_en')) {
+            await conn.query(`ALTER TABLE ${tabla}
+                ADD COLUMN eliminado_en  DATETIME    NULL,
+                ADD COLUMN eliminado_por VARCHAR(50) NULL`);
+            console.log(`✅ Migración: papelera (eliminado_en/eliminado_por) en ${tabla}.`);
+        }
+    }
+    await conn.query(`CREATE TABLE IF NOT EXISTS auditoria (
+        id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        usuario_id   INT UNSIGNED NULL,
+        rol          VARCHAR(15)  NOT NULL,
+        nombre       VARCHAR(160) NOT NULL,
+        accion       VARCHAR(60)  NOT NULL,
+        descripcion  VARCHAR(255) NOT NULL,
+        materia      VARCHAR(60)  NULL,
+        detalle_json JSON         NULL,
+        creado_en    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        INDEX idx_auditoria_fecha (creado_en),
+        INDEX idx_auditoria_rol (rol)
+    ) ENGINE = InnoDB`);
+};
+
 // Invariante del sistema: SIEMPRE existe al menos un Administrador Principal
 // activo. Si no hay ninguno (primera migración o datos corruptos), se
 // promueve al admin activo más antiguo.
 const asegurarAdminPrincipal = async (conn) => {
     const [[hay]] = await conn.query(
-        "SELECT COUNT(*) AS n FROM usuarios WHERE rol = 'admin' AND es_principal = TRUE AND activo = TRUE"
+        "SELECT COUNT(*) AS n FROM usuarios WHERE rol = 'admin' AND es_principal = TRUE AND activo = TRUE AND eliminado_en IS NULL"
     );
     if (!hay.n) {
         await conn.query(
             `UPDATE usuarios SET es_principal = TRUE, activo = TRUE
-             WHERE rol = 'admin' ORDER BY id LIMIT 1`
+             WHERE rol = 'admin' AND eliminado_en IS NULL ORDER BY id LIMIT 1`
         );
         console.log('✅ Migración: el admin más antiguo fue promovido a Administrador Principal.');
     }

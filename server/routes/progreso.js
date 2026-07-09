@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import pool from '../db.js';
+import { registrarAuditoria } from '../lib/auditoria.js';
 
 const router = Router();
 
@@ -174,6 +175,25 @@ router.post('/', async (req, res, next) => {
         }
 
         await conn.commit();
+        // Auditoría (SPEC-003): solo cuando quien resuelve es el propio
+        // estudiante (los registros de docente/admin son correcciones).
+        if (req.user.rol === 'estudiante') {
+            const [[info]] = await pool.query(
+                `SELECT r.titulo, r.tipo, m.nombre AS materia
+                 FROM retos r JOIN materias m ON m.id = r.materia_id WHERE r.id = ?`,
+                [retoId]
+            );
+            const VERBO = { quiz: 'Resolvió el quiz', clasificador: 'Jugó el clasificador', mision: 'Completó la misión' };
+            const [[quien]] = await pool.query('SELECT nombre_completo FROM usuarios WHERE id = ?', [req.user.id]);
+            registrarAuditoria({
+                usuario: req.user,
+                nombre: quien?.nombre_completo,
+                accion: porcentaje === 100 ? 'completo-reto' : 'avanzo-reto',
+                descripcion: `${VERBO[info?.tipo] || 'Completó la actividad'} "${info?.titulo || retoId}"${delta > 0 ? ` y ganó ${delta} XP` : ''}`,
+                materia: info?.materia || null,
+                detalle: { reto: info?.titulo, tipo: info?.tipo, porcentaje, xp_ganado: delta, xp_total: estudiante.xp_total + delta }
+            });
+        }
         res.status(201).json({
             estudiante_id: estudianteId,
             reto_id: retoId,

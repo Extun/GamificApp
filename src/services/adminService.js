@@ -62,6 +62,18 @@ export const actualizarAdministrador = (id, datos) =>
 export const eliminarAdministrador = (id) =>
     pedir(`/api/admin/administradores/${id}`, { method: 'DELETE' });
 
+// ---- Auditoría (SPEC-003) ----
+export const listarAuditoria = (rol) =>
+    pedir(`/api/admin/auditoria${rol ? `?rol=${rol}` : ''}`);
+export const auditoriaReciente = () => pedir('/api/admin/auditoria/reciente');
+
+// ---- Papelera (SPEC-003) ----
+export const listarPapelera = () => pedir('/api/admin/papelera');
+export const restaurarDePapelera = (tipo, id) =>
+    pedir(`/api/admin/papelera/${tipo}/${id}/restaurar`, { method: 'POST' });
+export const purgarDePapelera = (tipo, id) =>
+    pedir(`/api/admin/papelera/${tipo}/${id}`, { method: 'DELETE' });
+
 // ---- Institución (SPEC-002) ----
 export const actualizarInstitucion = (datos) =>
     pedir('/api/admin/institucion', { method: 'PUT', body: JSON.stringify(datos) });
@@ -87,5 +99,10 @@ export default {
     crearAdministrador,
     actualizarAdministrador,
     eliminarAdministrador,
+    listarAuditoria,
+    auditoriaReciente,
+    listarPapelera,
+    restaurarDePapelera,
+    purgarDePapelera,
     actualizarInstitucion
 };

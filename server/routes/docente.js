@@ -5,6 +5,7 @@ import pool from '../db.js';
 import { soloDocente } from '../middleware/auth.js';
 import { generarCodigo } from './auth.js';
 import { resetearPinADefault } from '../lib/estudiantes.js';
+import { registrarAuditoria } from '../lib/auditoria.js';
 
 const router = Router();
 router.use(soloDocente);
@@ -18,11 +19,11 @@ router.get('/mis-materias', async (req, res, next) => {
         // Solo materias activas: si el admin desactiva una, desaparece del
         // panel del docente sin perder la asignación ni el contenido.
         const [materias] = req.user.rol === 'admin'
-            ? await pool.query('SELECT id, nombre, color, icono FROM materias WHERE activa = TRUE ORDER BY id')
+            ? await pool.query('SELECT id, nombre, color, icono FROM materias WHERE activa = TRUE AND eliminado_en IS NULL ORDER BY id')
             : await pool.query(
                 `SELECT m.id, m.nombre, m.color, m.icono FROM materias m
                  JOIN docente_materia dm ON dm.materia_id = m.id
-                 WHERE dm.docente_id = ? AND m.activa = TRUE ORDER BY m.id`,
+                 WHERE dm.docente_id = ? AND m.activa = TRUE AND m.eliminado_en IS NULL ORDER BY m.id`,
                 [req.user.id]
             );
         res.json(materias);
@@ -42,7 +43,7 @@ router.post('/invitaciones', async (req, res, next) => {
         let cursoId = Number(req.body?.curso_id) || null;
         if (cursoId) {
             const [[filaCurso]] = await pool.query(
-                'SELECT CONCAT(nombre, " ", paralelo) AS etiqueta FROM cursos WHERE id = ? AND activo = TRUE',
+                'SELECT CONCAT(nombre, " ", paralelo) AS etiqueta FROM cursos WHERE id = ? AND activo = TRUE AND eliminado_en IS NULL',
                 [cursoId]
             );
             if (!filaCurso) return res.status(400).json({ error: 'Curso no encontrado o inactivo' });
@@ -68,6 +69,11 @@ router.post('/invitaciones', async (req, res, next) => {
                 }
             }
         }
+        registrarAuditoria({
+            usuario: req.user, accion: 'genero-invitaciones',
+            descripcion: `Generó ${codigos.length} ${codigos.length === 1 ? 'invitación' : 'invitaciones'} para ${curso}`,
+            detalle: { curso, cantidad: codigos.length, codigos }
+        });
         res.status(201).json({ curso, dias_vigencia: DIAS_VIGENCIA_INVITACION, codigos });
     } catch (err) {
         next(err);
@@ -108,7 +114,7 @@ router.get('/mis-estudiantes', async (req, res, next) => {
              FROM invitaciones_estudiante i
              JOIN usuarios u ON u.id = i.usuario_id
              JOIN estudiantes e ON e.id = u.estudiante_id
-             WHERE i.docente_id = ? AND i.estado = 'usado'
+             WHERE i.docente_id = ? AND i.estado = 'usado' AND u.eliminado_en IS NULL
              ORDER BY e.curso, u.nombre_completo`,
             [req.user.id]
         );
@@ -135,6 +141,12 @@ router.post('/estudiantes/:usuarioId/resetear-pin', async (req, res, next) => {
         }
         const pin = await resetearPinADefault(usuarioId);
         if (!pin) return res.status(404).json({ error: 'Estudiante no encontrado' });
+        const [[alumno]] = await pool.query('SELECT nombre_completo FROM usuarios WHERE id = ?', [usuarioId]);
+        registrarAuditoria({
+            usuario: req.user, accion: 'reseteo-pin',
+            descripcion: `Restableció el PIN de "${alumno?.nombre_completo || 'estudiante'}"`,
+            detalle: alumno ? { estudiante: alumno.nombre_completo } : null
+        });
         res.json({ ok: true, pin, mensaje: `PIN restablecido a su fecha de nacimiento: ${pin}` });
     } catch (err) {
         next(err);
