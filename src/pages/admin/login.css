@@ -26,7 +26,17 @@
     border-radius: 50%;
     filter: blur(2px);
     opacity: 0.55;
+    /* Deriva muy lenta: da vida al fondo sin competir con el formulario */
+    animation: login-deriva 24s ease-in-out infinite alternate;
 }
+
+@keyframes login-deriva {
+    from { transform: translate(0, 0) scale(1); }
+    to   { transform: translate(24px, -18px) scale(1.05); }
+}
+
+.login-burbuja-2 { animation-duration: 30s; animation-delay: -8s; }
+.login-burbuja-3 { animation-duration: 20s; animation-delay: -14s; }
 
 .login-burbuja-1 {
     width: 420px;
@@ -343,37 +353,6 @@
     font-weight: 600;
 }
 
-/* Encabezado del formulario de administrador */
-.login-admin-titulo {
-    margin: 0 0 14px;
-    padding: 11px 14px;
-    border-radius: var(--radius-sm);
-    background: var(--color-surface-alt);
-    border: 1px solid var(--color-border);
-    color: var(--color-text);
-    font-size: 0.9rem;
-    font-weight: 600;
-}
-
-/* Acceso administrativo: presente pero sin protagonismo */
-.login-admin-acceso {
-    background: none;
-    border: none;
-    padding: 4px 8px;
-    font-family: inherit;
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: var(--color-text-muted);
-    cursor: pointer;
-    border-radius: 8px;
-    transition: color 0.2s ease, background 0.2s ease;
-}
-
-.login-admin-acceso:hover {
-    color: var(--color-primary-dark);
-    background: var(--color-primary-soft);
-}
-
 .login-pie {
     font-size: 0.82rem;
     color: var(--color-text-muted);
@@ -439,6 +418,7 @@
 
 @media (prefers-reduced-motion: reduce) {
     .login-centro { animation: none; }
+    .login-burbuja { animation: none; }
     .login-role-card,
     .login-submit,
     .login-role-card:hover,

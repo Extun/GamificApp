@@ -18,7 +18,7 @@ El **MVP está completo y en producción** (Vercel + Render + Aiven). Los tres r
 
 | Módulo | Estado |
 |--------|--------|
-| Autenticación (login nombre+PIN, registro, emergencia, rate limiting) | ✅ Completo — Login y Registro unificados (2026-07-08, pulido final): mismo layout centrado con marca y pie institucional, selector de rol con mayor jerarquía, nota fija para docentes ("contraseña olvidada → contactar al administrador"), microanimaciones sutiles con `prefers-reduced-motion`; se eliminó el layout legado del aside en login.css. Misma lógica y flujos |
+| Autenticación (login nombre+PIN, registro, emergencia, rate limiting) | ✅ Completo — Login y Registro unificados (2026-07-09, sprint final): layout centrado compartido, tono institucional (sin "jugar" como acción), selector de dos perfiles (Estudiante/Docente); el admin entra por el formulario Docente y `DashboardPorRol` (App.jsx) abre el panel según el rol del JWT — sin login especial ni credenciales hardcodeadas. Nota fija de contraseña olvidada → administrador. Fondo con deriva lenta de burbujas y microanimaciones, todo con `prefers-reduced-motion` |
 | Gestión de docentes (admin) | 🟡 Parcial — falta UI de edición (endpoint `PUT /api/admin/docentes/:id` existe) |
 | Gestión de estudiantes e invitaciones | ✅ Completo |
 | Material de estudio (base64 en MySQL, preview PDF/docx) | ✅ Completo |

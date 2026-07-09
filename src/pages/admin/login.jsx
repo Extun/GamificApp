@@ -12,7 +12,7 @@ import authService from '../../services/authService';
 //   · Estudiante → nombre completo + PIN de 6 caracteres (letras o números)
 //   · Docente / Admin → usuario + contraseña
 export function Login(){
-    const [modo, setModo] = useState("estudiante");     // estudiante | docente | emergencia | admin
+    const [modo, setModo] = useState("estudiante");     // estudiante | docente | emergencia
     const [nombre, setNombre] = useState("");
     const [pin, setPin] = useState("");
     const [codigoEmergencia, setCodigoEmergencia] = useState("");
@@ -83,13 +83,12 @@ export function Login(){
                 <div className="login-card">
                     <header className="login-bienvenida">
                         <h1>Bienvenido a GamificApp</h1>
-                        <p className="login-card-sub">Plataforma educativa con actividades interactivas.</p>
+                        <p className="login-card-sub">Aprende con retos, misiones y actividades interactivas.</p>
                     </header>
 
                     {error && <div className="login-error" role="alert">{error}</div>}
                     {aviso && <div className="login-aviso" role="status"><EmojiEventsRoundedIcon /> {aviso}</div>}
 
-                    {modo !== "admin" && (
                     <div className="login-role">
                         <span className="login-role-label">Selecciona tu perfil para continuar</span>
                         <div className="login-role-options">
@@ -113,7 +112,6 @@ export function Login(){
                             </button>
                         </div>
                     </div>
-                    )}
 
                     {modo === "estudiante" && (
                         <form onSubmit={handleEstudiante} noValidate autoComplete="off">
@@ -197,11 +195,8 @@ export function Login(){
                         </form>
                     )}
 
-                    {(modo === "docente" || modo === "admin") && (
+                    {modo === "docente" && (
                         <form onSubmit={handleDocente} noValidate autoComplete="off">
-                            {modo === "admin" && (
-                                <p className="login-admin-titulo">Acceso administrativo de la institución.</p>
-                            )}
                             <label className="login-field">
                                 <span>Usuario</span>
                                 <input
@@ -234,22 +229,12 @@ export function Login(){
                             <button type="submit" className="login-submit" disabled={cargando}>
                                 {cargando ? 'Verificando…' : 'Iniciar sesión'}
                             </button>
-                            {modo === "docente" && (
-                                <p className="login-nota-docente">
-                                    Si olvidaste tu contraseña, contacta al administrador de la institución.
-                                </p>
-                            )}
+                            <p className="login-nota-docente">
+                                Si olvidaste tu contraseña, contacta al administrador de la institución.
+                            </p>
                         </form>
                     )}
                 </div>
-
-                <button
-                    type="button"
-                    className={`login-admin-acceso ${modo === "admin" ? "active" : ""}`}
-                    onClick={() => cambiarModo(modo === "admin" ? "estudiante" : "admin")}
-                >
-                    {modo === "admin" ? '← Volver al acceso general' : 'Acceso administrativo'}
-                </button>
 
                 <span className="login-pie">Unidad Educativa Fiscal Clemencia Coronel de Pincay</span>
             </main>
