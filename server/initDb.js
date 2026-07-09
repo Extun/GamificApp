@@ -39,6 +39,7 @@ export const inicializarEsquema = async () => {
         await migrarDatosSpec002(conn);
         await migrarColumnasAdmins(conn);
         await migrarFase2Admin(conn);
+        await migrarPanelDocente(conn);
         console.log('✅ Esquema verificado/creado en la base de datos.');
         await asegurarAdmin(conn);
         await asegurarAdminPrincipal(conn);
@@ -165,6 +166,45 @@ const migrarFase2Admin = async (conn) => {
         PRIMARY KEY (id),
         INDEX idx_auditoria_fecha (creado_en),
         INDEX idx_auditoria_rol (rol)
+    ) ENGINE = InnoDB`);
+};
+
+// SPEC-004 (migración 005) — Panel Docente: autoría de retos, foto de perfil
+// del docente y tabla de retroalimentaciones (observaciones privadas).
+const migrarPanelDocente = async (conn) => {
+    if (await faltaColumna(conn, 'retos', 'docente_id')) {
+        await conn.query('ALTER TABLE retos ADD COLUMN docente_id INT UNSIGNED NULL');
+        console.log('✅ Migración: docente_id agregado a retos.');
+    }
+    // La FK se agrega aparte: en una BD recién creada el script del esquema ya
+    // trae la columna (sin FK, porque `usuarios` se crea después de `retos`).
+    const [[fk]] = await conn.query(
+        `SELECT COUNT(*) AS n FROM information_schema.table_constraints
+         WHERE table_schema = DATABASE() AND table_name = 'retos'
+           AND constraint_name = 'fk_retos_docente'`
+    );
+    if (!fk.n) {
+        await conn.query(`ALTER TABLE retos
+            ADD CONSTRAINT fk_retos_docente FOREIGN KEY (docente_id)
+                REFERENCES usuarios (id) ON UPDATE CASCADE ON DELETE SET NULL`);
+        console.log('✅ Migración: FK fk_retos_docente agregada a retos.');
+    }
+    if (await faltaColumna(conn, 'usuarios', 'foto_data')) {
+        await conn.query('ALTER TABLE usuarios ADD COLUMN foto_data MEDIUMTEXT NULL');
+        console.log('✅ Migración: foto_data agregada a usuarios.');
+    }
+    await conn.query(`CREATE TABLE IF NOT EXISTS retroalimentaciones (
+        id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+        docente_id    INT UNSIGNED NOT NULL,
+        estudiante_id INT UNSIGNED NOT NULL,
+        mensaje       VARCHAR(400) NOT NULL,
+        creado_en     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        CONSTRAINT fk_retro_docente FOREIGN KEY (docente_id)
+            REFERENCES usuarios (id) ON UPDATE CASCADE ON DELETE CASCADE,
+        CONSTRAINT fk_retro_estudiante FOREIGN KEY (estudiante_id)
+            REFERENCES estudiantes (id) ON UPDATE CASCADE ON DELETE CASCADE,
+        INDEX idx_retro_estudiante (estudiante_id)
     ) ENGINE = InnoDB`);
 };
 

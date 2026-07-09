@@ -47,4 +47,27 @@ export const obtenerRetosPublicados = async ({ materiaId, tipo } = {}) => {
     }
 };
 
-export default { publicarReto, obtenerRetosPublicados };
+// ---- SPEC-004: Biblioteca de Actividades del docente ----
+
+const pedir = async (ruta, options = {}) => {
+    const res = await authFetch(`${API_URL}${ruta}`, {
+        ...options,
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+    return data;
+};
+
+// Todos los retos de las materias del docente, en cualquier estado.
+export const obtenerRetosGestion = () => pedir('/api/retos/gestion');
+
+// Archivar / restaurar / publicar borradores y ajustar descripción o XP.
+export const actualizarReto = (id, cambios) =>
+    pedir(`/api/retos/${id}`, { method: 'PATCH', body: JSON.stringify(cambios) });
+
+// Copia de trabajo en borrador ("Título (copia)").
+export const duplicarReto = (id) =>
+    pedir(`/api/retos/${id}/duplicar`, { method: 'POST' });
+
+export default { publicarReto, obtenerRetosPublicados, obtenerRetosGestion, actualizarReto, duplicarReto };

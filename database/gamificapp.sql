@@ -104,6 +104,9 @@ CREATE TABLE IF NOT EXISTS retos (
     configuracion_json JSON             NULL,
     xp_recompensa      INT UNSIGNED     NOT NULL DEFAULT 100,
     estado             ENUM('borrador','publicado','archivado') NOT NULL DEFAULT 'borrador',
+    -- Autoría (SPEC-004). Sin FK inline: `usuarios` se crea después; la FK
+    -- fk_retos_docente la agrega initDb.js (migración 005).
+    docente_id         INT UNSIGNED     NULL,
     creado_en          TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     CONSTRAINT fk_retos_materia
@@ -147,11 +150,29 @@ CREATE TABLE IF NOT EXISTS usuarios (
     -- Rate limiting: 5 fallos seguidos => bloqueo de 15 minutos.
     intentos_fallidos TINYINT UNSIGNED NOT NULL DEFAULT 0,
     bloqueado_hasta   TIMESTAMP    NULL,
+    -- Foto de perfil del docente (SPEC-004), data URL base64.
+    foto_data         MEDIUMTEXT   NULL,
     creado_en         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     CONSTRAINT fk_usuarios_estudiante
         FOREIGN KEY (estudiante_id) REFERENCES estudiantes (id)
         ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE = InnoDB;
+
+-- Retroalimentación docente (SPEC-004): observaciones privadas del docente
+-- asociadas a un estudiante. No son comentarios públicos.
+CREATE TABLE IF NOT EXISTS retroalimentaciones (
+    id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    docente_id    INT UNSIGNED NOT NULL,
+    estudiante_id INT UNSIGNED NOT NULL,
+    mensaje       VARCHAR(400) NOT NULL,
+    creado_en     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_retro_docente FOREIGN KEY (docente_id)
+        REFERENCES usuarios (id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_retro_estudiante FOREIGN KEY (estudiante_id)
+        REFERENCES estudiantes (id) ON UPDATE CASCADE ON DELETE CASCADE,
+    INDEX idx_retro_estudiante (estudiante_id)
 ) ENGINE = InnoDB;
 
 -- Material de estudio: fuente única de verdad. `data_url` guarda el archivo

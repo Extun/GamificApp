@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './dashboard.css';
 import './adminDashboard.css';
+import '../docente/docentePanel.css';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import LockRoundedIcon from '@mui/icons-material/LockRounded';
@@ -26,8 +27,25 @@ import { obtenerRanking } from '../../services/gamificationService';
 import { obtenerRetosPublicados } from '../../services/retosService';
 import {
     EmptyState,
+    SectionCard,
+    StatCard,
+    DashboardHeader,
     formatearFecha
 } from '../../components/dashboard/DashboardWidgets';
+import LocalLibraryRoundedIcon from '@mui/icons-material/LocalLibraryRounded';
+import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
+import AccountCircleRoundedIcon from '@mui/icons-material/AccountCircleRounded';
+import SchoolRoundedIcon from '@mui/icons-material/SchoolRounded';
+import DescriptionRoundedIcon from '@mui/icons-material/DescriptionRounded';
+import ExtensionRoundedIcon from '@mui/icons-material/ExtensionRounded';
+import MapRoundedIcon from '@mui/icons-material/MapRounded';
+import StarRoundedIcon from '@mui/icons-material/StarRounded';
+import PercentRoundedIcon from '@mui/icons-material/PercentRounded';
+import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
+import { BibliotecaActividades } from '../docente/BibliotecaActividades';
+import { RankingCompleto } from '../docente/RankingCompleto';
+import { PerfilDocente } from '../docente/PerfilDocente';
+import { FichaEstudiante } from '../docente/FichaEstudiante';
 
 // Etiquetas legibles de los tipos de reto publicables.
 const TIPO_RETO_LABEL = { quiz: 'Quiz', clasificador: 'Juego', mision: 'Misión' };
@@ -289,11 +307,12 @@ export function Dashboard() {
 
     // Salto directo desde el Home a una materia (y opcionalmente a una
     // sub-vista concreta, p. ej. el generador de quiz).
-    const irAMateria = (nombre, subvista = 'quiz') => {
+    const irAMateria = (nombre, subvista = 'quiz', tab = 'crear') => {
         if (!nombre) return;
         setPagina('materias');
         setMateriaSeleccionada(nombre);
         setSubVistaMateria(subvista);
+        setTabMateria(tab);
     };
 
     const handleGenerarInvitaciones = async (e) => {
@@ -335,6 +354,21 @@ export function Dashboard() {
             setRanking(filas.map((f) => ({ nombre: f.nombre, puntos: f.xp_total })))
         );
     }, []);
+
+    // Resumen real del Home (SPEC-004): stats + Centro de Actividad. Se
+    // refresca al volver al Inicio para reflejar lo último publicado/jugado.
+    const [resumen, setResumen] = useState(null);
+    useEffect(() => {
+        if (pagina === '' || pagina === 'perfil') {
+            docenteService.resumen().then(setResumen).catch(() => {});
+        }
+    }, [pagina]);
+
+    // Ficha rápida (SPEC-004): estudiante seleccionado en "Mis Estudiantes".
+    const [fichaEstudiante, setFichaEstudiante] = useState(null);
+
+    // Pestaña activa dentro de la vista de materia (SPEC-004).
+    const [tabMateria, setTabMateria] = useState('crear');
 
     const handleUploadMateria = async (materia, file, { isPrivate = false } = {}) => {
         const kind = getKind(file.name);
@@ -392,8 +426,11 @@ export function Dashboard() {
             titulo={getInstitucionCache()?.nombre || 'Unidad Educativa Fiscal Clemencia Coronel de Pincay'}
             items={[
                 { id: '', label: 'Inicio', Icon: HomeFilledIcon },
-                { id: 'materias', label: 'Materias', Icon: MenuBookIcon },
-                { id: 'estudiantes', label: 'Mis Estudiantes', Icon: GroupsRoundedIcon }
+                { id: 'materias', label: 'Materias', Icon: MenuBookIcon, grupo: 'Enseñanza' },
+                { id: 'biblioteca', label: 'Biblioteca', Icon: LocalLibraryRoundedIcon, grupo: 'Enseñanza' },
+                { id: 'estudiantes', label: 'Mis Estudiantes', Icon: GroupsRoundedIcon, grupo: 'Mi aula' },
+                { id: 'ranking', label: 'Ranking', Icon: EmojiEventsRoundedIcon, grupo: 'Mi aula' },
+                { id: 'perfil', label: 'Mi Perfil', Icon: AccountCircleRoundedIcon, grupo: 'Cuenta' }
             ].map((item) => ({
                 ...item,
                 activo: pagina === item.id,
@@ -409,19 +446,80 @@ export function Dashboard() {
                     mi aula → contenido → actividad reciente. Solo datos reales. */}
                 {pagina === "" && (
                     <div className="home-doc">
-                        <header className="home-saludo">
-                            <span className="home-avatar" aria-hidden="true">
-                                {(authService.getUsuario()?.username || 'D').charAt(0).toUpperCase()}
+                        {/* Bienvenida útil (SPEC-004): nombre, materias,
+                            estudiantes y el pulso real de la semana. */}
+                        <header className="doc-hero">
+                            <span className="doc-hero-avatar" aria-hidden="true">
+                                {(authService.getUsuario()?.nombre_completo || authService.getUsuario()?.username || 'D').charAt(0).toUpperCase()}
                             </span>
-                            <div className="home-saludo-meta">
-                                <h1>¡Hola, {authService.getUsuario()?.username || 'docente'}! 👋</h1>
-                                <p className="home-doc-sub">
-                                    {materias.length
-                                        ? `Tienes ${materias.length} ${materias.length === 1 ? 'materia' : 'materias'} y ${misEstudiantes.length} ${misEstudiantes.length === 1 ? 'estudiante' : 'estudiantes'} esperando nuevas aventuras.`
-                                        : 'Bienvenido a tu espacio para crear actividades.'}
-                                </p>
+                            <div className="doc-hero-meta">
+                                <h1>¡Hola, {authService.getUsuario()?.nombre_completo || authService.getUsuario()?.username || 'docente'}! 👋</h1>
+                                <p>Este es el estado de tu aula hoy.</p>
+                                <div className="doc-hero-chips">
+                                    <span className="doc-hero-chip">
+                                        📚 {materias.length ? materias.join(' · ') : 'Sin materias asignadas'}
+                                    </span>
+                                    <span className="doc-hero-chip">
+                                        🎒 {misEstudiantes.length} {misEstudiantes.length === 1 ? 'estudiante' : 'estudiantes'}
+                                    </span>
+                                    {resumen?.stats && (
+                                        <span className="doc-hero-chip">
+                                            📈 {resumen.stats.completados_semana} {resumen.stats.completados_semana === 1 ? 'reto completado' : 'retos completados'} esta semana
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         </header>
+
+                        {/* Estadísticas rápidas con datos reales. */}
+                        {resumen?.stats && (
+                            <div className="stats-row">
+                                <StatCard Icon={TaskAltRoundedIcon} valor={resumen.stats.actividades} etiqueta="Actividades creadas" tono="primary" />
+                                <StatCard Icon={AutoAwesomeRoundedIcon} valor={resumen.stats.quizzes} etiqueta="Quizzes" tono="accent" />
+                                <StatCard Icon={MapRoundedIcon} valor={resumen.stats.misiones} etiqueta="Misiones" tono="primary" />
+                                <StatCard Icon={ExtensionRoundedIcon} valor={resumen.stats.clasificadores} etiqueta="Clasificadores" tono="accent" />
+                                <StatCard Icon={DescriptionRoundedIcon} valor={resumen.stats.materiales} etiqueta="Materiales" tono="primary" />
+                                <StatCard Icon={StarRoundedIcon} valor={resumen.stats.xp_entregada} etiqueta="XP entregada" tono="fire" />
+                                <StatCard
+                                    Icon={PercentRoundedIcon}
+                                    valor={resumen.stats.promedio === null ? '—' : `${resumen.stats.promedio}%`}
+                                    etiqueta="Promedio general"
+                                    tono="accent"
+                                />
+                            </div>
+                        )}
+
+                        {/* Acciones rápidas: atajos, no reemplazan el menú. */}
+                        <section>
+                            <h2 style={{ marginBottom: 12 }}>Acciones rápidas</h2>
+                            <div className="doc-rapidas">
+                                <button type="button" className="doc-rapida" onClick={() => irAMateria(materiaSugerida || materias[0], 'quiz')} disabled={!materias.length}>
+                                    <span className="doc-rapida-emoji" aria-hidden="true">✨</span>
+                                    <strong>Crear Quiz</strong>
+                                    <span className="doc-rapida-desc">Preguntas con IA a partir de un tema</span>
+                                </button>
+                                <button type="button" className="doc-rapida" onClick={() => irAMateria(materiaSugerida || materias[0], 'mision')} disabled={!materias.length}>
+                                    <span className="doc-rapida-emoji" aria-hidden="true">🗺️</span>
+                                    <strong>Crear Misión</strong>
+                                    <span className="doc-rapida-desc">Una historia con desafíos</span>
+                                </button>
+                                <button type="button" className="doc-rapida" onClick={() => irAMateria(materiaSugerida || materias[0], 'quiz', 'material')} disabled={!materias.length}>
+                                    <span className="doc-rapida-emoji" aria-hidden="true">📄</span>
+                                    <strong>Subir Material</strong>
+                                    <span className="doc-rapida-desc">Documentos de apoyo para la clase</span>
+                                </button>
+                                <button type="button" className="doc-rapida" onClick={() => setPagina('ranking')}>
+                                    <span className="doc-rapida-emoji" aria-hidden="true">🏆</span>
+                                    <strong>Ver Ranking</strong>
+                                    <span className="doc-rapida-desc">Posiciones de todos tus estudiantes</span>
+                                </button>
+                                <button type="button" className="doc-rapida" onClick={() => setPagina('estudiantes')}>
+                                    <span className="doc-rapida-emoji" aria-hidden="true">🔑</span>
+                                    <strong>Generar Invitaciones</strong>
+                                    <span className="doc-rapida-desc">Códigos para registrar estudiantes</span>
+                                </button>
+                            </div>
+                        </section>
 
                         {borradorReciente ? (
                             <button className="home-hero-doc" onClick={() => irAMateria(borradorReciente.materia, 'quiz')}>
@@ -495,9 +593,30 @@ export function Dashboard() {
                             <ArrowForwardRoundedIcon className="home-doc-aula-flecha" />
                         </button>
 
-                        <section className="home-doc-reciente">
-                            <h2>Lo último que publicaste</h2>
-                            {retosRecientes.length ? (
+                        {/* Centro de Actividad (SPEC-004): cronología real de
+                            la auditoría — lo que hiciste tú y lo que hicieron
+                            TUS estudiantes. */}
+                        <SectionCard
+                            titulo="Centro de Actividad"
+                            Icon={TaskAltRoundedIcon}
+                            tag={resumen?.actividad?.length ? `${resumen.actividad.length} eventos` : undefined}
+                        >
+                            {resumen?.actividad?.length ? (
+                                <ul className="actividad-lista">
+                                    {resumen.actividad.map((ev) => (
+                                        <li key={ev.id} className="actividad-item">
+                                            <span className="actividad-icono">
+                                                {ev.rol === 'estudiante' ? <GroupsRoundedIcon /> : <SchoolRoundedIcon />}
+                                            </span>
+                                            <div className="actividad-meta">
+                                                <strong>{ev.nombre}</strong>
+                                                <span>{ev.materia ? `${ev.descripcion} · ${ev.materia}` : ev.descripcion}</span>
+                                            </div>
+                                            <span className="actividad-fecha">{formatearFecha(ev.creado_en)}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : retosRecientes.length ? (
                                 <ul className="actividad-lista">
                                     {retosRecientes.map((r) => (
                                         <li key={r.id} className="actividad-item">
@@ -515,14 +634,14 @@ export function Dashboard() {
                             ) : (
                                 <EmptyState
                                     Icon={TaskAltRoundedIcon}
-                                    titulo="Todavía no has publicado actividades"
-                                    mensaje="Cuando publiques tu primer quiz, juego o misión, aparecerá aquí."
+                                    titulo="Todavía no hay actividad que contar"
+                                    mensaje="Cuando publiques actividades o tus estudiantes las resuelvan, la cronología aparecerá aquí."
                                     accion={materiaSugerida
                                         ? { label: 'Crear mi primera actividad', onClick: () => irAMateria(materiaSugerida, 'quiz') }
                                         : undefined}
                                 />
                             )}
-                        </section>
+                        </SectionCard>
                     </div>
                 )}
 
@@ -543,7 +662,7 @@ export function Dashboard() {
                                         key={mat}
                                         className="home-doc-materia"
                                         style={ui.estilo}
-                                        onClick={() => { setMateriaSeleccionada(mat); setSubVistaMateria('quiz'); }}
+                                        onClick={() => { setMateriaSeleccionada(mat); setSubVistaMateria('quiz'); setTabMateria('resumen'); }}
                                     >
                                         <span className="home-doc-materia-emoji" aria-hidden="true">{ui.icono}</span>
                                         <span className="home-doc-materia-nombre">{mat}</span>
@@ -568,7 +687,7 @@ export function Dashboard() {
                     <div className="materia-doc">
                         <button
                             className="back-btn"
-                            onClick={() => { setMateriaSeleccionada(null); setArchivoPreview(null); setSubVistaMateria('quiz'); }}
+                            onClick={() => { setMateriaSeleccionada(null); setArchivoPreview(null); setSubVistaMateria('quiz'); setTabMateria('crear'); }}
                         >
                             ← Volver a mis materias
                         </button>
@@ -594,7 +713,106 @@ export function Dashboard() {
                             </div>
                         )}
 
-                        {/* Crear actividad: el protagonista de la pantalla */}
+                        {/* Espacio de aprendizaje (SPEC-004): todo lo de la
+                            materia en un solo lugar, organizado por pestañas. */}
+                        <nav className="doc-tabs" aria-label="Secciones de la materia">
+                            {[
+                                ['resumen', '📊 Resumen'],
+                                ['crear', '✨ Crear actividad'],
+                                ['actividades', '🎯 Actividades'],
+                                ['material', '📄 Material'],
+                                ['calificaciones', '📒 Calificaciones']
+                            ].map(([id, label]) => (
+                                <button
+                                    key={id}
+                                    type="button"
+                                    className={`doc-tab ${tabMateria === id ? 'doc-tab-activa' : ''}`}
+                                    onClick={() => setTabMateria(id)}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </nav>
+
+                        {/* RESUMEN — cómo va el aula en esta materia. */}
+                        {tabMateria === 'resumen' && (
+                            <>
+                                <WidgetsRendimiento
+                                    materia={materiaSeleccionada}
+                                    topEstudiantes={ranking}
+                                    retosPublicados={retosMateria.length}
+                                    siguientePaso={
+                                        archivosMateria.length > 0
+                                            ? { descripcion: "Ya tienes material cargado. Pon a prueba a tus estudiantes generando un quiz.", label: "Crear un quiz", destino: "quiz" }
+                                            : { descripcion: "Aún no hay material en esta materia. Súbelo en la pestaña Material y luego genera un quiz.", label: "Crear un quiz", destino: "quiz" }
+                                    }
+                                    onAccion={(destino) => { setSubVistaMateria(destino); setTabMateria('crear'); }}
+                                />
+                                <SectionCard
+                                    titulo="Últimas actividades publicadas"
+                                    Icon={TaskAltRoundedIcon}
+                                    tag={retosMateria.length ? `${retosMateria.length}` : undefined}
+                                    accion={{ label: 'Ver todas en la Biblioteca', onClick: () => setPagina('biblioteca') }}
+                                >
+                                    {retosMateria.length ? (
+                                        <ul className="actividad-lista">
+                                            {retosMateria.slice(0, 5).map((r) => (
+                                                <li key={r.id} className="actividad-item">
+                                                    <span className="actividad-icono"><TaskAltRoundedIcon /></span>
+                                                    <div className="actividad-meta">
+                                                        <strong>{r.titulo}</strong>
+                                                        <span>{TIPO_RETO_LABEL[r.tipo] || r.tipo} · ⭐ {r.xp_recompensa} XP</span>
+                                                    </div>
+                                                    <span className="actividad-fecha">{formatearFecha(r.creado_en)}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <EmptyState
+                                            Icon={TaskAltRoundedIcon}
+                                            titulo="Sin actividades todavía"
+                                            mensaje="Crea la primera en la pestaña «Crear actividad»."
+                                            accion={{ label: 'Crear actividad', onClick: () => setTabMateria('crear') }}
+                                        />
+                                    )}
+                                </SectionCard>
+                            </>
+                        )}
+
+                        {/* ACTIVIDADES — lo publicado en esta materia. */}
+                        {tabMateria === 'actividades' && (
+                            <SectionCard
+                                titulo={`Actividades de ${materiaSeleccionada}`}
+                                Icon={TaskAltRoundedIcon}
+                                tag={retosMateria.length ? `${retosMateria.length}` : undefined}
+                                accion={{ label: 'Gestionar en la Biblioteca', onClick: () => setPagina('biblioteca') }}
+                            >
+                                {retosMateria.length ? (
+                                    <ul className="actividad-lista">
+                                        {retosMateria.map((r) => (
+                                            <li key={r.id} className="actividad-item">
+                                                <span className="actividad-icono"><TaskAltRoundedIcon /></span>
+                                                <div className="actividad-meta">
+                                                    <strong>{r.titulo}</strong>
+                                                    <span>{TIPO_RETO_LABEL[r.tipo] || r.tipo} · ⭐ {r.xp_recompensa} XP{r.descripcion ? ` · ${r.descripcion}` : ''}</span>
+                                                </div>
+                                                <span className="actividad-fecha">{formatearFecha(r.creado_en)}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <EmptyState
+                                        Icon={TaskAltRoundedIcon}
+                                        titulo="Sin actividades publicadas"
+                                        mensaje="Las actividades que publiques en esta materia aparecerán aquí para tus estudiantes."
+                                        accion={{ label: 'Crear actividad', onClick: () => setTabMateria('crear') }}
+                                    />
+                                )}
+                            </SectionCard>
+                        )}
+
+                        {/* CREAR ACTIVIDAD — generadores (sin cambios de lógica). */}
+                        {tabMateria === 'crear' && (
                         <section className="materia-crear">
                             <div className="materia-crear-head">
                                 <h2>¿Qué actividad quieres crear hoy?</h2>
@@ -640,8 +858,11 @@ export function Dashboard() {
                                 <EditorClasificador materia={materiaSeleccionada} />
                             )}
                         </section>
+                        )}
 
-                        {/* Material de estudio, dividido por audiencia */}
+                        {/* MATERIAL — dividido por audiencia. */}
+                        {tabMateria === 'material' && (
+                        <>
                         <div className="materia-crear-head">
                             <h2>Material de estudio</h2>
                             <p>Sube documentos de apoyo: los públicos los ven tus estudiantes; los privados, solo tú.</p>
@@ -669,39 +890,11 @@ export function Dashboard() {
                                 onPreview={setArchivoPreview}
                             />
                         </div>
+                        </>
+                        )}
 
-                        {/* Tu clase: cómo va el aula en esta materia */}
-                        <div className="materia-crear-head">
-                            <h2>Tu clase en {materiaSeleccionada}</h2>
-                            <p>Un vistazo rápido a cómo van tus estudiantes.</p>
-                        </div>
-
-                        <WidgetsRendimiento
-                            materia={materiaSeleccionada}
-                            topEstudiantes={ranking}
-                            retosPublicados={retosMateria.length}
-                            siguientePaso={
-                                archivosMateria.length > 0
-                                    ? { descripcion: "Ya tienes material cargado. Pon a prueba a tus estudiantes generando un quiz.", label: "Crear un quiz", destino: "quiz" }
-                                    : { descripcion: "Aún no hay material en esta materia. Súbelo arriba y luego genera un quiz.", label: "Crear un quiz", destino: "quiz" }
-                            }
-                            onAccion={(destino) => setSubVistaMateria(destino)}
-                        />
-
-                        {/* Libro de Calificaciones: seguimiento, separado de la creación */}
-                        <button
-                            className="materia-libro-btn"
-                            onClick={() => setSubVistaMateria(subVistaMateria === 'calificaciones' ? 'quiz' : 'calificaciones')}
-                        >
-                            <span className="materia-libro-emoji" aria-hidden="true">📒</span>
-                            <span className="materia-libro-texto">
-                                <strong>Libro de Calificaciones</strong>
-                                <span>Revisa las notas de tus estudiantes en {materiaSeleccionada}</span>
-                            </span>
-                            <ArrowForwardRoundedIcon className={`materia-libro-flecha ${subVistaMateria === 'calificaciones' ? 'is-abierto' : ''}`} />
-                        </button>
-
-                        {subVistaMateria === 'calificaciones' && (
+                        {/* CALIFICACIONES — seguimiento por estudiante. */}
+                        {tabMateria === 'calificaciones' && (
                             <section className="card materia-subvista">
                                 <h3>Libro de Calificaciones de {materiaSeleccionada}</h3>
                                 <LibroCalificaciones materia={materiaSeleccionada} />
@@ -760,7 +953,12 @@ export function Dashboard() {
                         <section className="card">
                             <div className="card-head">
                                 <h3>Estudiantes registrados con mis códigos</h3>
-                                <span className="card-tag">{misEstudiantes.length}</span>
+                                <div className="section-head-extra">
+                                    <span className="card-tag">{misEstudiantes.length}</span>
+                                    <button type="button" className="section-accion" onClick={() => setPagina('ranking')}>
+                                        Ver ranking completo
+                                    </button>
+                                </div>
                             </div>
                             <table className="admin-tabla">
                                 <thead>
@@ -773,6 +971,12 @@ export function Dashboard() {
                                             <td>{est.curso}</td>
                                             <td>{est.xp_total}</td>
                                             <td className="admin-acciones">
+                                                <button
+                                                    title="Ver ficha del estudiante"
+                                                    onClick={() => setFichaEstudiante(est)}
+                                                >
+                                                    <VisibilityRoundedIcon sx={{ fontSize: '1.1rem' }} /> Ver ficha
+                                                </button>
                                                 <button title="Restablecer PIN a su fecha de nacimiento" onClick={() => handleResetPin(est)}>
                                                     <RestartAltRoundedIcon sx={{ fontSize: '1.1rem' }} /> Restablecer
                                                 </button>
@@ -813,12 +1017,88 @@ export function Dashboard() {
                     </div>
                 )}
 
+                {/* BIBLIOTECA — todas las actividades (SPEC-004). */}
+                {pagina === 'biblioteca' && (
+                    <div className="home-doc">
+                        <DashboardHeader
+                            titulo="Biblioteca de Actividades"
+                            subtitulo="Todo lo que has creado, en un solo lugar: busca, duplica, edita, archiva o restaura. Nada se borra para siempre."
+                        />
+                        <BibliotecaActividades onAviso={setAvisoOk} onError={setErrorMaterial} />
+                        {errorMaterial && (
+                            <div className="aviso-migracion" role="alert">
+                                <p>{errorMaterial}</p>
+                                <button onClick={() => setErrorMaterial('')}>Entendido</button>
+                            </div>
+                        )}
+                        {avisoOk && (
+                            <div className="admin-aviso-ok" role="status">
+                                <p>{avisoOk}</p>
+                                <button onClick={() => setAvisoOk('')}>OK</button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* RANKING COMPLETO (SPEC-004). */}
+                {pagina === 'ranking' && (
+                    <div className="home-doc">
+                        <DashboardHeader
+                            titulo="Ranking"
+                            subtitulo="La tabla de posiciones por XP acumulada. Puedes buscar, ordenar y filtrar por curso."
+                        />
+                        <RankingCompleto onError={setErrorMaterial} />
+                        {errorMaterial && (
+                            <div className="aviso-migracion" role="alert">
+                                <p>{errorMaterial}</p>
+                                <button onClick={() => setErrorMaterial('')}>Entendido</button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* MI PERFIL (SPEC-004). */}
+                {pagina === 'perfil' && (
+                    <div className="home-doc">
+                        <DashboardHeader
+                            titulo="Mi Perfil"
+                            subtitulo="Tu identidad como docente, tus números reales y tu actividad reciente."
+                        />
+                        {errorMaterial && (
+                            <div className="aviso-migracion" role="alert">
+                                <p>{errorMaterial}</p>
+                                <button onClick={() => setErrorMaterial('')}>Entendido</button>
+                            </div>
+                        )}
+                        {avisoOk && (
+                            <div className="admin-aviso-ok" role="status">
+                                <p>{avisoOk}</p>
+                                <button onClick={() => setAvisoOk('')}>OK</button>
+                            </div>
+                        )}
+                        <PerfilDocente
+                            stats={resumen?.stats}
+                            materias={materias}
+                            onAviso={setAvisoOk}
+                            onError={setErrorMaterial}
+                        />
+                    </div>
+                )}
+
             <FilePreviewModal
                 archivo={archivoPreview}
                 onClose={() => setArchivoPreview(null)}
                 onDownload={descargarArchivo}
                 onDelete={(a) => handleEliminarArchivo(materiaSeleccionada, a.id)}
             />
+
+            {/* Ficha rápida del estudiante: modal, sin abandonar la página. */}
+            {fichaEstudiante && (
+                <FichaEstudiante
+                    estudiante={fichaEstudiante}
+                    onCerrar={() => setFichaEstudiante(null)}
+                />
+            )}
         </SidebarLayout>
     );
 }

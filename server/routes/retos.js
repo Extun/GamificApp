@@ -124,6 +124,151 @@ router.get('/', async (req, res, next) => {
     }
 });
 
+// GET /api/retos/gestion — Biblioteca del docente (SPEC-004): TODOS los retos
+// de sus materias asignadas, en cualquier estado (borrador/publicado/
+// archivado), con cuántos estudiantes los han jugado. Sin configuracion_json
+// (pesado y no lo necesita el listado).
+router.get('/gestion', soloDocente, async (req, res, next) => {
+    try {
+        const esAdmin = req.user.rol === 'admin';
+        const filtroDocente = esAdmin
+            ? ''
+            : 'AND r.materia_id IN (SELECT materia_id FROM docente_materia WHERE docente_id = ?)';
+        const [filas] = await pool.query(
+            `SELECT r.id, r.materia_id, m.nombre AS materia, m.color, m.icono,
+                    r.titulo, r.tipo, r.descripcion, r.xp_recompensa, r.estado,
+                    r.creado_en,
+                    (SELECT COUNT(*) FROM progreso_estudiante p WHERE p.reto_id = r.id) AS veces_jugado
+             FROM retos r
+             JOIN materias m ON m.id = r.materia_id
+             WHERE m.eliminado_en IS NULL ${filtroDocente}
+             ORDER BY r.creado_en DESC, r.id DESC`,
+            esAdmin ? [] : [req.user.id]
+        );
+        res.json(filas);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Busca el reto y verifica que el docente pueda gestionarlo (materia asignada).
+// Devuelve la fila o responde el error y devuelve null.
+const retoGestionable = async (req, res, retoId) => {
+    if (!esIdValido(retoId)) {
+        res.status(400).json({ error: 'El id del reto debe ser un entero positivo' });
+        return null;
+    }
+    const [[reto]] = await pool.query(
+        `SELECT r.*, m.nombre AS materia_nombre FROM retos r
+         JOIN materias m ON m.id = r.materia_id WHERE r.id = ?`,
+        [retoId]
+    );
+    if (!reto) {
+        res.status(404).json({ error: 'Reto no encontrado' });
+        return null;
+    }
+    if (!await puedeGestionarMateria(req.user, reto.materia_id)) {
+        res.status(403).json({ error: 'No tienes asignada esta materia' });
+        return null;
+    }
+    return reto;
+};
+
+const ESTADOS_RETO = ['borrador', 'publicado', 'archivado'];
+
+// PATCH /api/retos/:id — gestión desde la Biblioteca (SPEC-004): cambiar el
+// estado (archivar/restaurar/publicar un borrador) y ajustar descripción o XP.
+// La configuración del juego NO se toca aquí (eso es de los editores), así que
+// no se rompe la compatibilidad de configuracion_json ya publicado.
+router.patch('/:id', soloDocente, async (req, res, next) => {
+    try {
+        const reto = await retoGestionable(req, res, Number(req.params.id));
+        if (!reto) return;
+
+        const cambios = [];
+        const params = [];
+        const estado = req.body?.estado;
+        if (estado !== undefined) {
+            if (!ESTADOS_RETO.includes(estado)) {
+                return res.status(400).json({ error: `estado debe ser uno de: ${ESTADOS_RETO.join(', ')}` });
+            }
+            cambios.push('estado = ?');
+            params.push(estado);
+        }
+        if (req.body?.descripcion !== undefined) {
+            cambios.push('descripcion = ?');
+            params.push(String(req.body.descripcion).trim() || null);
+        }
+        if (req.body?.xp_recompensa !== undefined) {
+            const xp = Number(req.body.xp_recompensa);
+            if (!esIdValido(xp) || xp > 100000) {
+                return res.status(400).json({ error: 'xp_recompensa debe ser un entero positivo' });
+            }
+            cambios.push('xp_recompensa = ?');
+            params.push(xp);
+        }
+        if (!cambios.length) {
+            return res.status(400).json({ error: 'Nada que actualizar (estado, descripcion o xp_recompensa)' });
+        }
+
+        await pool.query(`UPDATE retos SET ${cambios.join(', ')} WHERE id = ?`, [...params, reto.id]);
+
+        if (estado && estado !== reto.estado) {
+            const VERBO = { archivado: 'Archivó', publicado: 'Publicó', borrador: 'Pasó a borrador' };
+            registrarAuditoria({
+                usuario: req.user,
+                accion: `${estado === 'archivado' ? 'archivo' : 'cambio-estado'}-reto`,
+                descripcion: `${VERBO[estado]} la actividad "${reto.titulo}"`,
+                materia: reto.materia_nombre,
+                detalle: { titulo: reto.titulo, tipo: reto.tipo, de: reto.estado, a: estado }
+            });
+        }
+        res.json({ ok: true, id: reto.id });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// POST /api/retos/:id/duplicar — copia de trabajo en estado borrador
+// ("Título (copia)"). El original y el progreso de los estudiantes no se tocan.
+router.post('/:id/duplicar', soloDocente, async (req, res, next) => {
+    try {
+        const reto = await retoGestionable(req, res, Number(req.params.id));
+        if (!reto) return;
+
+        // Título único dentro de la materia: "(copia)", "(copia 2)", ...
+        const base = reto.titulo.replace(/ \(copia( \d+)?\)$/, '');
+        let titulo = null;
+        for (let n = 1; n <= 50; n++) {
+            const candidato = `${base} (copia${n > 1 ? ` ${n}` : ''})`.slice(0, 120);
+            const [[ocupado]] = await pool.query(
+                'SELECT 1 AS si FROM retos WHERE materia_id = ? AND titulo = ?',
+                [reto.materia_id, candidato]
+            );
+            if (!ocupado) { titulo = candidato; break; }
+        }
+        if (!titulo) {
+            return res.status(409).json({ error: 'Demasiadas copias de esta actividad; elimina o renombra alguna' });
+        }
+
+        const [creado] = await pool.query(
+            `INSERT INTO retos (materia_id, titulo, tipo, descripcion, configuracion_json, xp_recompensa, estado, docente_id)
+             SELECT materia_id, ?, tipo, descripcion, configuracion_json, xp_recompensa, 'borrador', ?
+             FROM retos WHERE id = ?`,
+            [titulo, req.user.id, reto.id]
+        );
+        registrarAuditoria({
+            usuario: req.user, accion: 'duplico-reto',
+            descripcion: `Duplicó la actividad "${reto.titulo}" como "${titulo}"`,
+            materia: reto.materia_nombre,
+            detalle: { original: reto.titulo, copia: titulo, tipo: reto.tipo }
+        });
+        res.status(201).json({ id: creado.insertId, titulo, estado: 'borrador' });
+    } catch (err) {
+        next(err);
+    }
+});
+
 // POST /api/retos — publica (o republica) un reto configurable.
 // Body: { materia_id, titulo, tipo, configuracion, xp_recompensa?, descripcion? }
 //
@@ -164,18 +309,21 @@ router.post('/', soloDocente, async (req, res, next) => {
         let retoId;
         if (existente) {
             retoId = existente.id;
+            // Republicar conserva la autoría original; si la fila es anterior
+            // a la migración 005 (docente_id NULL), la adopta quien republica.
             await pool.query(
                 `UPDATE retos
                  SET tipo = ?, descripcion = ?, configuracion_json = ?,
-                     xp_recompensa = ?, estado = 'publicado'
+                     xp_recompensa = ?, estado = 'publicado',
+                     docente_id = COALESCE(docente_id, ?)
                  WHERE id = ?`,
-                [tipo, descripcion, configJson, xp, retoId]
+                [tipo, descripcion, configJson, xp, req.user.id, retoId]
             );
         } else {
             const [creado] = await pool.query(
-                `INSERT INTO retos (materia_id, titulo, tipo, descripcion, configuracion_json, xp_recompensa, estado)
-                 VALUES (?, ?, ?, ?, ?, ?, 'publicado')`,
-                [materiaId, titulo, tipo, descripcion, configJson, xp]
+                `INSERT INTO retos (materia_id, titulo, tipo, descripcion, configuracion_json, xp_recompensa, estado, docente_id)
+                 VALUES (?, ?, ?, ?, ?, ?, 'publicado', ?)`,
+                [materiaId, titulo, tipo, descripcion, configJson, xp, req.user.id]
             );
             retoId = creado.insertId;
         }
