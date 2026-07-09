@@ -18,7 +18,7 @@ El **MVP está completo y en producción** (Vercel + Render + Aiven). Los tres r
 
 | Módulo | Estado |
 |--------|--------|
-| Autenticación (login nombre+PIN, registro, emergencia, rate limiting) | ✅ Completo — Login rediseñado (2026-07-08, Polish Sprint): bienvenida centrada, tarjetas de rol grandes, botón protagonista; misma lógica y flujos (el Registro conserva su layout anterior vía bloque de compatibilidad en login.css) |
+| Autenticación (login nombre+PIN, registro, emergencia, rate limiting) | ✅ Completo — Login y Registro unificados (2026-07-08, pulido final): mismo layout centrado con marca y pie institucional, selector de rol con mayor jerarquía, nota fija para docentes ("contraseña olvidada → contactar al administrador"), microanimaciones sutiles con `prefers-reduced-motion`; se eliminó el layout legado del aside en login.css. Misma lógica y flujos |
 | Gestión de docentes (admin) | 🟡 Parcial — falta UI de edición (endpoint `PUT /api/admin/docentes/:id` existe) |
 | Gestión de estudiantes e invitaciones | ✅ Completo |
 | Material de estudio (base64 en MySQL, preview PDF/docx) | ✅ Completo |

@@ -8,6 +8,7 @@ import authService from '../../services/authService';
 // Registro de estudiante con código de invitación del docente.
 // Al terminar muestra el PIN inicial (su fecha de nacimiento) y el código
 // de emergencia para que los anote ANTES de entrar a la plataforma.
+// Comparte layout e identidad visual con el Login (login.css).
 export function RegistroEstudiante() {
     const [nombre, setNombre] = useState('');
     const [fechaNacimiento, setFechaNacimiento] = useState('');
@@ -38,24 +39,25 @@ export function RegistroEstudiante() {
 
     return (
         <div className="login-page">
-            <aside className="login-aside">
-                <div className="login-brand">
-                    <SchoolRoundedIcon className="login-brand-icon" />
-                    <span>GamificApp</span>
-                </div>
-                <div className="login-aside-body">
-                    <h2>¡Bienvenido!<br/>Tu aventura empieza aquí.</h2>
-                    <p>Pide a tu docente un código de invitación y crea tu cuenta en menos de un minuto.</p>
-                </div>
-                <span className="login-aside-foot">Unidad Educativa · Registro de estudiantes</span>
-            </aside>
+            <div className="login-fondo" aria-hidden="true">
+                <span className="login-burbuja login-burbuja-1" />
+                <span className="login-burbuja login-burbuja-2" />
+                <span className="login-burbuja login-burbuja-3" />
+            </div>
 
-            <section className="login-form-wrap">
+            <main className="login-centro">
+                <div className="login-brand">
+                    <span className="login-brand-icon"><SchoolRoundedIcon /></span>
+                    <span className="login-brand-nombre">GamificApp</span>
+                </div>
+
                 <div className="login-card">
                     {!credenciales ? (
                         <>
-                            <h1>Crear mi cuenta</h1>
-                            <p className="login-card-sub">Necesitas el código que te dio tu docente.</p>
+                            <header className="login-bienvenida">
+                                <h1>Crear mi cuenta</h1>
+                                <p className="login-card-sub">Necesitas el código de invitación que te dio tu docente.</p>
+                            </header>
 
                             {error && <div className="login-error" role="alert">{error}</div>}
 
@@ -96,8 +98,10 @@ export function RegistroEstudiante() {
                         </>
                     ) : (
                         <>
-                            <h1><CelebrationRoundedIcon sx={{ verticalAlign: 'middle' }} /> ¡Cuenta creada!</h1>
-                            <p className="login-card-sub">Anota estos datos en tu cuaderno o carné. Los necesitarás para entrar.</p>
+                            <header className="login-bienvenida">
+                                <h1><CelebrationRoundedIcon sx={{ verticalAlign: 'middle' }} /> ¡Cuenta creada!</h1>
+                                <p className="login-card-sub">Anota estos datos en tu cuaderno o carné. Los necesitarás para entrar.</p>
+                            </header>
 
                             <div className="registro-credenciales">
                                 <h3>Mis datos para entrar</h3>
@@ -121,7 +125,9 @@ export function RegistroEstudiante() {
                         </>
                     )}
                 </div>
-            </section>
+
+                <span className="login-pie">Unidad Educativa Fiscal Clemencia Coronel de Pincay</span>
+            </main>
         </div>
     );
 }
