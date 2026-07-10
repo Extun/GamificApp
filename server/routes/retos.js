@@ -99,7 +99,7 @@ router.get('/gestion', soloDocente, async (req, res, next) => {
                     (SELECT COUNT(*) FROM progreso_estudiante p WHERE p.reto_id = r.id) AS veces_jugado
              FROM retos r
              JOIN materias m ON m.id = r.materia_id
-             LEFT JOIN cursos c ON c.id = r.curso_id
+             LEFT JOIN cursos c ON c.id = r.curso_id AND c.eliminado_en IS NULL
              WHERE m.eliminado_en IS NULL
                AND r.eliminado_en IS ${enPapelera ? 'NOT NULL' : 'NULL'} ${filtroDocente}
              ORDER BY r.creado_en DESC, r.id DESC`,

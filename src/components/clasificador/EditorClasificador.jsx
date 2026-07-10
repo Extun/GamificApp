@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
@@ -10,6 +10,7 @@ import { idPorNombre } from '../../services/materiasService';
 import { generarActividadIA } from '../../services/iaService';
 import { publicarReto } from '../../services/retosService';
 import { PUNTOS_POR_ACIERTO } from '../../services/gamificationService';
+import { useHistorialActividades, nuevaEntradaHistorial, HistorialActividades } from '../juegos/HistorialActividades';
 import './editorClasificador.css';
 
 // Editor no-code del juego 'Clasificador de Objetos'. El docente define el
@@ -44,9 +45,36 @@ export function EditorClasificador({ materia }) {
     const [publicado, setPublicado] = useState(false);
     const [aviso, setAviso] = useState('');
     const [error, setError] = useState('');
+    // Historial "Últimos juegos generados" (mismo patrón que el quiz):
+    // últimas 3 entradas por materia, en localStorage.
+    const [entradaId, setEntradaId] = useState(null);
+    const { historial, guardar: guardarHistorial, actualizar: actualizarHistorial, eliminar: eliminarHistorial } =
+        useHistorialActividades('edu_historialActividades_clasificador', materia);
 
     const materiaId = idPorNombre(materia);
     const totalElementos = categorias.reduce((n, c) => n + c.elementos.length, 0);
+
+    // Mantiene el historial sincronizado con lo que hay en el editor. La
+    // entrada se crea sola en cuanto el docente escribe algo (borrador) y se
+    // actualiza con cada edición; al publicar cambia de estado.
+    useEffect(() => {
+        const hayContenido = titulo.trim() || totalElementos > 0 || categorias.some((c) => c.nombre.trim());
+        if (!entradaId) {
+            if (!hayContenido) return;
+            const entrada = nuevaEntradaHistorial({ materia, titulo, categorias });
+            guardarHistorial(entrada);
+            setEntradaId(entrada.id);
+            return;
+        }
+        actualizarHistorial({
+            id: entradaId,
+            materia,
+            titulo,
+            categorias,
+            estado: publicado ? 'publicado' : 'borrador'
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [titulo, categorias, publicado]);
 
     // Regla mínima de publicación: título, 2+ categorías con nombre y al
     // menos un elemento en cada una (misma validación que aplica el backend).
@@ -97,12 +125,18 @@ export function EditorClasificador({ materia }) {
                 materiaId,
                 tema: temaIA.trim()
             });
-            setTitulo(data.titulo);
-            setCategorias((data.configuracion?.categorias || []).map((c) => ({
+            const nuevasCategorias = (data.configuracion?.categorias || []).map((c) => ({
                 id: idUnico(),
                 nombre: c.nombre,
                 elementos: c.elementos
-            })));
+            }));
+            // Cada generación con IA crea una entrada NUEVA en el historial
+            // (como el quiz), sin pisar el juego anterior.
+            const entrada = nuevaEntradaHistorial({ materia, titulo: data.titulo, categorias: nuevasCategorias });
+            guardarHistorial(entrada);
+            setEntradaId(entrada.id);
+            setTitulo(data.titulo);
+            setCategorias(nuevasCategorias);
             setPublicado(false);
         } catch (err) {
             setError(`No se pudo generar con la IA: ${err.message}`);
@@ -279,6 +313,33 @@ export function EditorClasificador({ materia }) {
                     {publicado ? 'Publicado' : publicando ? 'Publicando…' : 'Publicar juego para estudiantes'}
                 </button>
             </div>
+
+            <HistorialActividades
+                titulo="Últimos juegos generados"
+                items={historial}
+                activoId={entradaId}
+                onAbrir={(e) => {
+                    setTitulo(e.titulo || '');
+                    setCategorias(e.categorias?.length ? e.categorias : [categoriaVacia(), categoriaVacia()]);
+                    setEntradaId(e.id);
+                    setPublicado(e.estado === 'publicado');
+                    setAviso('');
+                    setError('');
+                }}
+                onEliminar={(id) => {
+                    eliminarHistorial(id);
+                    if (entradaId === id) {
+                        setTitulo('');
+                        setCategorias([categoriaVacia(), categoriaVacia()]);
+                        setEntradaId(null);
+                        setPublicado(false);
+                    }
+                }}
+                meta={(e) => {
+                    const n = (e.categorias || []).reduce((t, c) => t + (c.elementos?.length || 0), 0);
+                    return `${e.categorias?.length || 0} categorías · ${n} elementos`;
+                }}
+            />
         </section>
     );
 }

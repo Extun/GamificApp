@@ -18,6 +18,7 @@ import { publicarReto } from '../../services/retosService';
 import { PUNTOS_POR_ACIERTO } from '../../services/gamificationService';
 import docenteService from '../../services/docenteService';
 import { TIPOS_ACTIVIDAD } from './registroJuegos';
+import { useHistorialActividades, nuevaEntradaHistorial, HistorialActividades } from './HistorialActividades';
 
 export const DIFICULTADES_UI = [
     ['facil', '🙂 Fácil'],
@@ -59,6 +60,10 @@ export function GeneradorActividadIA({ materia, tipo }) {
     const [publicado, setPublicado] = useState(false);
     const [error, setError] = useState('');
     const [aviso, setAviso] = useState('');
+    // Historial "Últimas actividades generadas" (mismo patrón que el quiz):
+    // últimas 3 por materia, en localStorage bajo una clave propia del tipo.
+    const { historial, guardar: guardarHistorial, actualizar: actualizarHistorial, eliminar: eliminarHistorial } =
+        useHistorialActividades(`edu_historialActividades_${tipo}`, materia);
 
     // Nota: el dashboard monta este componente con key={tipo}, así que al
     // cambiar de tipo se reinicia todo el estado (sin efectos de limpieza).
@@ -90,11 +95,19 @@ export function GeneradorActividadIA({ materia, tipo }) {
                 dificultad,
                 cursoId: cursoId ? Number(cursoId) : undefined
             });
-            setActividad({
+            // La actividad nace como BORRADOR y se guarda en el historial para
+            // poder retomarla/editarla aunque el docente cambie de vista.
+            const entrada = nuevaEntradaHistorial({
+                materia,
+                tema: tema.trim(),
+                dificultad,
+                cursoId,
                 titulo: data.titulo,
                 descripcion: data.descripcion,
                 configuracion: data.configuracion
             });
+            guardarHistorial(entrada);
+            setActividad(entrada);
             setPublicado(false);
         } catch (err) {
             setError(`No se pudo generar con la IA: ${err.message}`);
@@ -103,13 +116,34 @@ export function GeneradorActividadIA({ materia, tipo }) {
         }
     };
 
-    // Cualquier edición desbloquea el botón de publicar (candado anti doble clic).
+    // Cualquier edición desbloquea el botón de publicar (candado anti doble
+    // clic) y sincroniza la entrada del historial, que vuelve a ser borrador.
     const editar = (cambio) => {
         setPublicado(false);
-        setActividad((prev) => ({ ...prev, ...cambio }));
+        setActividad((prev) => {
+            const actualizado = { ...prev, ...cambio, estado: 'borrador' };
+            actualizarHistorial(actualizado);
+            return actualizado;
+        });
     };
     const editarConfig = (cambio) =>
         editar({ configuracion: { ...actividad.configuracion, ...cambio } });
+
+    // Reabre una entrada del historial en el editor, con sus parámetros.
+    const abrirDelHistorial = (entrada) => {
+        setActividad(entrada);
+        setTema(entrada.tema || '');
+        setDificultad(entrada.dificultad || 'media');
+        setCursoId(entrada.cursoId || '');
+        setPublicado(entrada.estado === 'publicado');
+        setAviso('');
+        setError('');
+    };
+
+    const quitarDelHistorial = (id) => {
+        eliminarHistorial(id);
+        setActividad((actual) => (actual?.id === id ? null : actual));
+    };
 
     const guardar = async (estado) => {
         if (!actividad || guardando || (estado === 'publicado' && publicado)) return;
@@ -133,6 +167,9 @@ export function GeneradorActividadIA({ materia, tipo }) {
                 dificultad,
                 cursoId: cursoId ? Number(cursoId) : undefined
             });
+            const actualizado = { ...actividad, estado };
+            setActividad(actualizado);
+            actualizarHistorial(actualizado);
             if (estado === 'publicado') {
                 setPublicado(true);
                 setAviso('¡Actividad publicada! Ya es visible para tus estudiantes.');
@@ -372,6 +409,17 @@ export function GeneradorActividadIA({ materia, tipo }) {
                     </div>
                 </div>
             )}
+
+            <HistorialActividades
+                items={historial}
+                activoId={actividad?.id}
+                onAbrir={abrirDelHistorial}
+                onEliminar={quitarDelHistorial}
+                meta={(e) => {
+                    const n = contarItems(tipo, e.configuracion);
+                    return `${n} ${n === 1 ? 'ítem' : 'ítems'}`;
+                }}
+            />
         </section>
     );
 }

@@ -6,6 +6,7 @@ import PublishRoundedIcon from '@mui/icons-material/PublishRounded';
 import { publicarReto } from '../../services/retosService';
 import { authFetch } from '../../services/authService';
 import { idPorNombre } from '../../services/materiasService';
+import { useHistorialActividades, nuevaEntradaHistorial, HistorialActividades } from '../../components/juegos/HistorialActividades';
 import '../../components/mision/misionNarrativa.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -28,7 +29,11 @@ export function GeneradorMision({ materia = 'la materia' }) {
     const [tema, setTema] = useState('');
     const [tematica, setTematica] = useState(TEMATICAS[0].id);
     const [mision, setMision] = useState(null);       // borrador generado
+    const [entradaId, setEntradaId] = useState(null); // id en el historial local
     const [publicada, setPublicada] = useState(false);
+    // Historial "Últimas misiones generadas": últimas 3 por materia (localStorage).
+    const { historial, guardar: guardarHistorial, actualizar: actualizarHistorial, eliminar: eliminarHistorial } =
+        useHistorialActividades('edu_historialActividades_mision', materia);
     const [cargando, setCargando] = useState(false);
     const [publicando, setPublicando] = useState(false);
     const [error, setError] = useState('');
@@ -54,6 +59,17 @@ export function GeneradorMision({ materia = 'la materia' }) {
             });
             const data = await res.json().catch(() => null);
             if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+            // La misión nace como BORRADOR en el historial local: se puede
+            // retomar y publicar más tarde aunque se cambie de vista.
+            const entrada = nuevaEntradaHistorial({
+                materia,
+                tema: tema.trim(),
+                tematica,
+                titulo: data.mision?.titulo,
+                mision: data.mision
+            });
+            guardarHistorial(entrada);
+            setEntradaId(entrada.id);
             setMision(data.mision);
         } catch (err) {
             console.error('Error al generar la misión:', err);
@@ -83,6 +99,7 @@ export function GeneradorMision({ materia = 'la materia' }) {
                 descripcion: `Aventura de ${tema.trim()}`
             });
             setPublicada(true);
+            if (entradaId) actualizarHistorial({ id: entradaId, estado: 'publicado' });
             setAviso('¡Misión publicada! Ya es visible para los estudiantes.');
             setTimeout(() => setAviso(''), 4000);
         } catch (err) {
@@ -175,6 +192,30 @@ export function GeneradorMision({ materia = 'la materia' }) {
                     </button>
                 </div>
             )}
+
+            <HistorialActividades
+                titulo="Últimas misiones generadas"
+                items={historial}
+                activoId={entradaId}
+                onAbrir={(e) => {
+                    setMision(e.mision);
+                    setTema(e.tema || '');
+                    setTematica(e.tematica || TEMATICAS[0].id);
+                    setEntradaId(e.id);
+                    setPublicada(e.estado === 'publicado');
+                    setAviso('');
+                    setError('');
+                }}
+                onEliminar={(id) => {
+                    eliminarHistorial(id);
+                    if (entradaId === id) {
+                        setMision(null);
+                        setEntradaId(null);
+                        setPublicada(false);
+                    }
+                }}
+                meta={(e) => `${e.mision?.desafios?.length || 0} desafíos`}
+            />
         </section>
     );
 }
