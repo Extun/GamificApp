@@ -33,15 +33,18 @@ router.get('/:estudiante_id', async (req, res, next) => {
                     m.nombre        AS materia,
                     r.id            AS reto_id,
                     r.titulo        AS reto,
+                    r.tipo,
                     r.xp_recompensa,
                     p.porcentaje,
                     p.xp_obtenido,
                     p.completado,
+                    p.observacion,
+                    p.revisado,
                     p.actualizado_en
              FROM progreso_estudiante p
-             JOIN retos    r ON r.id = p.reto_id
-             -- Materias en la Papelera: su historial se oculta (vuelve al
-             -- restaurarlas); el XP acumulado no se toca.
+             -- Retos o materias en la Papelera: su historial se oculta (vuelve
+             -- al restaurarlos); el XP acumulado no se toca.
+             JOIN retos    r ON r.id = p.reto_id AND r.eliminado_en IS NULL
              JOIN materias m ON m.id = r.materia_id AND m.eliminado_en IS NULL
              WHERE p.estudiante_id = ?
              ORDER BY m.orden, m.id, r.id`,
@@ -107,12 +110,12 @@ router.post('/', async (req, res, next) => {
         let reto;
         if (esIdValido(retoIdBody)) {
             [[reto]] = await conn.query(
-                'SELECT id, xp_recompensa FROM retos WHERE id = ?',
+                'SELECT id, xp_recompensa FROM retos WHERE id = ? AND eliminado_en IS NULL',
                 [retoIdBody]
             );
         } else {
             [[reto]] = await conn.query(
-                'SELECT id, xp_recompensa FROM retos WHERE materia_id = ? AND titulo = ?',
+                'SELECT id, xp_recompensa FROM retos WHERE materia_id = ? AND titulo = ? AND eliminado_en IS NULL',
                 [materiaId, retoTitulo]
             );
             if (!reto) {
@@ -222,6 +225,85 @@ router.post('/', async (req, res, next) => {
         next(err);
     } finally {
         conn.release();
+    }
+});
+
+// PATCH /api/progreso/:estudiante_id/:reto_id — Libro de Calificaciones
+// (SPEC-006 Fase 7): el docente edita la observación del intento y lo marca
+// como revisado. NO toca porcentaje/XP (para eso está POST /api/progreso, que
+// mantiene la transacción idempotente). Solo docente/admin, y el docente solo
+// sobre estudiantes que él invitó (misma regla que resetear PIN).
+router.patch('/:estudiante_id/:reto_id', async (req, res, next) => {
+    const estudianteId = Number(req.params.estudiante_id);
+    const retoId = Number(req.params.reto_id);
+    if (!esIdValido(estudianteId) || !esIdValido(retoId)) {
+        return res.status(400).json({ error: 'estudiante_id y reto_id deben ser enteros positivos' });
+    }
+    if (req.user.rol === 'estudiante') {
+        return res.status(403).json({ error: 'Solo el docente puede editar el libro de calificaciones' });
+    }
+    if (req.user.rol === 'docente') {
+        const [propio] = await pool.query(
+            `SELECT 1 FROM invitaciones_estudiante i
+             JOIN usuarios u ON u.id = i.usuario_id
+             WHERE i.docente_id = ? AND u.estudiante_id = ?`,
+            [req.user.id, estudianteId]
+        );
+        if (!propio.length) {
+            return res.status(403).json({ error: 'Ese estudiante no pertenece a tus grupos' });
+        }
+    }
+
+    const cambios = [];
+    const params = [];
+    if (req.body?.observacion !== undefined) {
+        const obs = req.body.observacion === null ? null : String(req.body.observacion).trim().slice(0, 400);
+        cambios.push('observacion = ?');
+        params.push(obs || null);
+    }
+    if (req.body?.revisado !== undefined) {
+        cambios.push('revisado = ?');
+        params.push(Boolean(req.body.revisado));
+    }
+    if (!cambios.length) {
+        return res.status(400).json({ error: 'Nada que actualizar (observacion o revisado)' });
+    }
+
+    try {
+        // El UPDATE no debe mover `actualizado_en` (es la fecha del intento del
+        // estudiante, no de la revisión del docente).
+        const [resultado] = await pool.query(
+            `UPDATE progreso_estudiante
+             SET ${cambios.join(', ')}, actualizado_en = actualizado_en
+             WHERE estudiante_id = ? AND reto_id = ?`,
+            [...params, estudianteId, retoId]
+        );
+        if (!resultado.affectedRows) {
+            return res.status(404).json({ error: 'No hay progreso registrado de ese estudiante en esa actividad' });
+        }
+        const [[info]] = await pool.query(
+            `SELECT r.titulo, m.nombre AS materia,
+                    CONCAT(e.nombres, ' ', e.apellidos) AS estudiante
+             FROM retos r
+             JOIN materias m ON m.id = r.materia_id
+             JOIN estudiantes e ON e.id = ?
+             WHERE r.id = ?`,
+            [estudianteId, retoId]
+        );
+        registrarAuditoria({
+            usuario: req.user,
+            accion: 'ajusto-progreso',
+            descripcion: `Actualizó el libro de calificaciones de ${info?.estudiante || estudianteId} en "${info?.titulo || retoId}"`,
+            materia: info?.materia || null,
+            detalle: {
+                estudiante: info?.estudiante, reto: info?.titulo,
+                ...(req.body?.observacion !== undefined ? { observacion: req.body.observacion } : {}),
+                ...(req.body?.revisado !== undefined ? { revisado: Boolean(req.body.revisado) } : {})
+            }
+        });
+        res.json({ ok: true });
+    } catch (err) {
+        next(err);
     }
 });
 

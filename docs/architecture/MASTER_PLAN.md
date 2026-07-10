@@ -6,7 +6,7 @@ Roadmap de GamificApp: fases, backlog priorizado, dependencias y riesgos. El est
 
 # Última actualización
 
-2026-07-09 (SPEC-003 implementada: sprint final del panel de administración)
+2026-07-09 (SPEC-006 implementada: Centro de Trabajo Docente con IA)
 
 # Responsable
 
@@ -21,6 +21,7 @@ Fabrizio Zurita (Extun)
 | 2 | Dashboards reales | Reorganización de los 3 dashboards, componentes compartidos, cero datos ficticios | ✅ Hecho |
 | 3 | DevOS documental | Sistema documental — **cerrado y simplificado** en la consolidación 2026-07-07 (START_HERE + 4 docs vivos) | ✅ Hecho |
 | 3.5 | Centro de Administración (SPEC-002 + SPEC-003) | Materias/cursos/institución dinámicos, TablaPro, roles y permisos de admin, auditoría, papelera, sidebar agrupado | ✅ Hecho en código (2026-07-09) — **pendiente: backup Aiven + migraciones 002-004 + deploy** |
+| 3.6 | Centro de Trabajo Docente (SPEC-006) | 3 juegos nuevos (memorama, línea del tiempo, completar), IA genérica por registro, actividad sorpresa, adaptar con IA, Biblioteca IA con papelera/favoritas/estadísticas, Libro de Calificaciones editable | ✅ Hecho en código (2026-07-09) — **pendiente: migración 008 a Aiven + deploy + prueba end-to-end con BD** |
 | 4 | **Épica 1: Experiencia del estudiante** | Rediseño completo del lado del niño en 5 specs (ver §2) | 🟡 En curso (auditoría y SPEC-001 redactadas; nada implementado) |
 | 5 | Módulos incompletos | Libro de Calificaciones, 3 logros faltantes, UI de edición de docente | ⚪ Pendiente (antes de la defensa, si hay tiempo) |
 | 6 | Post-tesis | Multi-institución, archivos fuera de la BD, fallback de IA, memoria del asistente | ⚪ Futuro |
@@ -39,7 +40,7 @@ Insumos: `docs/audit/Auditoria-UX-Estudiante-v1.md`, `docs/specifications/SPEC-0
 
 ## 3. Backlog priorizado (fuera de la Épica 1)
 
-1. Libro de Calificaciones (consume `GET /api/progreso/:id`, ya existente) — única sección que promete y no cumple.
+1. ~~Libro de Calificaciones~~ ✅ Hecho (2026-07-09, SPEC-006: detalle por intento, observación, revisado y ajuste manual de XP con auditoría).
 2. Lógica de logros `racha-7`, `estrella-aula`, `explorador`.
 3. UI de edición de docente (endpoint `PUT /api/admin/docentes/:id` ya existe).
 4. Unificar fuente de materias (consumir `GET /api/materias` en vez de la constante).
@@ -53,9 +54,15 @@ Insumos: `docs/audit/Auditoria-UX-Estudiante-v1.md`, `docs/specifications/SPEC-0
 9. El upsert de retos por `(materia_id, titulo)` no tiene índice único en BD; dos publicaciones simultáneas podrían duplicar. Requiere migración con deduplicación previa.
 10. `useAutoRefresh` puede solapar peticiones si una tarda más que el intervalo (sin cancelación); riesgo bajo con los intervalos actuales.
 11. Migraciones manuales 002 no idempotentes y `initDb` agrupa `color/icono/activa` bajo una sola comprobación de `color`; frágil ante migraciones parciales.
-12. Lint: quedan 15 errores frontend (`react-hooks/set-state-in-effect`, `react-refresh/only-export-components`); corregirlos exige reestructurar componentes.
+12. Lint: quedan 29 errores frontend (`react-hooks/set-state-in-effect`, `react-refresh/only-export-components`, algunos `no-empty`/`no-unused-vars` previos); corregirlos exige reestructurar componentes (los archivos nuevos de SPEC-006 repiten el patrón registro-de-constantes + componente).
 13. Accesibilidad de modales: sin focus trap, cierre con Escape ni restauración de foco.
-14. Rendimiento menor: `TablaPro` recibe `buscar`/`renderFila` inline (memo inútil); chunks grandes de Vite (`index` ~1.34 MB, `pdf.worker` ~1.29 MB) → code-splitting post-tesis.
+14. Rendimiento menor: `TablaPro` recibe `buscar`/`renderFila` inline (memo inútil); chunks grandes de Vite (`index` ~1.44 MB, `pdf.worker` ~1.29 MB) → code-splitting post-tesis.
+
+### Diferidos de SPEC-006 (requieren migración propia)
+
+15. Actividades **programadas** (fecha de publicación futura): no existe columna en BD.
+16. Estadísticas por pregunta ("más fallada/acertada") y tiempo promedio: exigen `detalle_json` en `progreso_estudiante` + cambios en todos los reproductores.
+17. El Libro de Calificaciones consulta el progreso estudiante por estudiante (N peticiones); con aulas grandes convendría un endpoint agregado por materia.
 
 ## 4. Dependencias
 

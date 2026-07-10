@@ -12,7 +12,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 // POST /api/retos — publica (o republica) un reto con su configuración.
 // Lanza Error con el mensaje del servidor si la publicación falla, para que
 // el editor pueda mostrárselo al docente.
-export const publicarReto = async ({ materiaId, titulo, tipo, configuracion, xpRecompensa, descripcion }) => {
+export const publicarReto = async ({ materiaId, titulo, tipo, configuracion, xpRecompensa, descripcion, estado, origen, dificultad, cursoId }) => {
     const res = await authFetch(`${API_URL}/api/retos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -22,7 +22,12 @@ export const publicarReto = async ({ materiaId, titulo, tipo, configuracion, xpR
             tipo,
             configuracion,
             xp_recompensa: xpRecompensa,
-            descripcion
+            descripcion,
+            // SPEC-006: opcionales; sin ellos el servidor publica como siempre.
+            estado,
+            origen,
+            dificultad,
+            curso_id: cursoId
         })
     });
     const data = await res.json().catch(() => null);
@@ -60,7 +65,9 @@ const pedir = async (ruta, options = {}) => {
 };
 
 // Todos los retos de las materias del docente, en cualquier estado.
-export const obtenerRetosGestion = () => pedir('/api/retos/gestion');
+// `{ papelera: true }` lista en cambio los eliminados (pestaña Papelera).
+export const obtenerRetosGestion = ({ papelera } = {}) =>
+    pedir(`/api/retos/gestion${papelera ? '?papelera=1' : ''}`);
 
 // Archivar / restaurar / publicar borradores y ajustar descripción o XP.
 export const actualizarReto = (id, cambios) =>
@@ -70,4 +77,27 @@ export const actualizarReto = (id, cambios) =>
 export const duplicarReto = (id) =>
     pedir(`/api/retos/${id}/duplicar`, { method: 'POST' });
 
-export default { publicarReto, obtenerRetosPublicados, obtenerRetosGestion, actualizarReto, duplicarReto };
+// ---- SPEC-006: Papelera y estadísticas de actividades ----
+
+// Envía a la papelera (soft-delete; el progreso de los estudiantes no se toca).
+export const eliminarReto = (id) =>
+    pedir(`/api/retos/${id}`, { method: 'DELETE' });
+
+// Saca de la papelera con su estado exacto.
+export const restaurarReto = (id) =>
+    pedir(`/api/retos/${id}/restaurar`, { method: 'POST' });
+
+// Purga definitiva (el servidor la rechaza si hay progreso registrado).
+export const purgarReto = (id) =>
+    pedir(`/api/retos/${id}/definitivo`, { method: 'DELETE' });
+
+// Números reales de una actividad, derivados de progreso_estudiante.
+export const estadisticasReto = (id) => pedir(`/api/retos/${id}/estadisticas`);
+
+// Detalle de UNA actividad (con configuración) para la vista previa del docente.
+export const obtenerRetoDetalle = (id) => pedir(`/api/retos/${id}`);
+
+export default {
+    publicarReto, obtenerRetosPublicados, obtenerRetosGestion, actualizarReto,
+    duplicarReto, eliminarReto, restaurarReto, purgarReto, estadisticasReto
+};

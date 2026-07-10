@@ -102,6 +102,14 @@ CREATE TABLE IF NOT EXISTS retos (
     -- Autoría (SPEC-004). Sin FK inline: `usuarios` se crea después; la FK
     -- fk_retos_docente la agrega initDb.js (migración 005).
     docente_id         INT UNSIGNED     NULL,
+    -- Centro de Trabajo Docente (SPEC-006, migración 008). curso_id sin FK
+    -- inline: `cursos` se crea después; la agrega initDb.js (fk_retos_curso).
+    origen             VARCHAR(10)      NOT NULL DEFAULT 'manual',
+    favorito           BOOLEAN          NOT NULL DEFAULT FALSE,
+    dificultad         VARCHAR(10)      NULL,
+    curso_id           INT UNSIGNED     NULL,
+    eliminado_en       DATETIME         NULL,
+    eliminado_por      VARCHAR(50)      NULL,
     creado_en          TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     CONSTRAINT fk_retos_materia
@@ -117,6 +125,9 @@ CREATE TABLE IF NOT EXISTS progreso_estudiante (
     porcentaje     TINYINT UNSIGNED NOT NULL DEFAULT 0,
     xp_obtenido    INT UNSIGNED     NOT NULL DEFAULT 0,
     completado     BOOLEAN          NOT NULL DEFAULT FALSE,
+    -- Libro de Calificaciones (SPEC-006, migración 008).
+    observacion    VARCHAR(400)     NULL,
+    revisado       BOOLEAN          NOT NULL DEFAULT FALSE,
     actualizado_en TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP
                                     ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),

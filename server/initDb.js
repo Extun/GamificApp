@@ -42,6 +42,7 @@ export const inicializarEsquema = async () => {
         await migrarPanelDocente(conn);
         await migrarCatalogoInteligente(conn);
         await migrarUnicidadPapelera(conn);
+        await migrarCentroDocente(conn);
         console.log('✅ Esquema verificado/creado en la base de datos.');
         await asegurarAdmin(conn);
         await asegurarAdminPrincipal(conn);
@@ -258,6 +259,41 @@ const migrarUnicidadPapelera = async (conn) => {
                 (IF(eliminado_en IS NULL, nombre, NULL)),
                 (IF(eliminado_en IS NULL, paralelo, NULL)))`);
         console.log('✅ Migración: unicidad de cursos ahora ignora la papelera.');
+    }
+};
+
+// Migración 008 (SPEC-006) — Centro de Trabajo Docente: metadatos de las
+// actividades (origen IA, favorito, dificultad, curso destino), Papelera de
+// retos y Libro de Calificaciones (observación/revisado por intento).
+const migrarCentroDocente = async (conn) => {
+    if (await faltaColumna(conn, 'retos', 'origen')) {
+        await conn.query(`ALTER TABLE retos
+            ADD COLUMN origen        VARCHAR(10)  NOT NULL DEFAULT 'manual',
+            ADD COLUMN favorito      BOOLEAN      NOT NULL DEFAULT FALSE,
+            ADD COLUMN dificultad    VARCHAR(10)  NULL,
+            ADD COLUMN curso_id      INT UNSIGNED NULL,
+            ADD COLUMN eliminado_en  DATETIME     NULL,
+            ADD COLUMN eliminado_por VARCHAR(50)  NULL`);
+        console.log('✅ Migración: metadatos del centro docente agregados a retos.');
+    }
+    // FK aparte (mismo patrón que fk_retos_docente): en una BD recién creada
+    // `retos` se crea antes que `cursos`, así que la columna llega sin FK.
+    const [[fk]] = await conn.query(
+        `SELECT COUNT(*) AS n FROM information_schema.table_constraints
+         WHERE table_schema = DATABASE() AND table_name = 'retos'
+           AND constraint_name = 'fk_retos_curso'`
+    );
+    if (!fk.n) {
+        await conn.query(`ALTER TABLE retos
+            ADD CONSTRAINT fk_retos_curso FOREIGN KEY (curso_id)
+                REFERENCES cursos (id) ON UPDATE CASCADE ON DELETE SET NULL`);
+        console.log('✅ Migración: FK fk_retos_curso agregada a retos.');
+    }
+    if (await faltaColumna(conn, 'progreso_estudiante', 'observacion')) {
+        await conn.query(`ALTER TABLE progreso_estudiante
+            ADD COLUMN observacion VARCHAR(400) NULL,
+            ADD COLUMN revisado    BOOLEAN      NOT NULL DEFAULT FALSE`);
+        console.log('✅ Migración: observación/revisado agregados a progreso_estudiante.');
     }
 };
 

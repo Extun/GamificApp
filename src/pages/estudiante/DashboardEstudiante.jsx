@@ -16,7 +16,7 @@ import RocketLaunchRoundedIcon from '@mui/icons-material/RocketLaunchRounded';
 import { SidebarLayout } from '../../components/dashboard/SidebarLayout';
 import { FileChip, FilePreviewModal, descargarArchivo } from '../../components/archivos/ArchivoChip';
 import { QuizInteractivo } from '../../components/quiz/QuizInteractivo';
-import { JuegoDragAndDrop } from '../../components/clasificador/JuegoDragAndDrop';
+import { JUEGOS_UI, juegoJugable } from '../../components/juegos/registroJuegos';
 import { MisionNarrativa } from '../../components/mision/MisionNarrativa';
 import AutoStoriesRoundedIcon from '@mui/icons-material/AutoStoriesRounded';
 import { obtenerRetosPublicados } from '../../services/retosService';
@@ -125,8 +125,11 @@ export function DashboardEstudiante() {
         let vigente = true;
         obtenerRetosPublicados({ materiaId: materia.id, tipo: 'quiz' })
             .then((retos) => { if (vigente) setQuizzes(retos.filter((r) => r.configuracion?.preguntas?.length)); });
-        obtenerRetosPublicados({ materiaId: materia.id, tipo: 'clasificador' })
-            .then((retos) => { if (vigente) setJuegos(retos); });
+        // Juegos = todo reto publicado cuyo tipo esté en el registro JUEGOS_UI
+        // (clasificador, memorama, línea del tiempo, completar…): un solo
+        // listado y un solo despacho por tipo, sin pedir tipo por tipo.
+        obtenerRetosPublicados({ materiaId: materia.id })
+            .then((retos) => { if (vigente) setJuegos(retos.filter((r) => JUEGOS_UI[r.tipo] && juegoJugable(r))); });
         obtenerRetosPublicados({ materiaId: materia.id, tipo: 'mision' })
             .then((retos) => { if (vigente) setMisionesRetos(retos.filter((r) => r.configuracion?.desafios?.length)); });
         obtenerMaterial(materia.id)
@@ -450,22 +453,27 @@ export function DashboardEstudiante() {
                                     </div>
                                     {juegos.length > 0 ? (
                                         <ul className="quiz-disponible-lista">
-                                            {juegos.map((j) => (
-                                                <li key={j.id}>
-                                                    <button className="quiz-disponible-item" onClick={() => setJuegoActivo(j)}>
-                                                        <span className="quiz-disponible-icon"><ExtensionRoundedIcon /></span>
-                                                        <span className="quiz-disponible-meta">
-                                                            <span className="quiz-disponible-tema">{j.titulo}</span>
-                                                            <span className="quiz-disponible-sub">
-                                                                Clasificador · {j.configuracion?.categorias?.length || 0} categorías · {j.xp_recompensa} XP
+                                            {juegos.map((j) => {
+                                                const ui = JUEGOS_UI[j.tipo];
+                                                return (
+                                                    <li key={j.id}>
+                                                        <button className="quiz-disponible-item" onClick={() => setJuegoActivo(j)}>
+                                                            <span className="quiz-disponible-icon" aria-hidden="true">
+                                                                {ui?.emoji || <ExtensionRoundedIcon />}
                                                             </span>
-                                                        </span>
-                                                        <span className="quiz-disponible-cta">
-                                                            Jugar <ArrowForwardRoundedIcon sx={{ fontSize: "1rem" }} />
-                                                        </span>
-                                                    </button>
-                                                </li>
-                                            ))}
+                                                            <span className="quiz-disponible-meta">
+                                                                <span className="quiz-disponible-tema">{j.titulo}</span>
+                                                                <span className="quiz-disponible-sub">
+                                                                    {ui?.etiqueta || j.tipo} · {ui?.resumen(j.configuracion)} · {j.xp_recompensa} XP
+                                                                </span>
+                                                            </span>
+                                                            <span className="quiz-disponible-cta">
+                                                                Jugar <ArrowForwardRoundedIcon sx={{ fontSize: "1rem" }} />
+                                                            </span>
+                                                        </button>
+                                                    </li>
+                                                );
+                                            })}
                                         </ul>
                                     ) : (
                                         <p className="vacio-msg">Aún no hay juegos publicados en esta materia. ¡Vuelve pronto!</p>
@@ -524,11 +532,18 @@ export function DashboardEstudiante() {
                                         <h3>{juegoActivo.titulo}</h3>
                                         <button className="back-btn back-btn-inline" onClick={() => setJuegoActivo(null)}>← Otros juegos</button>
                                     </div>
-                                    <JuegoDragAndDrop
-                                        reto={juegoActivo}
-                                        estudianteId={estudianteId}
-                                        onSalir={() => setJuegoActivo(null)}
-                                    />
+                                    {(() => {
+                                        const Player = JUEGOS_UI[juegoActivo.tipo]?.Player;
+                                        return Player ? (
+                                            <Player
+                                                reto={juegoActivo}
+                                                estudianteId={estudianteId}
+                                                onSalir={() => setJuegoActivo(null)}
+                                            />
+                                        ) : (
+                                            <p className="vacio-msg">Este juego no está disponible en tu versión de la app.</p>
+                                        );
+                                    })()}
                                 </section>
                             )}
                         </>

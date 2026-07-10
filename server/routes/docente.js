@@ -201,7 +201,7 @@ router.get('/resumen', async (req, res, next) => {
         // Contenido creado en sus materias, por tipo y estado.
         const [retos] = sinMaterias ? [[]] : await pool.query(
             `SELECT tipo, estado, COUNT(*) AS n FROM retos
-             WHERE materia_id IN (?) GROUP BY tipo, estado`,
+             WHERE materia_id IN (?) AND eliminado_en IS NULL GROUP BY tipo, estado`,
             [materiaIds]
         );
         const [[materiales]] = sinMaterias ? [[{ n: 0 }]] : await pool.query(
@@ -295,7 +295,7 @@ router.get('/estudiantes/:usuarioId/detalle', async (req, res, next) => {
             `SELECT r.titulo, r.tipo, m.nombre AS materia, p.porcentaje,
                     p.xp_obtenido, p.completado, p.actualizado_en
              FROM progreso_estudiante p
-             JOIN retos r ON r.id = p.reto_id
+             JOIN retos r ON r.id = p.reto_id AND r.eliminado_en IS NULL
              JOIN materias m ON m.id = r.materia_id AND m.eliminado_en IS NULL
              WHERE p.estudiante_id = ?
              ORDER BY p.actualizado_en DESC LIMIT 10`,
@@ -306,7 +306,7 @@ router.get('/estudiantes/:usuarioId/detalle', async (req, res, next) => {
                     COUNT(*) AS actividades, SUM(p.completado) AS completadas,
                     ROUND(AVG(p.porcentaje)) AS promedio
              FROM progreso_estudiante p
-             JOIN retos r ON r.id = p.reto_id
+             JOIN retos r ON r.id = p.reto_id AND r.eliminado_en IS NULL
              JOIN materias m ON m.id = r.materia_id AND m.eliminado_en IS NULL
              WHERE p.estudiante_id = ?
              GROUP BY m.id ORDER BY m.orden, m.id`,

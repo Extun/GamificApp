@@ -1817,3 +1817,131 @@
     .materia-hero-emoji { font-size: 2.2rem; }
     .materia-hero-meta h1 { font-size: 1.35rem; }
 }
+
+/* ---- SPEC-006: Centro de trabajo docente ---- */
+
+/* Botón de Actividad sorpresa (la IA elige juego, tema y dificultad) */
+.crear-sorpresa-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    width: 100%;
+    padding: 0.85rem 1.1rem;
+    border: 1.5px dashed var(--color-primary-light);
+    border-radius: var(--radius-md);
+    background: var(--color-primary-soft, #eef2ff);
+    color: var(--color-primary-dark);
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.crear-sorpresa-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.crear-sorpresa-btn:disabled { opacity: 0.7; cursor: wait; }
+
+/* Vista previa editable del generador de actividades con IA */
+.gen-ia-preview { display: flex; flex-direction: column; gap: 0.9rem; margin-top: 1rem; }
+.gen-ia-items { display: flex; flex-direction: column; gap: 0.55rem; }
+.gen-ia-item { display: flex; align-items: center; gap: 0.45rem; }
+.gen-ia-item input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: var(--radius-sm);
+    font: inherit;
+}
+.gen-ia-item input.gen-ia-item-etiqueta { flex: 0 1 130px; }
+.gen-ia-item > button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.35rem;
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    cursor: pointer;
+    color: var(--color-texto-suave, #64748b);
+}
+.gen-ia-item > button:hover { color: var(--color-primary-dark); border-color: var(--color-primary-light); }
+.gen-ia-item-sep { font-size: 1.05rem; color: var(--color-texto-suave, #64748b); }
+.gen-ia-item-num {
+    flex: 0 0 1.6rem;
+    height: 1.6rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--color-primary-soft, #eef2ff);
+    color: var(--color-primary-dark);
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+.gen-ia-frase {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.65rem;
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: var(--radius-md);
+}
+.gen-ia-opciones { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.gen-ia-opcion {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: var(--radius-sm);
+}
+.gen-ia-opcion input[type="text"], .gen-ia-opcion input:not([type="radio"]) {
+    border: none;
+    outline: none;
+    font: inherit;
+    width: 9rem;
+    max-width: 40vw;
+    background: transparent;
+}
+.gen-ia-opcion.is-correcta { border-color: var(--color-exito, #16a34a); background: #f0fdf4; }
+.gen-ia-acciones { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+
+@media (max-width: 640px) {
+    .gen-ia-item { flex-wrap: wrap; }
+    .gen-ia-item input.gen-ia-item-etiqueta { flex-basis: 100%; }
+}
+
+/* Biblioteca IA (SPEC-006) */
+.bib-tabs { margin-bottom: 0.8rem; }
+.bib-fav-filtro {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.9rem;
+    color: var(--color-texto-suave, #64748b);
+    white-space: nowrap;
+}
+.bib-fav-btn {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 0.15rem;
+    display: inline-flex;
+    color: var(--color-texto-suave, #94a3b8);
+}
+.bib-fav-btn:disabled { opacity: 0.4; cursor: default; }
+.bib-origen-ia { font-size: 0.9rem; }
+.bib-preview-lista { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.bib-preview-lista ul { margin: 0.25rem 0 0; padding-left: 1.1rem; }
+.bib-preview-lista .is-correcta { color: var(--color-exito, #16a34a); font-weight: 600; }
+.bib-preview-texto p { margin: 0.4rem 0; }
+.bib-preview-json { overflow-x: auto; font-size: 0.8rem; }
+.bib-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.7rem;
+    margin-bottom: 0.8rem;
+}
+
+/* Libro de Calificaciones (SPEC-006) */
+.libro-calif { display: flex; flex-direction: column; gap: 0.7rem; }
+.libro-toolbar { display: flex; justify-content: flex-end; }

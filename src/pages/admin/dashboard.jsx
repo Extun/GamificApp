@@ -54,6 +54,8 @@ const leerComoDataUrl = (file) => new Promise((resolve, reject) => {
 import { GeneradorQuiz } from './GeneradorQuiz';
 import { GeneradorMision } from './GeneradorMision';
 import { EditorClasificador } from '../../components/clasificador/EditorClasificador';
+import { GeneradorActividadIA } from '../../components/juegos/GeneradorActividadIA';
+import { actividadSorpresa } from '../../services/iaService';
 import { LibroCalificaciones } from '../../components/dashboard/LibroCalificaciones';
 import { Grid, Card } from '@mui/material';
 import { SidebarLayout } from '../../components/dashboard/SidebarLayout';
@@ -352,6 +354,26 @@ export function Dashboard() {
 
     const [tabMateria, setTabMateria] = useState('crear');
 
+    // ✨ Actividad sorpresa (SPEC-006 Fase 3): la IA decide juego, tema,
+    // dificultad y cantidad, y guarda un BORRADOR (nunca publica sola).
+    const [sorpresaCargando, setSorpresaCargando] = useState(false);
+    const [sorpresaResultado, setSorpresaResultado] = useState(null);
+    const generarSorpresa = async () => {
+        const materiaId = materiaIdPorNombre(materiaSeleccionada);
+        if (!materiaId || sorpresaCargando) return;
+        setSorpresaCargando(true);
+        setErrorMaterial('');
+        setSorpresaResultado(null);
+        try {
+            const data = await actividadSorpresa({ materiaId });
+            setSorpresaResultado(data);
+        } catch (err) {
+            setErrorMaterial(`No se pudo generar la actividad sorpresa: ${err.message}`);
+        } finally {
+            setSorpresaCargando(false);
+        }
+    };
+
     const handleUploadMateria = async (materia, file, { isPrivate = false } = {}) => {
         const kind = getKind(file.name);
         const archivo = {
@@ -631,6 +653,12 @@ export function Dashboard() {
                                 <button onClick={() => setErrorMaterial('')}>Entendido</button>
                             </div>
                         )}
+                        {avisoOk && (
+                            <div className="admin-aviso-ok" role="status">
+                                <p>{avisoOk}</p>
+                                <button onClick={() => setAvisoOk('')}>OK</button>
+                            </div>
+                        )}
 
                         <nav className="doc-tabs" aria-label="Secciones de la materia">
                             {[
@@ -696,34 +724,14 @@ export function Dashboard() {
                         )}
 
                         {tabMateria === 'actividades' && (
-                            <SectionCard
-                                titulo={`Actividades de ${materiaSeleccionada}`}
-                                Icon={TaskAltRoundedIcon}
-                                tag={retosMateria.length ? `${retosMateria.length}` : undefined}
-                                accion={{ label: 'Gestionar en la Biblioteca', onClick: () => setPagina('biblioteca') }}
-                            >
-                                {retosMateria.length ? (
-                                    <ul className="actividad-lista">
-                                        {retosMateria.map((r) => (
-                                            <li key={r.id} className="actividad-item">
-                                                <span className="actividad-icono"><TaskAltRoundedIcon /></span>
-                                                <div className="actividad-meta">
-                                                    <strong>{r.titulo}</strong>
-                                                    <span>{TIPO_RETO_LABEL[r.tipo] || r.tipo} · ⭐ {r.xp_recompensa} XP{r.descripcion ? ` · ${r.descripcion}` : ''}</span>
-                                                </div>
-                                                <span className="actividad-fecha">{formatearFecha(r.creado_en)}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <EmptyState
-                                        Icon={TaskAltRoundedIcon}
-                                        titulo="Sin actividades publicadas"
-                                        mensaje="Las actividades que publiques en esta materia aparecerán aquí para tus estudiantes."
-                                        accion={{ label: 'Crear actividad', onClick: () => setTabMateria('crear') }}
-                                    />
-                                )}
-                            </SectionCard>
+                            // SPEC-006 Fase 6: la pestaña Actividades ES la Biblioteca
+                            // pre-filtrada por esta materia (borradores, publicadas,
+                            // archivadas, papelera, filtros y estadísticas incluidos).
+                            <BibliotecaActividades
+                                materiaId={materiaIdPorNombre(materiaSeleccionada)}
+                                onAviso={setAvisoOk}
+                                onError={setErrorMaterial}
+                            />
                         )}
 
                         {tabMateria === 'crear' && (
@@ -732,6 +740,30 @@ export function Dashboard() {
                                 <h2>¿Qué actividad quieres crear hoy?</h2>
                                 <p>Elige un tipo, revisa el contenido y publícalo para tus estudiantes.</p>
                             </div>
+
+                            <button
+                                type="button"
+                                className="crear-sorpresa-btn"
+                                onClick={generarSorpresa}
+                                disabled={sorpresaCargando}
+                            >
+                                {sorpresaCargando
+                                    ? <span className="quiz-spinner" aria-hidden="true" />
+                                    : <AutoAwesomeRoundedIcon sx={{ fontSize: '1.15rem' }} />}
+                                {sorpresaCargando
+                                    ? 'La IA está preparando tu sorpresa…'
+                                    : '✨ Actividad sorpresa: la IA elige el juego, el tema y la dificultad'}
+                            </button>
+                            {sorpresaResultado && (
+                                <div className="admin-aviso-ok" role="status">
+                                    <p>
+                                        Borrador creado: «{sorpresaResultado.reto.titulo}» ({sorpresaResultado.reto.tipo}).
+                                        {sorpresaResultado.objetivo ? ` Objetivo: ${sorpresaResultado.objetivo}` : ''}{' '}
+                                        Revísalo en la pestaña Actividades o en la Biblioteca para editarlo o publicarlo.
+                                    </p>
+                                    <button onClick={() => setSorpresaResultado(null)}>OK</button>
+                                </div>
+                            )}
 
                             <div className="crear-tipos">
                                 <button
@@ -758,6 +790,30 @@ export function Dashboard() {
                                     <strong>Misión Narrativa</strong>
                                     <span className="crear-tipo-desc">Una historia por capítulos con desafíos para avanzar</span>
                                 </button>
+                                <button
+                                    className={`crear-tipo ${subVistaMateria === 'memorama' ? 'crear-tipo-activo' : ''}`}
+                                    onClick={() => setSubVistaMateria('memorama')}
+                                >
+                                    <span className="crear-tipo-emoji" aria-hidden="true">🃏</span>
+                                    <strong>Memorama</strong>
+                                    <span className="crear-tipo-desc">Parejas para emparejar, generadas con IA desde un tema</span>
+                                </button>
+                                <button
+                                    className={`crear-tipo ${subVistaMateria === 'linea-tiempo' ? 'crear-tipo-activo' : ''}`}
+                                    onClick={() => setSubVistaMateria('linea-tiempo')}
+                                >
+                                    <span className="crear-tipo-emoji" aria-hidden="true">⏳</span>
+                                    <strong>Línea del tiempo</strong>
+                                    <span className="crear-tipo-desc">Eventos o pasos para ordenar, generados con IA</span>
+                                </button>
+                                <button
+                                    className={`crear-tipo ${subVistaMateria === 'completar' ? 'crear-tipo-activo' : ''}`}
+                                    onClick={() => setSubVistaMateria('completar')}
+                                >
+                                    <span className="crear-tipo-emoji" aria-hidden="true">✏️</span>
+                                    <strong>Completar espacios</strong>
+                                    <span className="crear-tipo-desc">Frases con espacios en blanco y opciones, con IA</span>
+                                </button>
                             </div>
 
                             {subVistaMateria === 'quiz' && (
@@ -770,6 +826,10 @@ export function Dashboard() {
 
                             {subVistaMateria === 'clasificador' && (
                                 <EditorClasificador materia={materiaSeleccionada} />
+                            )}
+
+                            {['memorama', 'linea-tiempo', 'completar'].includes(subVistaMateria) && (
+                                <GeneradorActividadIA key={subVistaMateria} materia={materiaSeleccionada} tipo={subVistaMateria} />
                             )}
                         </section>
                         )}

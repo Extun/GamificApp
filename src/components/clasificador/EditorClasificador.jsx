@@ -5,7 +5,9 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import RocketLaunchRoundedIcon from '@mui/icons-material/RocketLaunchRounded';
 import CategoryRoundedIcon from '@mui/icons-material/CategoryRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
+import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import { idPorNombre } from '../../services/materiasService';
+import { generarActividadIA } from '../../services/iaService';
 import { publicarReto } from '../../services/retosService';
 import { PUNTOS_POR_ACIERTO } from '../../services/gamificationService';
 import './editorClasificador.css';
@@ -31,6 +33,11 @@ export function EditorClasificador({ materia }) {
     ]);
     // Texto en el input "nuevo elemento" de cada categoría, por id.
     const [nuevoElemento, setNuevoElemento] = useState({});
+    // «Generar con IA» (SPEC-006): el docente escribe el tema y la IA llena
+    // título, categorías y elementos en ESTE mismo editor (misma ruta genérica
+    // que memorama/línea del tiempo/completar).
+    const [temaIA, setTemaIA] = useState('');
+    const [generandoIA, setGenerandoIA] = useState(false);
     const [publicando, setPublicando] = useState(false);
     // Tras publicar, el botón queda bloqueado hasta que el docente edite algo:
     // así un doble clic no crea el mismo juego dos veces.
@@ -72,6 +79,36 @@ export function EditorClasificador({ materia }) {
 
     const eliminarElemento = (cat, indice) => {
         editarCategoria(cat.id, { elementos: cat.elementos.filter((_, i) => i !== indice) });
+    };
+
+    const generarConIA = async (e) => {
+        e.preventDefault();
+        if (!temaIA.trim() || generandoIA) return;
+        if (!materiaId) {
+            setError('No se reconoce la materia actual; recarga la página.');
+            return;
+        }
+        setGenerandoIA(true);
+        setError('');
+        setAviso('');
+        try {
+            const data = await generarActividadIA({
+                tipo: 'clasificador',
+                materiaId,
+                tema: temaIA.trim()
+            });
+            setTitulo(data.titulo);
+            setCategorias((data.configuracion?.categorias || []).map((c) => ({
+                id: idUnico(),
+                nombre: c.nombre,
+                elementos: c.elementos
+            })));
+            setPublicado(false);
+        } catch (err) {
+            setError(`No se pudo generar con la IA: ${err.message}`);
+        } finally {
+            setGenerandoIA(false);
+        }
     };
 
     const publicar = async () => {
@@ -121,6 +158,25 @@ export function EditorClasificador({ materia }) {
                 arrastrar a la canasta correcta. Consejo: empieza cada elemento con un emoji
                 (ej. <em>🐬 Delfín</em>) para que sea más visual para los niños.
             </p>
+
+            <form className="quiz-form" onSubmit={generarConIA}>
+                <label className="quiz-field">
+                    <span>Tema (para generar con IA)</span>
+                    <input
+                        type="text"
+                        value={temaIA}
+                        onChange={(e) => setTemaIA(e.target.value)}
+                        placeholder="Ej. Animales vertebrados e invertebrados"
+                        maxLength={200}
+                    />
+                </label>
+                <button type="submit" className="quiz-generar-btn" disabled={generandoIA || !temaIA.trim()}>
+                    {generandoIA
+                        ? <span className="quiz-spinner" aria-hidden="true" />
+                        : <AutoAwesomeRoundedIcon sx={{ fontSize: '1.1rem' }} />}
+                    {generandoIA ? 'Generando…' : 'Generar con IA'}
+                </button>
+            </form>
 
             <label className="quiz-field clasificador-titulo-field">
                 <span>Título del reto</span>

@@ -27,6 +27,17 @@ El **MVP está completo y en producción** (Vercel + Render + Aiven). Los tres r
 > - Migraciones versionadas en `database/migraciones/002-admin-center.sql` (+ reversa). `initDb.js` las aplica de forma idempotente al arrancar. **Falta el paso 7 de la spec: backup de Aiven + aplicar migración + deploy.**
 > - Editores (Quiz/Clasificador) con candado anti doble publicación (botón "Publicado" hasta editar algo).
 
+> **SPEC-006 — Centro de Trabajo Docente / Materias + IA (2026-07-09, implementada en código; migración 008 a Aiven PENDIENTE):**
+> - **BD (migración `008-centro-docente.sql` + reversa, idempotente en `initDb.js`):** `retos` gana `origen` ('manual'|'ia'), `favorito`, `dificultad`, `curso_id` (FK a cursos) y papelera propia (`eliminado_en`/`eliminado_por`); `progreso_estudiante` gana `observacion` y `revisado`.
+> - **Arquitectura de IA reutilizable:** `server/lib/iaCliente.js` (cliente Gemini + reintentos, `generarJSON`), `server/lib/actividadesIA.js` (registro por tipo: schema + prompt con contexto REAL de BD —materia/nivel/competencias, curso, institución, dificultad— + normalización) y `server/lib/validadoresRetos.js` (validadores compartidos por `retos.js` y la IA). Cero prompts duplicados; agregar un juego = una entrada en el registro + validador + reproductor.
+> - **Endpoints IA:** `POST /api/ia/generar` (genérico, 6 tipos, valida y NO guarda), `POST /api/ia/sorpresa` (la IA decide juego/tema/dificultad/cantidad/objetivo y guarda BORRADOR), `POST /api/ia/adaptar` (transforma una actividad existente —materia/curso/dificultad/temática/tema— manteniendo el formato; guarda copia en borrador). `/api/ia/quiz` y `/api/ia/mision` se conservan por compatibilidad delegando en el registro. Todo con `soloDocente` + materia asignada + auditoría.
+> - **3 juegos nuevos 100% genéricos** (mismo pipeline `retos` → `configuracion_json` → reproductor → `POST /api/progreso`): **Memorama** (`parejas`), **Línea del tiempo** (`eventos` a ordenar; sirve para procesos/algoritmos) y **Completar espacios** (`frases` con `___` y opciones). Reproductores en `src/components/juegos/` con registro frontend `registroJuegos.jsx` (`JUEGOS_UI`): la pestaña Juegos del estudiante lista TODOS los tipos jugables y despacha por `tipo` (ya no solo clasificador).
+> - **Creación docente:** componente único `GeneradorActividadIA` (tema + cantidad + dificultad + curso → vista previa editable → borrador o publicar) para los 3 juegos; el Clasificador ganó «✨ Generar con IA» que llena su editor; botón «✨ Actividad sorpresa» en la pestaña Crear.
+> - **Biblioteca IA (`BibliotecaActividades` ampliada):** pestañas Todas/Borradores/Publicadas/Archivadas/**Papelera** (restaurar/purgar; la purga se rechaza si hay progreso), filtros por tipo/materia/origen ✨IA-manual/curso/dificultad/favoritas, orden «más utilizadas», ⭐ favorito, 👁 vista previa (GET `/api/retos/:id`, render de la configuración por tipo), 📊 estadísticas reales (GET `/api/retos/:id/estadisticas`: intentos, completados, promedio, mejor/peor, XP entregada — sin datos por pregunta ni tiempos: la BD no los registra), ✨ Adaptar con IA. La pestaña **Actividades** de la vista de materia reutiliza este mismo componente con `materiaId` (cero duplicados). `DELETE /api/retos/:id` es soft-delete a papelera.
+> - **Libro de Calificaciones real:** TablaPro por materia con detalle por intento (`ModalPanel`): observación + revisado (`PATCH /api/progreso/:est/:reto`, docente solo sobre SUS estudiantes) y ajuste manual de XP reutilizando `POST /api/progreso` (transacción `FOR UPDATE` e idempotencia intactas: solo abona mejoras). Todo ajuste queda en Auditoría (`ajusto-progreso`).
+> - Verificado: `npm run build` limpio, lint con los mismos patrones React documentados (MASTER_PLAN §3.12), app cargando en navegador. **Sin MySQL local: la verificación end-to-end (IA, papelera, calificaciones) queda para el deploy con la migración 008.**
+> - Spec: `docs/specifications/SPEC-006-Centro-Trabajo-Docente.md` (la numeración SPEC-003 ya estaba ocupada por Panel Admin Fase 2).
+
 > **Endurecimiento por auditoría externa (2026-07-09):** correcciones puntuales sin cambios de esquema ni de arquitectura: (1) un docente solo registra XP (`POST /api/progreso`) de estudiantes que él invitó (misma regla que resetear PIN); (2) los estudiantes ya no acceden a retos ni material de materias desactivadas por ID directo; (3) el DELETE de curso también rechaza cursos con invitaciones pendientes vigentes; (4) nombre + paralelo del curso se validan a máx. 19 caracteres en total (límite de las columnas VARCHAR(20) denormalizadas); (5) el PUT de cursos sincroniza catálogo y denormalizados en una transacción; (6) los textos institucionales hardcodeados en Home admin y Registro ahora usan `institucionService`; (7) ESLint con globals de Node para `server/` (lint: 38 → 15 errores; los 15 restantes son patrones de React documentados en MASTER_PLAN §3). Los hallazgos que requieren migración de BD quedaron en el backlog (MASTER_PLAN §3, ítems 7–14).
 
 > **Módulo Administradores (2026-07-09, adelantado de la Fase 2 de SPEC-002; migración a Aiven PENDIENTE):**
@@ -72,11 +83,13 @@ El **MVP está completo y en producción** (Vercel + Render + Aiven). Los tres r
 | Gestión de docentes (admin) | ✅ Completo — rediseño del panel admin (2026-07-09): formulario de alta como asistente en 2 pasos con materias como tarjetas pastel, lista de docentes con chips por materia y modal "Editar materias" que consume el `PUT /api/admin/docentes/:id` existente (agregar/quitar materias sin recrear al docente) |
 | Gestión de estudiantes e invitaciones | ✅ Completo — rediseño (2026-07-09): tabla de estudiantes con avatares y chips de curso; Invitaciones dividida en "Pendientes" (pendiente/expirado, con eliminación previa confirmación vía nuevo `DELETE /api/admin/invitaciones/:id`, que rechaza códigos usados) e "Historial de utilizadas" (solo lectura, con fecha de uso = fecha de registro del estudiante, sin columna nueva en BD). Home del admin con hero institucional, accesos rápidos y ancho máximo 1100px centrado |
 | Material de estudio (base64 en MySQL, preview PDF/docx) | ✅ Completo |
-| Generador de Quiz (IA + editor) / Clasificador / Misión Narrativa (IA) | ✅ Completo (crear y jugar) |
+| Generador de Quiz (IA + editor) / Clasificador / Misión Narrativa (IA) | ✅ Completo (crear y jugar) — el Clasificador ahora también genera con IA (SPEC-006) |
+| Memorama / Línea del tiempo / Completar espacios (100% IA, genéricos) | ✅ Completo (2026-07-09, SPEC-006: crear con `GeneradorActividadIA` y jugar vía registro `JUEGOS_UI`) |
+| Actividad sorpresa / Adaptar con IA / Biblioteca IA con papelera y estadísticas | ✅ Completo en código (2026-07-09, SPEC-006; end-to-end pendiente de deploy) |
 | XP / niveles / ranking | ✅ Completo (transaccional, idempotente) |
 | Logros | 🟡 Parcial — 2 de 5 con lógica real (`racha-7`, `estrella-aula`, `explorador` sin desbloqueo) |
 | Dashboards de los 3 roles con datos 100% reales | ✅ Completo — Panel Docente rediseñado por completo (2026-07-09, SPEC-004; Home simplificado como centro de trabajo el 2026-07-09): Home con materias como foco, Centro de actividad tipo timeline y resumen en 2 tarjetas, Biblioteca de Actividades, vista de materia en pestañas, Ranking completo, Mi Perfil y ficha rápida de estudiante con retroalimentación |
-| Libro de Calificaciones | 🔴 Placeholder vacío |
+| Libro de Calificaciones | ✅ Completo (2026-07-09, SPEC-006: detalle por intento, observación, revisado, ajuste manual de XP con auditoría) |
 | Asistente IA | ⚪ Retirado del menú (2026-07-08, Polish Sprint): la IA solo se usa dentro de los generadores de actividades. `asistenteIA.jsx` y la ruta `/api/ia/asistente` siguen existiendo pero sin entrada en la UI |
 | Navegación | 🔴 3 rutas planas (`/`, `/registro`, `/dashboard`); todo lo interno con `useState`, sin sub-rutas |
 
@@ -98,7 +111,7 @@ Insumos: `docs/audit/Auditoria-UX-Estudiante-v1.md` y `docs/specifications/SPEC-
 
 ## 4. Backlog secundario (antes de defensa de tesis, si hay tiempo)
 
-1. Libro de Calificaciones real (consume `GET /api/progreso/:id`, ya existente).
+1. ~~Libro de Calificaciones real~~ ✅ Hecho (2026-07-09, SPEC-006).
 2. Lógica de los 3 logros faltantes.
 3. ~~UI de edición de docente~~ ✅ Hecho (2026-07-09, rediseño panel admin).
 4. ~~Unificar fuente de materias~~ ✅ Hecho (2026-07-09, SPEC-002 Fase 1).
