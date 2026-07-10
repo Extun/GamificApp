@@ -885,30 +885,44 @@ export function Dashboard() {
                             </div>
                         )}
 
+                        {errorMaterial && (
+                            <div className="aviso-migracion" role="alert">
+                                <p>{errorMaterial}</p>
+                                <button onClick={() => setErrorMaterial('')}>Entendido</button>
+                            </div>
+                        )}
+
                         <section className="card">
                             <div className="card-head">
                                 <h3><VpnKeyRoundedIcon sx={{ fontSize: '1.1rem', verticalAlign: 'middle' }} /> Generar invitaciones</h3>
                             </div>
-                            <form className="admin-form" onSubmit={handleGenerarInvitaciones}>
-                                <select
-                                    value={invCursoId}
-                                    onChange={(e) => setInvCursoId(e.target.value)}
-                                    aria-label="Curso de los estudiantes"
-                                >
-                                    <option value="">Elige el curso…</option>
-                                    {cursos.map((c) => (
-                                        <option key={c.id} value={c.id}>{c.etiqueta}</option>
-                                    ))}
-                                </select>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max="40"
-                                    value={invCantidad}
-                                    onChange={(e) => setInvCantidad(Number(e.target.value))}
-                                />
-                                <button type="submit" className="upload-mini-btn">Generar códigos</button>
-                            </form>
+                            {cursos.length === 0 ? (
+                                <p className="contenido-sub" style={{ margin: 0 }}>
+                                    Todavía no hay cursos disponibles. Pídele al administrador que cree
+                                    un curso en su panel para poder generar códigos de invitación.
+                                </p>
+                            ) : (
+                                <form className="admin-form" onSubmit={handleGenerarInvitaciones}>
+                                    <select
+                                        value={invCursoId}
+                                        onChange={(e) => setInvCursoId(e.target.value)}
+                                        aria-label="Curso de los estudiantes"
+                                    >
+                                        <option value="">Elige el curso…</option>
+                                        {cursos.map((c) => (
+                                            <option key={c.id} value={c.id}>{c.etiqueta}</option>
+                                        ))}
+                                    </select>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="40"
+                                        value={invCantidad}
+                                        onChange={(e) => setInvCantidad(Number(e.target.value))}
+                                    />
+                                    <button type="submit" className="upload-mini-btn">Generar códigos</button>
+                                </form>
+                            )}
                             {codigosNuevos.length > 0 && (
                                 <div className="inv-codigos-nuevos">
                                     {codigosNuevos.map((c) => <code key={c}>{c}</code>)}
