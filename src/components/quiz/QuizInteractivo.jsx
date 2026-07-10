@@ -107,7 +107,7 @@ export function LogroToast({ titulo = '¡Logro desbloqueado!', mensaje, icono, o
 // Si recibe `estudianteId` y `reto` ({ id } o { materiaId, titulo }), además
 // persiste el resultado en la BD central vía la API y confirma el guardado
 // con un toast.
-export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteId, reto }) {
+export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteId, reto, onCompletado }) {
     const [aciertos, setAciertos] = useState(0);
     const [respondidas, setRespondidas] = useState(0);
     const [puntosGanados, setPuntosGanados] = useState(0);
@@ -154,6 +154,7 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
         }
 
         servidor.then((data) => {
+            onCompletado?.();
             if (!data) return;
             const mision = data.nuevas_misiones?.[0];
             if (mision) {
@@ -166,7 +167,7 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
                 });
             }
         });
-    }, [completado, aciertos, total, estudianteId, reto]);
+    }, [completado, aciertos, total, estudianteId, reto, onCompletado]);
 
     return (
         <div className="quiz-interactivo" key={claveQuiz}>

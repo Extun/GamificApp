@@ -37,7 +37,7 @@ const partirEmoji = (texto) => {
     return match ? { emoji: match[1], label: match[2] || '' } : { emoji: null, label: texto };
 };
 
-export function JuegoDragAndDrop({ reto, estudianteId, onSalir }) {
+export function JuegoDragAndDrop({ reto, estudianteId, onSalir, onCompletado }) {
     const categorias = reto?.configuracion?.categorias || [];
 
     // Aplana la configuración del docente en fichas jugables y las mezcla.
@@ -118,6 +118,7 @@ export function JuegoDragAndDrop({ reto, estudianteId, onSalir }) {
         }
 
         servidor.then((data) => {
+            onCompletado?.();
             if (!data) return;
             const mision = data.nuevas_misiones?.[0];
             if (mision) {
@@ -130,7 +131,7 @@ export function JuegoDragAndDrop({ reto, estudianteId, onSalir }) {
                 });
             }
         });
-    }, [completado, aciertos, total, estudianteId, reto]);
+    }, [completado, aciertos, total, estudianteId, reto, onCompletado]);
 
     // Permite reintentar tras reiniciar la partida.
     useEffect(() => {

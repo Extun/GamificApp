@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../admin/dashboard.css';
 import './dashboardEstudiante.css';
@@ -18,7 +18,7 @@ import { MisionNarrativa } from '../../components/mision/MisionNarrativa';
 import AutoStoriesRoundedIcon from '@mui/icons-material/AutoStoriesRounded';
 import { obtenerRetosPublicados } from '../../services/retosService';
 import ExtensionRoundedIcon from '@mui/icons-material/ExtensionRounded';
-import gamificationService from '../../services/gamificationService';
+import gamificationService, { XP_POR_NIVEL } from '../../services/gamificationService';
 import authService from '../../services/authService';
 import { obtenerMaterial } from '../../services/materialesService';
 import { listarMaterias, uiMateria } from '../../services/materiasService';
@@ -65,45 +65,53 @@ export function DashboardEstudiante() {
     // Identidad del estudiante en sesión: habilita la persistencia en MySQL.
     const estudianteId = gamificationService.getEstudianteId();
 
-    // Fuerza un re-render cuando llega la sincronización con el servidor.
-    const [, setSync] = useState(0);
+    // Contador que fuerza releer el progreso del servidor tras completar una
+    // actividad (lo disparan los reproductores mediante onCompletado).
+    const [refrescar, setRefrescar] = useState(0);
+    const refrescarProgreso = useCallback(() => setRefrescar((n) => n + 1), []);
 
-    // Datos reales de gamificación: se leen en cada render, así que reflejan el
-    // XP/los logros más recientes al cambiar de página o al salir de un quiz.
+    // Caché local de gamificación (localStorage): SOLO respaldo mientras el
+    // servidor responde. La fuente de verdad es la BD (misionesResumen).
     const gami = gamificationService.getResumen();
 
-    // Resumen de misiones del servidor (SPEC-007): fuente de verdad del conteo
-    // de premios, compartida con la página "Mis Premios". Se prefiere sobre el
-    // contador local de logros; si el servidor aún no responde (p. ej. antes de
-    // la migración 009), la tarjeta cae al conteo en caché sin romperse.
+    // Resumen del servidor (SPEC-007): XP, nivel, racha y premios REALES,
+    // compartido con "Mis Premios". Se refresca al entrar al Home y cada vez que
+    // se completa una actividad, para que la barra de XP refleje el cambio.
     const [misionesResumen, setMisionesResumen] = useState(null);
+
+    // Retos publicados: fallback de "Continuar aprendiendo". Basta cargarlos al
+    // entrar; no dependen del progreso ni de la página activa.
     useEffect(() => {
         let vigente = true;
-        obtenerMisiones()
-            .then((res) => { if (vigente && res?.resumen) setMisionesResumen(res.resumen); })
-            .catch(() => { /* sin red: la tarjeta usa el conteo en caché */ });
+        obtenerRetosPublicados()
+            .then((retos) => { if (vigente) setRetosDisponibles(retos); })
+            .catch(() => { /* sin red: el Home muestra su estado vacío */ });
         return () => { vigente = false; };
     }, []);
+
+    // Progreso oficial (XP por reto) + resumen de misiones desde la BD. Se
+    // vuelve a leer al llegar al Home y tras completar una actividad, así el
+    // XP/nivel/premios del Home siempre muestran la verdad del servidor.
+    useEffect(() => {
+        if (!estudianteId || pagina !== '') return;
+        let vigente = true;
+        gamificationService.obtenerProgreso(estudianteId).then((data) => {
+            if (vigente && Array.isArray(data?.progreso)) setProgresoDetalle(data.progreso);
+        });
+        obtenerMisiones()
+            .then((res) => { if (vigente && res?.resumen) setMisionesResumen(res.resumen); })
+            .catch(() => { /* sin red: la barra usa el respaldo en caché */ });
+        return () => { vigente = false; };
+    }, [estudianteId, pagina, refrescar]);
+
+    // Valores de la barra de nivel: se prefiere el servidor; si aún no
+    // respondió, se cae al caché local para no mostrar la barra vacía.
+    const xpMostrado = misionesResumen ? misionesResumen.xp : gami.xp;
+    const nivelMostrado = misionesResumen ? misionesResumen.nivel : gami.nivel;
+    const porcentajeNivel = Math.round(((xpMostrado % XP_POR_NIVEL) / XP_POR_NIVEL) * 100);
+    const rachaActual = misionesResumen?.racha_actual || 0;
     // Conteo de premios consistente con la página de Premios.
     const premiosGanados = misionesResumen ? misionesResumen.completadas : gami.totalLogros;
-
-    // Al entrar: trae de la BD el XP oficial del estudiante, su avance por
-    // reto y los retos publicados; refresca al llegar.
-    useEffect(() => {
-        let vigente = true;
-        const tareas = [
-            obtenerRetosPublicados().then((retos) => {
-                if (vigente) setRetosDisponibles(retos);
-            })
-        ];
-        if (estudianteId) {
-            tareas.push(gamificationService.obtenerProgreso(estudianteId).then((data) => {
-                if (vigente && Array.isArray(data?.progreso)) setProgresoDetalle(data.progreso);
-            }));
-        }
-        Promise.allSettled(tareas).then(() => { if (vigente) setSync((s) => s + 1); });
-        return () => { vigente = false; };
-    }, [estudianteId]);
 
     // Carga desde la BD los quizzes y juegos publicados y el material de la
     // materia abierta. Si la red falla, los servicios devuelven [] y las
@@ -232,11 +240,16 @@ export function DashboardEstudiante() {
                                 <div className="home-saludo-meta">
                                     <h1>¡Hola, {nombreEstudiante.split(' ')[0]}! 👋</h1>
                                     <div className="home-nivel">
-                                        <span className="home-nivel-badge">Nivel {gami.nivel}</span>
+                                        <span className="home-nivel-badge">Nivel {nivelMostrado}</span>
                                         <div className="progress-track home-nivel-track">
-                                            <div className="progress-fill" style={{ width: `${gami.porcentaje}%` }} />
+                                            <div className="progress-fill" style={{ width: `${porcentajeNivel}%` }} />
                                         </div>
-                                        <span className="home-nivel-xp">⭐ {gami.xp} XP</span>
+                                        <span className="home-nivel-xp">⭐ {xpMostrado} XP</span>
+                                        {rachaActual > 0 && (
+                                            <span className="home-nivel-racha" title="Días seguidos jugando">
+                                                🔥 {rachaActual}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             </header>
@@ -433,6 +446,7 @@ export function DashboardEstudiante() {
                                         mostrarPuntaje
                                         estudianteId={estudianteId}
                                         reto={quizActivo}
+                                        onCompletado={refrescarProgreso}
                                     />
                                 </section>
                             )}
@@ -513,6 +527,7 @@ export function DashboardEstudiante() {
                                         reto={misionActiva}
                                         estudianteId={estudianteId}
                                         onSalir={() => setMisionActiva(null)}
+                                        onCompletado={refrescarProgreso}
                                     />
                                 </section>
                             )}
@@ -530,6 +545,7 @@ export function DashboardEstudiante() {
                                                 reto={juegoActivo}
                                                 estudianteId={estudianteId}
                                                 onSalir={() => setJuegoActivo(null)}
+                                                onCompletado={refrescarProgreso}
                                             />
                                         ) : (
                                             <p className="vacio-msg">Este juego no está disponible en tu versión de la app.</p>

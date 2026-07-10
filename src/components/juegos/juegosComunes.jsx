@@ -22,7 +22,9 @@ export const mezclar = (arr) => {
 
 // Hook de recompensa: al completarse el juego suma XP/logros una sola vez y
 // persiste en la BD central. `semilla` reinicia el candado al volver a jugar.
-export const useRecompensa = ({ completado, estudianteId, reto, tipo, aciertos, total, semilla }) => {
+// `onCompletado` avisa al contenedor (el Home) cuando el servidor confirma el
+// progreso, para que refresque el XP/nivel/premios con la verdad de la BD.
+export const useRecompensa = ({ completado, estudianteId, reto, tipo, aciertos, total, semilla, onCompletado }) => {
     const [puntosGanados, setPuntosGanados] = useState(0);
     const [toast, setToast] = useState(null);
     const recompensado = useRef(false);
@@ -47,6 +49,9 @@ export const useRecompensa = ({ completado, estudianteId, reto, tipo, aciertos, 
             setToast({ mensaje: nuevosLogros[0].titulo });
         }
         servidor.then((data) => {
+            // Avisa siempre (aunque la red fallara): el Home vuelve a leer la
+            // verdad de la BD y así la barra de XP refleja el cambio al instante.
+            onCompletado?.();
             if (!data) return;
             const mision = data.nuevas_misiones?.[0];
             if (mision) {
@@ -59,7 +64,7 @@ export const useRecompensa = ({ completado, estudianteId, reto, tipo, aciertos, 
                 });
             }
         });
-    }, [completado, aciertos, total, estudianteId, reto, tipo]);
+    }, [completado, aciertos, total, estudianteId, reto, tipo, onCompletado]);
 
     return { puntosGanados, toast, setToast };
 };

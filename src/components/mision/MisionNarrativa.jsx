@@ -21,7 +21,7 @@ import './misionNarrativa.css';
 
 const LETRAS = ['A', 'B', 'C'];
 
-export function MisionNarrativa({ reto, estudianteId, onSalir }) {
+export function MisionNarrativa({ reto, estudianteId, onSalir, onCompletado }) {
     const mision = reto?.configuracion || {};
     const desafios = mision.desafios || [];
     const total = desafios.length;
@@ -88,6 +88,7 @@ export function MisionNarrativa({ reto, estudianteId, onSalir }) {
         }
 
         servidor.then((data) => {
+            onCompletado?.();
             if (!data) return;
             const mision = data.nuevas_misiones?.[0];
             if (mision) {

@@ -9,7 +9,7 @@ import TouchAppRoundedIcon from '@mui/icons-material/TouchAppRounded';
 import { mezclar, useRecompensa, PantallaFinal, LogroToast } from './juegosComunes';
 import './juegos.css';
 
-export function Memorama({ reto, estudianteId, onSalir }) {
+export function Memorama({ reto, estudianteId, onSalir, onCompletado }) {
     const parejas = reto?.configuracion?.parejas || [];
     const instruccion = reto?.configuracion?.instruccion || 'Encuentra las parejas que se corresponden.';
 
@@ -35,7 +35,7 @@ export function Memorama({ reto, estudianteId, onSalir }) {
     ).length;
 
     const { puntosGanados, toast, setToast } = useRecompensa({
-        completado, estudianteId, reto, tipo: 'memorama', aciertos, total, semilla
+        completado, estudianteId, reto, tipo: 'memorama', aciertos, total, semilla, onCompletado
     });
 
     const reiniciar = () => {
