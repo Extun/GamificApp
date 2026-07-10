@@ -14,15 +14,15 @@ const pedir = async (ruta, options = {}) => {
 };
 
 export const listarDocentes = () => pedir('/api/admin/docentes');
-export const crearDocente = ({ username, password, materiaIds }) =>
+export const crearDocente = ({ username, password, materiaIds, cursoIds }) =>
     pedir('/api/admin/docentes', {
         method: 'POST',
-        body: JSON.stringify({ username, password, materia_ids: materiaIds })
+        body: JSON.stringify({ username, password, materia_ids: materiaIds, curso_ids: cursoIds })
     });
-export const actualizarDocente = (id, { password, materiaIds }) =>
+export const actualizarDocente = (id, { password, materiaIds, cursoIds }) =>
     pedir(`/api/admin/docentes/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({ password, materia_ids: materiaIds })
+        body: JSON.stringify({ password, materia_ids: materiaIds, curso_ids: cursoIds })
     });
 export const eliminarDocente = (id) => pedir(`/api/admin/docentes/${id}`, { method: 'DELETE' });
 

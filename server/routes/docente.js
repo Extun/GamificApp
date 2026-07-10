@@ -39,19 +39,20 @@ router.get('/mis-materias', async (req, res, next) => {
 router.post('/invitaciones', async (req, res, next) => {
     try {
         const cantidad = Math.min(Math.max(Number(req.body?.cantidad) || 1, 1), 40);
-        // SPEC-002: el curso se elige del catálogo (curso_id). Se acepta
-        // también el texto libre `curso` por compatibilidad transitoria.
-        let curso = String(req.body?.curso || '').trim();
-        let cursoId = Number(req.body?.curso_id) || null;
-        if (cursoId) {
-            const [[filaCurso]] = await pool.query(
-                'SELECT CONCAT(nombre, " ", paralelo) AS etiqueta FROM cursos WHERE id = ? AND activo = TRUE AND eliminado_en IS NULL',
-                [cursoId]
-            );
-            if (!filaCurso) return res.status(400).json({ error: 'Curso no encontrado o inactivo' });
-            curso = filaCurso.etiqueta;
-        }
-        if (!curso) return res.status(400).json({ error: 'Elige el curso de la lista' });
+        // El curso se elige del catálogo (curso_id) y DEBE estar asignado a
+        // este docente (migración 010). Ya no se acepta texto libre: eso
+        // permitía invitar a cualquier curso saltándose la asignación.
+        const cursoId = Number(req.body?.curso_id) || null;
+        if (!cursoId) return res.status(400).json({ error: 'Elige el curso de la lista' });
+        const [[filaCurso]] = await pool.query(
+            `SELECT CONCAT(c.nombre, ' ', c.paralelo) AS etiqueta
+             FROM cursos c
+             JOIN docente_curso dc ON dc.curso_id = c.id AND dc.docente_id = ?
+             WHERE c.id = ? AND c.activo = TRUE AND c.eliminado_en IS NULL`,
+            [req.user.id, cursoId]
+        );
+        if (!filaCurso) return res.status(403).json({ error: 'Ese curso no está asignado a tu cuenta. Pídele al administrador que te lo asigne.' });
+        const curso = filaCurso.etiqueta;
 
         const codigos = [];
         for (let i = 0; i < cantidad; i++) {

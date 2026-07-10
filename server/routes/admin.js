@@ -29,7 +29,13 @@ router.get('/docentes', conPermiso('docentes'), async (_req, res, next) => {
                     COALESCE(JSON_ARRAYAGG(
                         CASE WHEN m.id IS NOT NULL
                              THEN JSON_OBJECT('id', m.id, 'nombre', m.nombre) END
-                    ), JSON_ARRAY()) AS materias
+                    ), JSON_ARRAY()) AS materias,
+                    (SELECT COALESCE(JSON_ARRAYAGG(
+                                JSON_OBJECT('id', c.id, 'etiqueta', CONCAT(c.nombre, ' ', c.paralelo))
+                            ), JSON_ARRAY())
+                     FROM docente_curso dc
+                     JOIN cursos c ON c.id = dc.curso_id AND c.eliminado_en IS NULL
+                     WHERE dc.docente_id = u.id) AS cursos
              FROM usuarios u
              LEFT JOIN docente_materia dm ON dm.docente_id = u.id
              LEFT JOIN materias m ON m.id = dm.materia_id AND m.eliminado_en IS NULL
@@ -38,24 +44,26 @@ router.get('/docentes', conPermiso('docentes'), async (_req, res, next) => {
              ORDER BY u.username`
         );
         // JSON_ARRAYAGG deja [null] cuando no hay asignaciones: se limpia aquí.
+        const aArray = (v) => (typeof v === 'string' ? JSON.parse(v) : v || []).filter(Boolean);
         res.json(filas.map((f) => ({
             ...f,
-            materias: (typeof f.materias === 'string' ? JSON.parse(f.materias) : f.materias)
-                .filter(Boolean)
+            materias: aArray(f.materias),
+            cursos: aArray(f.cursos)
         })));
     } catch (err) {
         next(err);
     }
 });
 
-// POST /api/admin/docentes — crea un docente y le asigna sus materias.
-// Body: { username, password, materia_ids: [1, 3] }
+// POST /api/admin/docentes — crea un docente y le asigna sus materias y cursos.
+// Body: { username, password, materia_ids: [1, 3], curso_ids: [2] }
 router.post('/docentes', conPermiso('docentes'), async (req, res, next) => {
     const conn = await pool.getConnection();
     try {
         const username = String(req.body?.username || '').trim().toLowerCase();
         const password = String(req.body?.password || '');
         const materiaIds = Array.isArray(req.body?.materia_ids) ? req.body.materia_ids : [];
+        const cursoIds = Array.isArray(req.body?.curso_ids) ? req.body.curso_ids : [];
 
         if (!USERNAME_VALIDO.test(username)) {
             return res.status(400).json({ error: 'Usuario inválido (3-50 caracteres: letras, números, . _ -)' });
@@ -75,9 +83,15 @@ router.post('/docentes', conPermiso('docentes'), async (req, res, next) => {
                 [creado.insertId, Number(materiaId)]
             );
         }
+        for (const cursoId of cursoIds) {
+            await conn.query(
+                'INSERT IGNORE INTO docente_curso (docente_id, curso_id) VALUES (?, ?)',
+                [creado.insertId, Number(cursoId)]
+            );
+        }
         await conn.commit();
-        auditar(req, 'creo-docente', `Creó la cuenta del docente "${username}"`, { docente: username, materia_ids: materiaIds });
-        res.status(201).json({ id: creado.insertId, username, rol: 'docente', materia_ids: materiaIds });
+        auditar(req, 'creo-docente', `Creó la cuenta del docente "${username}"`, { docente: username, materia_ids: materiaIds, curso_ids: cursoIds });
+        res.status(201).json({ id: creado.insertId, username, rol: 'docente', materia_ids: materiaIds, curso_ids: cursoIds });
     } catch (err) {
         await conn.rollback().catch(() => {});
         if (err.code === 'ER_DUP_ENTRY') {
@@ -89,8 +103,8 @@ router.post('/docentes', conPermiso('docentes'), async (req, res, next) => {
     }
 });
 
-// PUT /api/admin/docentes/:id — cambia contraseña y/o materias asignadas.
-// Body: { password?, materia_ids? }
+// PUT /api/admin/docentes/:id — cambia contraseña y/o materias y cursos asignados.
+// Body: { password?, materia_ids?, curso_ids? }
 router.put('/docentes/:id', conPermiso('docentes'), async (req, res, next) => {
     const conn = await pool.getConnection();
     try {
@@ -120,11 +134,21 @@ router.put('/docentes/:id', conPermiso('docentes'), async (req, res, next) => {
                 );
             }
         }
+        if (Array.isArray(req.body?.curso_ids)) {
+            await conn.query('DELETE FROM docente_curso WHERE docente_id = ?', [docenteId]);
+            for (const cursoId of req.body.curso_ids) {
+                await conn.query(
+                    'INSERT IGNORE INTO docente_curso (docente_id, curso_id) VALUES (?, ?)',
+                    [docenteId, Number(cursoId)]
+                );
+            }
+        }
         await conn.commit();
         auditar(req, 'edito-docente', `Actualizó la cuenta del docente "${docente.username}"`, {
             docente: docente.username,
             cambio_password: Boolean(req.body?.password),
-            materia_ids: Array.isArray(req.body?.materia_ids) ? req.body.materia_ids : undefined
+            materia_ids: Array.isArray(req.body?.materia_ids) ? req.body.materia_ids : undefined,
+            curso_ids: Array.isArray(req.body?.curso_ids) ? req.body.curso_ids : undefined
         });
         res.json({ ok: true });
     } catch (err) {
@@ -456,15 +480,15 @@ const validarCurso = (body) => {
 };
 
 // GET /api/admin/cursos — todos, con conteos reales de estudiantes y
-// docentes (docentes = emisores distintos de invitaciones del curso).
+// docentes asignados (docente_curso, migración 010).
 router.get('/cursos', conPermiso('cursos'), async (_req, res, next) => {
     try {
         const [cursos] = await pool.query(
             `SELECT c.id, c.nombre, c.paralelo, c.nivel, c.activo, c.creado_en,
                     CONCAT(c.nombre, ' ', c.paralelo) AS etiqueta,
                     (SELECT COUNT(*) FROM estudiantes e WHERE e.curso_id = c.id) AS estudiantes,
-                    (SELECT COUNT(DISTINCT i.docente_id) FROM invitaciones_estudiante i
-                     WHERE i.curso_id = c.id) AS docentes
+                    (SELECT COUNT(*) FROM docente_curso dc
+                     WHERE dc.curso_id = c.id) AS docentes
              FROM cursos c
              WHERE c.eliminado_en IS NULL
              ORDER BY c.nombre, c.paralelo`

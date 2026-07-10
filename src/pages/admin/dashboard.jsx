@@ -898,8 +898,8 @@ export function Dashboard() {
                             </div>
                             {cursos.length === 0 ? (
                                 <p className="contenido-sub" style={{ margin: 0 }}>
-                                    Todavía no hay cursos disponibles. Pídele al administrador que cree
-                                    un curso en su panel para poder generar códigos de invitación.
+                                    Todavía no tienes cursos asignados. Pídele al administrador que te
+                                    asigne uno para poder generar códigos de invitación.
                                 </p>
                             ) : (
                                 <form className="admin-form" onSubmit={handleGenerarInvitaciones}>

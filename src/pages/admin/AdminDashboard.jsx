@@ -88,6 +88,47 @@ function ChipsMaterias({ materias, catalogo }) {
     );
 }
 
+// Selector de cursos (migración 010): mismos gestos que SelectorMaterias, pero
+// los cursos no tienen color/icono, así que son chips neutros conmutables.
+function SelectorCursos({ cursos, seleccion, onToggle }) {
+    if (!cursos.length) {
+        return <p className="docente-sin-materias">No hay cursos activos. Créalos en la sección «Cursos».</p>;
+    }
+    return (
+        <div className="curso-pick-grid">
+            {cursos.map((c) => {
+                const activa = seleccion.includes(c.id);
+                return (
+                    <button
+                        type="button"
+                        key={c.id}
+                        className={`curso-pick ${activa ? 'is-activa' : ''}`}
+                        aria-pressed={activa}
+                        onClick={() => onToggle(c.id)}
+                    >
+                        <span className="curso-pick-nombre">{c.etiqueta}</span>
+                        {activa && <TaskAltRoundedIcon className="materia-pick-check" />}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
+// Chips de solo lectura con los cursos asignados a un docente.
+function ChipsCursos({ cursos }) {
+    if (!cursos?.length) return <span className="docente-sin-materias">Sin cursos asignados</span>;
+    return (
+        <div className="docente-chips">
+            {cursos.map((c) => (
+                <span key={c.id} className="docente-chip docente-chip-curso">
+                    <span aria-hidden="true">🏫</span> {c.etiqueta}
+                </span>
+            ))}
+        </div>
+    );
+}
+
 // Icono de la actividad reciente según quién hizo la acción (auditoría).
 const ICONO_ROL = {
     docente: SchoolRoundedIcon,
@@ -125,10 +166,12 @@ export function AdminDashboard() {
     const [nuevoUsuario, setNuevoUsuario] = useState('');
     const [nuevaClave, setNuevaClave] = useState('');
     const [materiasSel, setMateriasSel] = useState([]);
+    const [cursosSel, setCursosSel] = useState([]);
 
-    // Modal "Editar materias" de un docente existente.
+    // Modal "Editar asignaciones" de un docente existente.
     const [docenteEditando, setDocenteEditando] = useState(null);
     const [materiasEdicion, setMateriasEdicion] = useState([]);
+    const [cursosEdicion, setCursosEdicion] = useState([]);
     const [guardandoMaterias, setGuardandoMaterias] = useState(false);
 
     const cargar = async () => {
@@ -189,32 +232,42 @@ export function AdminDashboard() {
             await adminService.crearDocente({
                 username: nuevoUsuario.trim(),
                 password: nuevaClave,
-                materiaIds: materiasSel
+                materiaIds: materiasSel,
+                cursoIds: cursosSel
             });
             setNuevoUsuario('');
             setNuevaClave('');
             setMateriasSel([]);
+            setCursosSel([]);
         }, 'Docente creado correctamente.');
     };
 
     const toggleMateria = (id) =>
         setMateriasSel((prev) => prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]);
+    const toggleCurso = (id) =>
+        setCursosSel((prev) => prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]);
 
     const abrirEdicionMaterias = (docente) => {
         setDocenteEditando(docente);
         setMateriasEdicion(docente.materias.map((m) => m.id));
+        setCursosEdicion((docente.cursos || []).map((c) => c.id));
     };
 
     const toggleMateriaEdicion = (id) =>
         setMateriasEdicion((prev) => prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]);
+    const toggleCursoEdicion = (id) =>
+        setCursosEdicion((prev) => prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]);
 
     const guardarMaterias = async () => {
         if (!docenteEditando) return;
         setGuardandoMaterias(true);
         await ejecutar(async () => {
-            await adminService.actualizarDocente(docenteEditando.id, { materiaIds: materiasEdicion });
+            await adminService.actualizarDocente(docenteEditando.id, {
+                materiaIds: materiasEdicion,
+                cursoIds: cursosEdicion
+            });
             setDocenteEditando(null);
-        }, `Materias de "${docenteEditando.username}" actualizadas.`);
+        }, `Asignaciones de "${docenteEditando.username}" actualizadas.`);
         setGuardandoMaterias(false);
     };
 
@@ -435,11 +488,28 @@ export function AdminDashboard() {
                                             />
                                         </div>
 
+                                        <div className="asistente-paso">
+                                            <div className="asistente-paso-head">
+                                                <span className="asistente-num">3</span>
+                                                <div>
+                                                    <strong>Cursos que gestionará</strong>
+                                                    <p>Solo podrá generar invitaciones para los cursos que le asignes. Podrás cambiarlos después.</p>
+                                                </div>
+                                            </div>
+                                            <SelectorCursos
+                                                cursos={cursos.filter((c) => c.activo)}
+                                                seleccion={cursosSel}
+                                                onToggle={toggleCurso}
+                                            />
+                                        </div>
+
                                         <div className="asistente-pie">
                                             <span className="asistente-resumen">
-                                                {materiasSel.length
-                                                    ? `${materiasSel.length} ${materiasSel.length === 1 ? 'materia seleccionada' : 'materias seleccionadas'}`
-                                                    : 'Ninguna materia seleccionada'}
+                                                {cursosSel.length
+                                                    ? `${cursosSel.length} ${cursosSel.length === 1 ? 'curso' : 'cursos'} · ${materiasSel.length} ${materiasSel.length === 1 ? 'materia' : 'materias'}`
+                                                    : materiasSel.length
+                                                        ? `${materiasSel.length} ${materiasSel.length === 1 ? 'materia seleccionada' : 'materias seleccionadas'}`
+                                                        : 'Sin materias ni cursos seleccionados'}
                                             </span>
                                             <button type="submit" className="quiz-generar-btn">
                                                 <PersonAddAlt1RoundedIcon sx={{ fontSize: '1.2rem' }} />
@@ -464,6 +534,7 @@ export function AdminDashboard() {
                                                     <div className="docente-info">
                                                         <strong>{d.username}</strong>
                                                         <ChipsMaterias materias={d.materias} catalogo={materias} />
+                                                        <ChipsCursos cursos={d.cursos} />
                                                     </div>
                                                     <div className="docente-acciones">
                                                         <button
@@ -472,7 +543,7 @@ export function AdminDashboard() {
                                                             onClick={() => abrirEdicionMaterias(d)}
                                                         >
                                                             <EditRoundedIcon sx={{ fontSize: '1.05rem' }} />
-                                                            Editar materias
+                                                            Editar asignaciones
                                                         </button>
                                                         <button
                                                             type="button"
@@ -602,7 +673,7 @@ export function AdminDashboard() {
                             <div className="dash-secciones">
                                 <DashboardHeader
                                     titulo="Cursos"
-                                    subtitulo="Los cursos y paralelos de la institución. Los docentes eligen de esta lista al generar códigos de invitación."
+                                    subtitulo="Los cursos y paralelos de la institución. Asígnalos a cada docente desde su ficha (Docentes → Editar asignaciones); solo así podrán generar invitaciones para ese curso."
                                 />
                                 <ModuloCursos cursos={cursos} ejecutar={ejecutar} />
                             </div>
@@ -742,14 +813,14 @@ export function AdminDashboard() {
             {/* Modal para editar las materias de un docente sin recrearlo. */}
             {docenteEditando && (
                 <div className="preview-backdrop" onClick={() => !guardandoMaterias && setDocenteEditando(null)}>
-                    <div className="preview-panel modal-materias" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Editar materias del docente">
+                    <div className="preview-panel modal-materias" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Editar asignaciones del docente">
                         <div className="preview-head">
                             <div className="preview-head-file">
                                 <span className="docente-avatar" aria-hidden="true">
                                     {docenteEditando.username.charAt(0).toUpperCase()}
                                 </span>
                                 <div className="preview-head-text">
-                                    <h3>Editar materias</h3>
+                                    <h3>Editar asignaciones</h3>
                                     <span>{docenteEditando.username}</span>
                                 </div>
                             </div>
@@ -765,6 +836,14 @@ export function AdminDashboard() {
                                 materias={materias.filter((m) => m.activa)}
                                 seleccion={materiasEdicion}
                                 onToggle={toggleMateriaEdicion}
+                            />
+                            <p className="modal-materias-ayuda" style={{ marginTop: 18 }}>
+                                Cursos que gestionará. Solo podrá generar invitaciones para los cursos seleccionados.
+                            </p>
+                            <SelectorCursos
+                                cursos={cursos.filter((c) => c.activo)}
+                                seleccion={cursosEdicion}
+                                onToggle={toggleCursoEdicion}
                             />
                         </div>
                         <div className="preview-foot">

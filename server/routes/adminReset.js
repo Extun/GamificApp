@@ -45,6 +45,7 @@ const TABLAS_A_VACIAR = [
     'materiales',
     'invitaciones_estudiante',
     'docente_materia',
+    'docente_curso',
     'retos',
     'estudiantes',
     'cursos',

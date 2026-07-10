@@ -45,6 +45,7 @@ export const inicializarEsquema = async () => {
         await migrarUnicidadPapelera(conn);
         await migrarCentroDocente(conn);
         await migrarSistemaMisiones(conn);
+        await migrarDocenteCurso(conn);
         console.log('✅ Esquema verificado/creado en la base de datos.');
         await asegurarAdmin(conn);
         await asegurarAdminPrincipal(conn);
@@ -393,6 +394,25 @@ const migrarSistemaMisiones = async (conn) => {
         );
     }
     console.log(`✅ Migración: sistema de misiones (${MISIONES.length} misiones semilla).`);
+};
+
+// Migración 010 — asignación de cursos a docentes (muchos-a-muchos, igual que
+// docente_materia). El admin decide qué curso(s) maneja cada docente; el
+// docente solo puede invitar estudiantes a sus cursos. "Empezar en limpio":
+// no se precarga ninguna asignación.
+const migrarDocenteCurso = async (conn) => {
+    await conn.query(`CREATE TABLE IF NOT EXISTS docente_curso (
+        id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+        docente_id INT UNSIGNED NOT NULL,
+        curso_id   INT UNSIGNED NOT NULL,
+        creado_en  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_docente_curso (docente_id, curso_id),
+        CONSTRAINT fk_dc_docente FOREIGN KEY (docente_id) REFERENCES usuarios (id)
+            ON UPDATE CASCADE ON DELETE CASCADE,
+        CONSTRAINT fk_dc_curso FOREIGN KEY (curso_id) REFERENCES cursos (id)
+            ON UPDATE CASCADE ON DELETE CASCADE
+    ) ENGINE = InnoDB`);
 };
 
 // Invariante del sistema: SIEMPRE existe al menos un Administrador Principal

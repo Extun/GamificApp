@@ -105,7 +105,7 @@ export function ModuloCursos({ cursos, ejecutar }) {
                     <EmptyState
                         Icon={Diversity3RoundedIcon}
                         titulo="Sin cursos registrados"
-                        mensaje="Crea los cursos de la institución (ej: 2do A). Los docentes los elegirán al generar códigos de invitación."
+                        mensaje="Crea los cursos de la institución (ej: 2do A). Luego asígnalos a cada docente desde su ficha (Docentes → Editar asignaciones)."
                         accion={{ label: 'Crear curso', onClick: abrirNuevo }}
                     />
                 )}
@@ -115,7 +115,7 @@ export function ModuloCursos({ cursos, ejecutar }) {
                 <ModalPanel
                     className="modal-materias"
                     titulo={editando === 'nuevo' ? 'Nuevo curso' : 'Editar curso'}
-                    subtitulo={editando === 'nuevo' ? 'Los docentes lo verán al generar invitaciones' : editando.etiqueta}
+                    subtitulo={editando === 'nuevo' ? 'Luego asígnalo a los docentes desde su ficha' : editando.etiqueta}
                     onCerrar={() => setEditando(null)}
                     pie={
                         <>
@@ -171,7 +171,7 @@ export function ModuloCursos({ cursos, ejecutar }) {
                                     checked={form.activo}
                                     onChange={(e) => setForm({ ...form, activo: e.target.checked })}
                                 />
-                                Curso activo (los docentes pueden generar invitaciones para él)
+                                Curso activo (se puede asignar a docentes y generar invitaciones)
                             </label>
                         )}
                     </div>
