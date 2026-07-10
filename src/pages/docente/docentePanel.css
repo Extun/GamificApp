@@ -3,103 +3,180 @@
    modales) se reutiliza de dashboard.css / adminDashboard.css /
    dashboardWidgets.css con los tokens de index.css. */
 
-/* ---------- Home: hero de bienvenida con datos del aula ---------- */
-.doc-hero {
+/* ---------- Home: saludo compacto (rediseño UX) ----------
+   El Home ya no es un dashboard de métricas: saludo ligero,
+   materias como protagonistas y el resto en segundo plano. */
+.home-doc-inicio {
+    gap: 36px;
+    padding-bottom: 24px;
+}
+
+.doc-saludo {
     display: flex;
     align-items: center;
-    gap: 18px;
-    padding: 26px 28px;
-    border-radius: var(--radius-lg);
-    background: linear-gradient(120deg, var(--color-primary-soft), #e0f2fe);
-    border: 1px solid var(--color-border);
+    gap: 14px;
+    padding: 4px 2px;
 }
 
-.doc-hero-avatar {
-    width: 64px;
-    height: 64px;
+.doc-saludo-avatar {
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
-    background: var(--color-surface);
+    background: var(--color-primary-soft);
     display: grid;
     place-items: center;
-    font-size: 1.6rem;
+    font-size: 1.25rem;
     font-weight: 700;
     color: var(--color-primary);
-    box-shadow: var(--shadow-sm);
     flex-shrink: 0;
-    overflow: hidden;
 }
 
-.doc-hero-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.doc-hero-meta h1 {
+.doc-saludo-meta h1 {
     margin: 0;
     font-family: var(--font-head);
-    font-size: 1.45rem;
+    font-size: 1.35rem;
 }
 
-.doc-hero-meta p {
-    margin: 4px 0 10px;
+.doc-saludo-meta p {
+    margin: 2px 0 0;
     color: var(--color-text-muted);
-}
-
-.doc-hero-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.doc-hero-chip {
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: 999px;
-    padding: 4px 12px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--color-text);
-}
-
-/* ---------- Home: accesos rápidos ---------- */
-.doc-rapidas {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-    gap: 12px;
-}
-
-.doc-rapida {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 14px 16px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
-    cursor: pointer;
-    text-align: left;
-    font: inherit;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.doc-rapida:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-}
-
-.doc-rapida-emoji {
-    font-size: 1.4rem;
-}
-
-.doc-rapida strong {
     font-size: 0.92rem;
 }
 
-.doc-rapida span.doc-rapida-desc {
-    font-size: 0.78rem;
+/* Aviso dentro de la tarjeta de materia sin actividades */
+.home-doc-materia-aviso {
+    font-weight: 600;
+    color: #b45309;
+}
+
+/* Centro de actividad: timeline ligera */
+.home-doc-centro h2,
+.home-doc-duo h3 {
+    margin: 0 0 12px;
+    font-size: 1.15rem;
+}
+
+.centro-timeline {
+    list-style: none;
+    margin: 0;
+    padding: 12px 16px;
+    display: grid;
+    gap: 4px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+.centro-evento {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 4px;
+    font-size: 0.9rem;
+}
+
+.centro-evento + .centro-evento {
+    border-top: 1px solid var(--color-border);
+}
+
+.centro-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.centro-dot-logro { background: #22c55e; }
+.centro-dot-docente { background: #3b82f6; }
+.centro-dot-pendiente { background: #f59e0b; }
+
+.centro-evento-texto { flex: 1; min-width: 0; }
+
+.centro-evento-link {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    font: inherit;
+    color: var(--color-text);
+    text-align: left;
+    cursor: pointer;
+    padding: 0;
+}
+
+.centro-evento-link:hover {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+.centro-evento-fecha {
+    flex-shrink: 0;
+    font-size: 0.76rem;
     color: var(--color-text-muted);
+}
+
+/* Actividad reciente: filtros por tipo */
+.reciente-filtros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.doc-tab-mini {
+    padding: 6px 14px;
+    font-size: 0.82rem;
+}
+
+/* Resumen en dos tarjetas (segundo plano, al final del Home) */
+.home-doc-duo {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+
+.duo-card h3 {
+    margin: 0 0 10px;
+    font-size: 1rem;
+}
+
+.duo-lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.duo-lista li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 2px;
+    font-size: 0.88rem;
+}
+
+.duo-lista li + li {
+    border-top: 1px solid var(--color-border);
+}
+
+.duo-lista li span { color: var(--color-text-muted); }
+.duo-lista li strong { font-size: 0.95rem; }
+
+@media (max-width: 720px) {
+    .home-doc-inicio { gap: 28px; }
+    .home-doc-duo { grid-template-columns: 1fr; }
+
+    .centro-evento {
+        flex-wrap: wrap;
+    }
+
+    .centro-evento-fecha {
+        width: 100%;
+        padding-left: 20px;
+    }
 }
 
 /* ---------- Pestañas píldora (vista de materia) ---------- */
@@ -447,16 +524,6 @@
 }
 
 @media (max-width: 560px) {
-    .doc-hero {
-        flex-direction: column;
-        text-align: center;
-        align-items: center;
-    }
-
-    .doc-hero-chips {
-        justify-content: center;
-    }
-
     .ficha-retro-form {
         flex-direction: column;
     }

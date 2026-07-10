@@ -28,19 +28,12 @@ import { obtenerRetosPublicados } from '../../services/retosService';
 import {
     EmptyState,
     SectionCard,
-    StatCard,
     DashboardHeader,
     formatearFecha
 } from '../../components/dashboard/DashboardWidgets';
 import LocalLibraryRoundedIcon from '@mui/icons-material/LocalLibraryRounded';
 import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
 import AccountCircleRoundedIcon from '@mui/icons-material/AccountCircleRounded';
-import SchoolRoundedIcon from '@mui/icons-material/SchoolRounded';
-import DescriptionRoundedIcon from '@mui/icons-material/DescriptionRounded';
-import ExtensionRoundedIcon from '@mui/icons-material/ExtensionRounded';
-import MapRoundedIcon from '@mui/icons-material/MapRounded';
-import StarRoundedIcon from '@mui/icons-material/StarRounded';
-import PercentRoundedIcon from '@mui/icons-material/PercentRounded';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import { BibliotecaActividades } from '../docente/BibliotecaActividades';
 import { RankingCompleto } from '../docente/RankingCompleto';
@@ -245,19 +238,6 @@ export function Dashboard() {
         return () => { vigente = false; };
     }, [materias]);
 
-    const borradorReciente = useMemo(() => {
-        try {
-            const data = JSON.parse(localStorage.getItem('edu_historialQuizzes')) || {};
-            const borradores = Object.values(data)
-                .flat()
-                .filter((q) => q?.estado === 'borrador' && materias.includes(q.materia));
-            borradores.sort((a, b) => (b.id || 0) - (a.id || 0));
-            return borradores[0] || null;
-        } catch {
-            return null;
-        }
-    }, [materias]);
-
     const materiaSugerida = useMemo(() => {
         if (!materias.length) return null;
         return [...materias].sort(
@@ -269,8 +249,13 @@ export function Dashboard() {
         Object.entries(retosPorMateria)
             .flatMap(([nombre, retos]) => retos.map((r) => ({ ...r, materia: nombre })))
             .sort((a, b) => new Date(b.creado_en) - new Date(a.creado_en))
-            .slice(0, 5)
+            .slice(0, 12)
     ), [retosPorMateria]);
+
+    const [filtroReciente, setFiltroReciente] = useState('todos');
+    const retosFiltrados = filtroReciente === 'todos'
+        ? retosRecientes
+        : retosRecientes.filter((r) => r.tipo === filtroReciente);
 
     const irAMateria = (nombre, subvista = 'quiz', tab = 'crear') => {
         if (!nombre) return;
@@ -327,6 +312,36 @@ export function Dashboard() {
     }, [pagina]);
 
     const [fichaEstudiante, setFichaEstudiante] = useState(null);
+
+    const usuarioActual = authService.getUsuario();
+    const nombreDocente = usuarioActual?.nombre_completo || usuarioActual?.username || 'docente';
+    const horaActual = new Date().getHours();
+    const saludoDia = horaActual < 12 ? 'Buenos días' : horaActual < 19 ? 'Buenas tardes' : 'Buenas noches';
+
+    // Centro de actividad: cronología ligera con lo que ya sabemos
+    // (materias sin actividades + eventos reales del resumen). Sin datos, se oculta.
+    const eventosAula = useMemo(() => {
+        const eventos = [];
+        materias.forEach((mat) => {
+            if (retosPorMateria[mat] && retosPorMateria[mat].length === 0) {
+                eventos.push({
+                    id: `sin-${mat}`,
+                    tono: 'pendiente',
+                    texto: `${mat} todavía no tiene actividades.`,
+                    materiaDestino: mat
+                });
+            }
+        });
+        (resumen?.actividad || []).slice(0, 5).forEach((ev) => {
+            eventos.push({
+                id: `ev-${ev.id}`,
+                tono: ev.rol === 'estudiante' ? 'logro' : 'docente',
+                texto: `${ev.nombre}: ${ev.descripcion}${ev.materia ? ` · ${ev.materia}` : ''}`,
+                fecha: formatearFecha(ev.creado_en)
+            });
+        });
+        return eventos.slice(0, 6);
+    }, [materias, retosPorMateria, resumen]);
 
     const [tabMateria, setTabMateria] = useState('crear');
 
@@ -397,109 +412,21 @@ export function Dashboard() {
         >
 
                 {pagina === "" && (
-                    <div className="home-doc">
-                        <header className="doc-hero">
-                            <span className="doc-hero-avatar" aria-hidden="true">
-                                {(authService.getUsuario()?.nombre_completo || authService.getUsuario()?.username || 'D').charAt(0).toUpperCase()}
+                    <div className="home-doc home-doc-inicio">
+                        <header className="doc-saludo">
+                            <span className="doc-saludo-avatar" aria-hidden="true">
+                                {nombreDocente.charAt(0).toUpperCase()}
                             </span>
-                            <div className="doc-hero-meta">
-                                <h1>¡Hola, {authService.getUsuario()?.nombre_completo || authService.getUsuario()?.username || 'docente'}! 👋</h1>
-                                <p>Este es el estado de tu aula hoy.</p>
-                                <div className="doc-hero-chips">
-                                    <span className="doc-hero-chip">
-                                        📚 {materias.length ? materias.join(' · ') : 'Sin materias asignadas'}
-                                    </span>
-                                    <span className="doc-hero-chip">
-                                        🎒 {misEstudiantes.length} {misEstudiantes.length === 1 ? 'estudiante' : 'estudiantes'}
-                                    </span>
-                                    {resumen?.stats && (
-                                        <span className="doc-hero-chip">
-                                            📈 {resumen.stats.completados_semana} {resumen.stats.completados_semana === 1 ? 'reto completado' : 'retos completados'} esta semana
-                                        </span>
-                                    )}
-                                </div>
+                            <div className="doc-saludo-meta">
+                                <h1>{saludoDia}, {nombreDocente}.</h1>
+                                <p>
+                                    Hoy tienes {materias.length} {materias.length === 1 ? 'materia' : 'materias'} y{' '}
+                                    {misEstudiantes.length} {misEstudiantes.length === 1 ? 'estudiante' : 'estudiantes'}.
+                                </p>
                             </div>
                         </header>
 
-                        {resumen?.stats && (
-                            <div className="stats-row">
-                                <StatCard Icon={TaskAltRoundedIcon} valor={resumen.stats.actividades} etiqueta="Actividades creadas" tono="primary" />
-                                <StatCard Icon={AutoAwesomeRoundedIcon} valor={resumen.stats.quizzes} etiqueta="Quizzes" tono="accent" />
-                                <StatCard Icon={MapRoundedIcon} valor={resumen.stats.misiones} etiqueta="Misiones" tono="primary" />
-                                <StatCard Icon={ExtensionRoundedIcon} valor={resumen.stats.clasificadores} etiqueta="Clasificadores" tono="accent" />
-                                <StatCard Icon={DescriptionRoundedIcon} valor={resumen.stats.materiales} etiqueta="Materiales" tono="primary" />
-                                <StatCard Icon={StarRoundedIcon} valor={resumen.stats.xp_entregada} etiqueta="XP entregada" tono="fire" />
-                                <StatCard
-                                    Icon={PercentRoundedIcon}
-                                    valor={resumen.stats.promedio === null ? '—' : `${resumen.stats.promedio}%`}
-                                    etiqueta="Promedio general"
-                                    tono="accent"
-                                />
-                            </div>
-                        )}
-
-                        <section>
-                            <h2 style={{ marginBottom: 12 }}>Acciones rápidas</h2>
-                            <div className="doc-rapidas">
-                                <button type="button" className="doc-rapida" onClick={() => irAMateria(materiaSugerida || materias[0], 'quiz')} disabled={!materias.length}>
-                                    <span className="doc-rapida-emoji" aria-hidden="true">✨</span>
-                                    <strong>Crear Quiz</strong>
-                                    <span className="doc-rapida-desc">Preguntas con IA a partir de un tema</span>
-                                </button>
-                                <button type="button" className="doc-rapida" onClick={() => irAMateria(materiaSugerida || materias[0], 'mision')} disabled={!materias.length}>
-                                    <span className="doc-rapida-emoji" aria-hidden="true">🗺️</span>
-                                    <strong>Crear Misión</strong>
-                                    <span className="doc-rapida-desc">Una historia con desafíos</span>
-                                </button>
-                                <button type="button" className="doc-rapida" onClick={() => irAMateria(materiaSugerida || materias[0], 'quiz', 'material')} disabled={!materias.length}>
-                                    <span className="doc-rapida-emoji" aria-hidden="true">📄</span>
-                                    <strong>Subir Material</strong>
-                                    <span className="doc-rapida-desc">Documentos de apoyo para la clase</span>
-                                </button>
-                                <button type="button" className="doc-rapida" onClick={() => setPagina('ranking')}>
-                                    <span className="doc-rapida-emoji" aria-hidden="true">🏆</span>
-                                    <strong>Ver Ranking</strong>
-                                    <span className="doc-rapida-desc">Posiciones de todos tus estudiantes</span>
-                                </button>
-                                <button type="button" className="doc-rapida" onClick={() => setPagina('estudiantes')}>
-                                    <span className="doc-rapida-emoji" aria-hidden="true">🔑</span>
-                                    <strong>Generar Invitaciones</strong>
-                                    <span className="doc-rapida-desc">Códigos para registrar estudiantes</span>
-                                </button>
-                            </div>
-                        </section>
-
-                        {borradorReciente ? (
-                            <button className="home-hero-doc" onClick={() => irAMateria(borradorReciente.materia, 'quiz')}>
-                                <span className="home-hero-doc-emoji" aria-hidden="true">✨</span>
-                                <span className="home-hero-doc-texto">
-                                    <strong>Termina tu quiz de "{borradorReciente.tema}"</strong>
-                                    <span>Lo dejaste a medias en {borradorReciente.materia} · {borradorReciente.cantidad} preguntas listas para revisar</span>
-                                </span>
-                                <ArrowForwardRoundedIcon className="home-hero-doc-flecha" />
-                            </button>
-                        ) : materiaSugerida ? (
-                            <button className="home-hero-doc" onClick={() => irAMateria(materiaSugerida)}>
-                                <span className="home-hero-doc-emoji" aria-hidden="true">✨</span>
-                                <span className="home-hero-doc-texto">
-                                    <strong>Crea una actividad hoy</strong>
-                                    <span>
-                                        {(retosPorMateria[materiaSugerida] || []).length
-                                            ? `${materiaSugerida} es la materia con menos actividades: dale una nueva.`
-                                            : `${materiaSugerida} todavía no tiene actividades: ¡estrénala con un quiz, un juego o una misión!`}
-                                    </span>
-                                </span>
-                                <ArrowForwardRoundedIcon className="home-hero-doc-flecha" />
-                            </button>
-                        ) : (
-                            <EmptyState
-                                Icon={MenuBookIcon}
-                                titulo="Aún no tienes materias asignadas"
-                                mensaje="Pide al administrador que te asigne materias para empezar a crear actividades."
-                            />
-                        )}
-
-                        {materias.length > 0 && (
+                        {materias.length > 0 ? (
                             <section className="home-doc-materias">
                                 <h2>Tus materias</h2>
                                 <div className="home-doc-materias-grid">
@@ -516,79 +443,121 @@ export function Dashboard() {
                                             >
                                                 <span className="home-doc-materia-emoji" aria-hidden="true">{ui.icono}</span>
                                                 <span className="home-doc-materia-nombre">{mat}</span>
-                                                <span className="home-doc-materia-detalle">
-                                                    {retos.length
-                                                        ? `${cuenta('quiz')} quizzes · ${cuenta('clasificador')} juegos · ${cuenta('mision')} misiones`
-                                                        : 'Sin actividades todavía'}
-                                                </span>
+                                                {retos.length ? (
+                                                    <span className="home-doc-materia-detalle">
+                                                        {cuenta('quiz')} quizzes · {cuenta('clasificador')} juegos · {cuenta('mision')} misiones
+                                                    </span>
+                                                ) : (
+                                                    <span className="home-doc-materia-detalle home-doc-materia-aviso">
+                                                        Sin actividades · crea la primera
+                                                    </span>
+                                                )}
                                             </button>
                                         );
                                     })}
                                 </div>
                             </section>
+                        ) : (
+                            <EmptyState
+                                Icon={MenuBookIcon}
+                                titulo="Aún no tienes materias asignadas"
+                                mensaje="Pide al administrador que te asigne materias para empezar a crear actividades."
+                            />
                         )}
 
-                        <button className="home-doc-aula" onClick={() => setPagina('estudiantes')}>
-                            <span className="home-doc-aula-emoji" aria-hidden="true">🎒</span>
-                            <span className="home-doc-aula-texto">
-                                <strong>Mi aula</strong>
-                                <span>
-                                    {(misEstudiantes.length || invitaciones.length)
-                                        ? `${misEstudiantes.length} ${misEstudiantes.length === 1 ? 'estudiante registrado' : 'estudiantes registrados'} · ${invitaciones.filter((i) => i.estado === 'pendiente').length} invitaciones por usar · ${invitaciones.filter((i) => i.estado === 'usado').length} códigos usados`
-                                        : 'Tu aula está vacía: genera códigos de invitación para que tus estudiantes se registren solos.'}
-                                </span>
-                            </span>
-                            <ArrowForwardRoundedIcon className="home-doc-aula-flecha" />
-                        </button>
+                        {eventosAula.length > 0 && (
+                            <section className="home-doc-centro">
+                                <h2>Centro de actividad</h2>
+                                <ul className="centro-timeline">
+                                    {eventosAula.map((ev) => (
+                                        <li key={ev.id} className="centro-evento">
+                                            <span className={`centro-dot centro-dot-${ev.tono}`} aria-hidden="true" />
+                                            {ev.materiaDestino ? (
+                                                <button
+                                                    type="button"
+                                                    className="centro-evento-link"
+                                                    onClick={() => irAMateria(ev.materiaDestino)}
+                                                >
+                                                    {ev.texto}
+                                                </button>
+                                            ) : (
+                                                <span className="centro-evento-texto">{ev.texto}</span>
+                                            )}
+                                            {ev.fecha && <span className="centro-evento-fecha">{ev.fecha}</span>}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </section>
+                        )}
 
-                        <SectionCard
-                            titulo="Centro de Actividad"
-                            Icon={TaskAltRoundedIcon}
-                            tag={resumen?.actividad?.length ? `${resumen.actividad.length} eventos` : undefined}
-                        >
-                            {resumen?.actividad?.length ? (
-                                <ul className="actividad-lista">
-                                    {resumen.actividad.map((ev) => (
-                                        <li key={ev.id} className="actividad-item">
-                                            <span className="actividad-icono">
-                                                {ev.rol === 'estudiante' ? <GroupsRoundedIcon /> : <SchoolRoundedIcon />}
-                                            </span>
-                                            <div className="actividad-meta">
-                                                <strong>{ev.nombre}</strong>
-                                                <span>{ev.materia ? `${ev.descripcion} · ${ev.materia}` : ev.descripcion}</span>
-                                            </div>
-                                            <span className="actividad-fecha">{formatearFecha(ev.creado_en)}</span>
-                                        </li>
+                        {retosRecientes.length > 0 && (
+                            <section className="home-doc-reciente">
+                                <h2>Actividad reciente</h2>
+                                <div className="reciente-filtros" role="tablist" aria-label="Filtrar por tipo">
+                                    {[
+                                        ['todos', 'Todo'],
+                                        ['quiz', 'Quiz'],
+                                        ['mision', 'Misión'],
+                                        ['clasificador', 'Clasificador']
+                                    ].map(([id, label]) => (
+                                        <button
+                                            key={id}
+                                            type="button"
+                                            className={`doc-tab doc-tab-mini ${filtroReciente === id ? 'doc-tab-activa' : ''}`}
+                                            onClick={() => setFiltroReciente(id)}
+                                        >
+                                            {label}
+                                        </button>
                                     ))}
-                                </ul>
-                            ) : retosRecientes.length ? (
-                                <ul className="actividad-lista">
-                                    {retosRecientes.map((r) => (
-                                        <li key={r.id} className="actividad-item">
-                                            <span className="actividad-icono"><TaskAltRoundedIcon /></span>
-                                            <div className="actividad-meta">
-                                                <strong>{r.titulo}</strong>
-                                                <span>
-                                                    {TIPO_RETO_LABEL[r.tipo] || r.tipo} · {r.materia} · {r.xp_recompensa} XP
-                                                </span>
-                                            </div>
-                                            <span className="actividad-fecha">{formatearFecha(r.creado_en)}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <EmptyState
-                                    Icon={TaskAltRoundedIcon}
-                                    titulo="Todavía no hay actividad que contar"
-                                    mensaje="Cuando publiques actividades o tus estudiantes las resuelvan, la cronología aparecerá aquí."
-                                    accion={materiaSugerida
-                                        ? { label: 'Crear mi primera actividad', onClick: () => irAMateria(materiaSugerida, 'quiz') }
-                                        : undefined}
-                                />
-                            )}
-                        </SectionCard>
+                                </div>
+                                {retosFiltrados.length ? (
+                                    <ul className="actividad-lista">
+                                        {retosFiltrados.slice(0, 6).map((r) => (
+                                            <li key={r.id} className="actividad-item">
+                                                <span className="actividad-icono"><TaskAltRoundedIcon /></span>
+                                                <div className="actividad-meta">
+                                                    <strong>{r.titulo}</strong>
+                                                    <span>
+                                                        {TIPO_RETO_LABEL[r.tipo] || r.tipo} · {r.materia} · {r.xp_recompensa} XP
+                                                    </span>
+                                                </div>
+                                                <span className="actividad-fecha">{formatearFecha(r.creado_en)}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p className="vacio-msg">No hay actividades de este tipo todavía.</p>
+                                )}
+                            </section>
+                        )}
+
+                        {resumen?.stats && (
+                            <div className="home-doc-duo">
+                                <section className="card duo-card">
+                                    <h3>Actividad creada</h3>
+                                    <ul className="duo-lista">
+                                        <li><span>Total actividades</span><strong>{resumen.stats.actividades}</strong></li>
+                                        <li><span>Quizzes</span><strong>{resumen.stats.quizzes}</strong></li>
+                                        <li><span>Misiones</span><strong>{resumen.stats.misiones}</strong></li>
+                                        <li><span>Clasificadores</span><strong>{resumen.stats.clasificadores}</strong></li>
+                                        <li><span>Materiales</span><strong>{resumen.stats.materiales}</strong></li>
+                                    </ul>
+                                </section>
+                                <section className="card duo-card">
+                                    <h3>Estado del aula</h3>
+                                    <ul className="duo-lista">
+                                        <li><span>XP generado</span><strong>{resumen.stats.xp_entregada}</strong></li>
+                                        {resumen.stats.promedio !== null && (
+                                            <li><span>Promedio general</span><strong>{resumen.stats.promedio}%</strong></li>
+                                        )}
+                                        <li><span>Retos completados esta semana</span><strong>{resumen.stats.completados_semana}</strong></li>
+                                    </ul>
+                                </section>
+                            </div>
+                        )}
                     </div>
                 )}
+
 
                 {pagina === "materias" && !materiaSeleccionada && (
                     <div className="home-doc">
