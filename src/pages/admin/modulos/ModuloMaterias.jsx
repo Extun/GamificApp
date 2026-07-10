@@ -52,7 +52,9 @@ export function ModuloMaterias({ materias, docentes = [], ejecutar }) {
     // `editando`: null = cerrado, 'nueva' = crear, objeto = editar existente.
     const [editando, setEditando] = useState(null);
     const [form, setForm] = useState(FORM_VACIO);
-    const [asignarModo, setAsignarModo] = useState('ninguno');
+    // Por defecto la materia nueva se asigna a todos los docentes activos:
+    // así se propaga sola Admin → Docente sin pasos manuales extra.
+    const [asignarModo, setAsignarModo] = useState('todos');
     const [asignarIds, setAsignarIds] = useState([]);
     const [asignando, setAsignando] = useState(null);
     const [asignacionIds, setAsignacionIds] = useState([]);
@@ -60,7 +62,7 @@ export function ModuloMaterias({ materias, docentes = [], ejecutar }) {
 
     const abrirNueva = () => {
         setForm(FORM_VACIO);
-        setAsignarModo('ninguno');
+        setAsignarModo('todos');
         setAsignarIds([]);
         setEditando('nueva');
     };
@@ -411,8 +413,8 @@ export function ModuloMaterias({ materias, docentes = [], ejecutar }) {
                             <div className="matcat-asignar">
                                 <strong>¿A qué docentes asignarla?</strong>
                                 {[
+                                    ['todos', `Asignar automáticamente a todos los docentes (${docentes.length})`],
                                     ['ninguno', 'No asignar todavía (lo harás desde "Docentes")'],
-                                    ['todos', `Asignar a todos los docentes actuales (${docentes.length})`],
                                     ['algunos', 'Elegir docentes específicos']
                                 ].map(([valor, etiqueta]) => (
                                     <label key={valor} className="matcat-radio">

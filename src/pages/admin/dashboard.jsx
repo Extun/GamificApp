@@ -189,9 +189,16 @@ export function Dashboard() {
         listarMaterias()
             .catch(() => [])
             .then(() => docenteService.misMaterias())
-            .then((lista) => setMaterias(lista.map((m) => m.nombre)))
+            .then((lista) => setMaterias((prev) => {
+                const nombres = lista.map((m) => m.nombre);
+                // Misma referencia si nada cambió, para no re-disparar los
+                // efectos que dependen de `materias` en cada navegación.
+                return JSON.stringify(prev) === JSON.stringify(nombres) ? prev : nombres;
+            }))
             .catch((err) => setErrorMaterial(`No se pudieron cargar tus materias: ${err.message}`));
-    }, []);
+        // Depende de `pagina`: al cambiar de sección se re-consulta la BD,
+        // así una materia recién asignada por el admin aparece sin recargar.
+    }, [pagina]);
 
     const [misEstudiantes, setMisEstudiantes] = useState([]);
     const [invitaciones, setInvitaciones] = useState([]);
