@@ -85,6 +85,15 @@ export const purgarDePapelera = (tipo, id) =>
 export const actualizarInstitucion = (datos) =>
     pedir('/api/admin/institucion', { method: 'PUT', body: JSON.stringify(datos) });
 
+// ---- Misiones (SPEC-007, Fase 2) ----
+export const listarMisiones = () => pedir('/api/admin/misiones');
+export const crearMision = (datos) =>
+    pedir('/api/admin/misiones', { method: 'POST', body: JSON.stringify(datos) });
+export const actualizarMision = (id, datos) =>
+    pedir(`/api/admin/misiones/${id}`, { method: 'PUT', body: JSON.stringify(datos) });
+export const activarMision = (id, activa) =>
+    pedir(`/api/admin/misiones/${id}/activa`, { method: 'PATCH', body: JSON.stringify({ activa }) });
+
 export default {
     listarDocentes,
     crearDocente,
@@ -113,5 +122,9 @@ export default {
     listarPapelera,
     restaurarDePapelera,
     purgarDePapelera,
-    actualizarInstitucion
+    actualizarInstitucion,
+    listarMisiones,
+    crearMision,
+    actualizarMision,
+    activarMision
 };

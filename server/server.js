@@ -16,6 +16,8 @@ import rankingRouter from './routes/ranking.js';
 import iaRouter from './routes/ia.js';
 import institucionRouter from './routes/institucion.js';
 import cursosRouter from './routes/cursos.js';
+import misionesRouter from './routes/misiones.js';
+import adminMisionesRouter from './routes/adminMisiones.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -86,6 +88,8 @@ app.use('/api/institucion', institucionRouter);
 // ---- A partir de aquí, TODA la API exige un JWT válido ----
 app.use('/api', autenticar);
 
+// Antes de adminRouter para que esta sub-ruta tenga precedencia.
+app.use('/api/admin/misiones', adminMisionesRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/docente', docenteRouter);
 app.use('/api/materias/:id/material', materialesRouter);
@@ -94,6 +98,7 @@ app.use('/api/progreso', progresoRouter);
 app.use('/api/retos', retosRouter);
 app.use('/api/ranking', rankingRouter);
 app.use('/api/cursos', cursosRouter);
+app.use('/api/misiones', misionesRouter);
 app.use('/api/ia', iaRouter);
 
 // Manejador central de errores: nunca filtra detalles internos al cliente.

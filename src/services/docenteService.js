@@ -62,9 +62,12 @@ export const cambiarPassword = (passwordActual, passwordNueva) =>
 // Ranking completo (posición, curso, XP, completados, última actividad).
 export const rankingCompleto = () => pedir('/api/ranking/completo');
 
+// Estadísticas de misiones de sus estudiantes (SPEC-007, solo lectura).
+export const misionesResumen = () => pedir('/api/docente/misiones');
+
 export default {
     misMaterias, listarCursos, generarInvitaciones, listarInvitaciones,
     misEstudiantes, resetearPinEstudiante,
     resumen, detalleEstudiante, crearRetroalimentacion, eliminarRetroalimentacion,
-    miPerfil, actualizarPerfil, cambiarPassword, rankingCompleto
+    miPerfil, actualizarPerfil, cambiarPassword, rankingCompleto, misionesResumen
 };

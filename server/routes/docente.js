@@ -280,6 +280,104 @@ router.get('/resumen', async (req, res, next) => {
     }
 });
 
+// GET /api/docente/misiones — estadísticas AGREGADAS y de SOLO LECTURA del
+// progreso de misiones de los estudiantes del docente (SPEC-007, Fase 2). El
+// docente observa, nunca modifica. El admin ve el total institucional.
+router.get('/misiones', async (req, res, next) => {
+    try {
+        // Estudiantes en el ámbito (los que se registraron con SUS códigos; el
+        // admin, todos). Se filtra por el estudiante de mision_estudiante.
+        const filtro = req.user.rol === 'admin'
+            ? { sql: '', params: [] }
+            : {
+                sql: `AND me.estudiante_id IN (
+                        SELECT u.estudiante_id FROM invitaciones_estudiante i
+                        JOIN usuarios u ON u.id = i.usuario_id
+                        WHERE i.docente_id = ? AND i.estado = 'usado')`,
+                params: [req.user.id]
+            };
+
+        // Nº de estudiantes del ámbito (denominador de los promedios).
+        const [[aula]] = req.user.rol === 'admin'
+            ? await pool.query('SELECT COUNT(*) AS n FROM estudiantes')
+            : await pool.query(
+                `SELECT COUNT(DISTINCT u.estudiante_id) AS n
+                 FROM invitaciones_estudiante i
+                 JOIN usuarios u ON u.id = i.usuario_id
+                 WHERE i.docente_id = ? AND i.estado = 'usado' AND u.estudiante_id IS NOT NULL`,
+                [req.user.id]
+            );
+
+        // Misiones activas por categoría (base para el % de avance).
+        const [catBase] = await pool.query(
+            'SELECT categoria, COUNT(*) AS total FROM misiones WHERE activa = TRUE GROUP BY categoria'
+        );
+
+        // Completadas por categoría / por tier, y las más completadas.
+        const [porCategoria] = await pool.query(
+            `SELECT mi.categoria, SUM(me.completada) AS completadas
+             FROM mision_estudiante me JOIN misiones mi ON mi.id = me.mision_id
+             WHERE mi.activa = TRUE ${filtro.sql}
+             GROUP BY mi.categoria`,
+            filtro.params
+        );
+        const [porTier] = await pool.query(
+            `SELECT mi.tier, SUM(me.completada) AS completadas
+             FROM mision_estudiante me JOIN misiones mi ON mi.id = me.mision_id
+             WHERE mi.activa = TRUE ${filtro.sql}
+             GROUP BY mi.tier`,
+            filtro.params
+        );
+        const [top] = await pool.query(
+            `SELECT mi.titulo, mi.categoria, mi.tier, SUM(me.completada) AS veces
+             FROM mision_estudiante me JOIN misiones mi ON mi.id = me.mision_id
+             WHERE mi.activa = TRUE ${filtro.sql}
+             GROUP BY mi.id HAVING veces > 0
+             ORDER BY veces DESC, mi.orden LIMIT 8`,
+            filtro.params
+        );
+        const [[tot]] = await pool.query(
+            `SELECT COALESCE(SUM(me.completada), 0) AS completadas
+             FROM mision_estudiante me JOIN misiones mi ON mi.id = me.mision_id
+             WHERE mi.activa = TRUE ${filtro.sql}`,
+            filtro.params
+        );
+
+        const estudiantes = Number(aula.n) || 0;
+        const baseCat = {};
+        for (const c of catBase) baseCat[c.categoria] = Number(c.total);
+        const completadasCat = {};
+        for (const c of porCategoria) completadasCat[c.categoria] = Number(c.completadas || 0);
+
+        const categorias = Object.keys(baseCat).map((cat) => {
+            const completadas = completadasCat[cat] || 0;
+            const posibles = (baseCat[cat] || 0) * estudiantes;
+            return {
+                categoria: cat,
+                completadas,
+                avance: posibles > 0 ? Math.round((completadas / posibles) * 100) : 0
+            };
+        });
+
+        res.json({
+            estudiantes,
+            completadas: Number(tot.completadas) || 0,
+            promedio_por_estudiante: estudiantes > 0
+                ? Math.round(((Number(tot.completadas) || 0) / estudiantes) * 10) / 10
+                : 0,
+            categorias,
+            por_tier: porTier.map((t) => ({ tier: t.tier, completadas: Number(t.completadas || 0) })),
+            top: top.map((t) => ({ titulo: t.titulo, categoria: t.categoria, tier: t.tier, veces: Number(t.veces) }))
+        });
+    } catch (err) {
+        // Tablas de misiones ausentes (deploy a medias): panel sin datos.
+        if (err.code === 'ER_NO_SUCH_TABLE') {
+            return res.json({ estudiantes: 0, completadas: 0, promedio_por_estudiante: 0, categorias: [], por_tier: [], top: [] });
+        }
+        next(err);
+    }
+});
+
 // GET /api/docente/estudiantes/:usuarioId/detalle — ficha rápida (SPEC-004):
 // datos, XP, últimas actividades reales, progreso por materia, insignias con
 // regla real derivable en servidor y las retroalimentaciones del docente.

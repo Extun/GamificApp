@@ -38,6 +38,8 @@ import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import { BibliotecaActividades } from '../docente/BibliotecaActividades';
 import { RankingCompleto } from '../docente/RankingCompleto';
 import { PerfilDocente } from '../docente/PerfilDocente';
+import { MisionesDocente } from '../docente/MisionesDocente';
+import MilitaryTechRoundedIcon from '@mui/icons-material/MilitaryTechRounded';
 import { FichaEstudiante } from '../docente/FichaEstudiante';
 
 const TIPO_RETO_LABEL = { quiz: 'Quiz', clasificador: 'Juego', mision: 'Misión' };
@@ -428,6 +430,7 @@ export function Dashboard() {
                 { id: 'biblioteca', label: 'Biblioteca', Icon: LocalLibraryRoundedIcon, grupo: 'Enseñanza' },
                 { id: 'estudiantes', label: 'Mis Estudiantes', Icon: GroupsRoundedIcon, grupo: 'Mi aula' },
                 { id: 'ranking', label: 'Ranking', Icon: EmojiEventsRoundedIcon, grupo: 'Mi aula' },
+                { id: 'misiones', label: 'Misiones', Icon: MilitaryTechRoundedIcon, grupo: 'Mi aula' },
                 { id: 'perfil', label: 'Mi Perfil', Icon: AccountCircleRoundedIcon, grupo: 'Cuenta' }
             ].map((item) => ({
                 ...item,
@@ -1017,6 +1020,22 @@ export function Dashboard() {
                             subtitulo="La tabla de posiciones por XP acumulada. Puedes buscar, ordenar y filtrar por curso."
                         />
                         <RankingCompleto onError={setErrorMaterial} />
+                        {errorMaterial && (
+                            <div className="aviso-migracion" role="alert">
+                                <p>{errorMaterial}</p>
+                                <button onClick={() => setErrorMaterial('')}>Entendido</button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {pagina === 'misiones' && (
+                    <div className="home-doc">
+                        <DashboardHeader
+                            titulo="Misiones de mis estudiantes"
+                            subtitulo="El avance general de tus estudiantes en el sistema de misiones. Solo para observar; el catálogo lo gestiona el administrador."
+                        />
+                        <MisionesDocente onError={setErrorMaterial} />
                         {errorMaterial && (
                             <div className="aviso-migracion" role="alert">
                                 <p>{errorMaterial}</p>

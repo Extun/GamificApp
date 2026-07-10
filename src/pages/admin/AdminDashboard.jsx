@@ -20,6 +20,7 @@ import ApartmentRoundedIcon from '@mui/icons-material/ApartmentRounded';
 import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
 import HistoryEduRoundedIcon from '@mui/icons-material/HistoryEduRounded';
 import DeleteSweepRoundedIcon from '@mui/icons-material/DeleteSweepRounded';
+import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
 import authService from '../../services/authService';
 import adminService from '../../services/adminService';
 import { listarMaterias, estiloMateria } from '../../services/materiasService';
@@ -28,6 +29,7 @@ import { SidebarLayout } from '../../components/dashboard/SidebarLayout';
 import useAutoRefresh from '../../hooks/useAutoRefresh';
 import ModuloMaterias from './modulos/ModuloMaterias';
 import ModuloCursos from './modulos/ModuloCursos';
+import ModuloMisiones from './modulos/ModuloMisiones';
 import ModuloInstitucion from './modulos/ModuloInstitucion';
 import ModuloAdministradores from './modulos/ModuloAdministradores';
 import ModuloAuditoria from './modulos/ModuloAuditoria';
@@ -113,6 +115,8 @@ export function AdminDashboard() {
     // Auditoría y Papelera (SPEC-003).
     const [auditoria, setAuditoria] = useState([]);
     const [papelera, setPapelera] = useState([]);
+    // Catálogo de misiones (SPEC-007). Incluye metadatos para el formulario.
+    const [misionesData, setMisionesData] = useState({ misiones: [], categorias: [], tiers: [], tipos_objetivo: [], horizontes: [] });
     const [actividadReciente, setActividadReciente] = useState([]);
     const [error, setError] = useState('');
     const [avisoOk, setAvisoOk] = useState('');
@@ -132,7 +136,7 @@ export function AdminDashboard() {
             setError('');
             // Cada lista se pide solo si la sesión tiene ese permiso (la UI
             // oculta; el servidor rechazaría igual las peticiones de más).
-            const [d, e, i, m, c, a, au, p, rec] = await Promise.all([
+            const [d, e, i, m, c, a, au, p, rec, ms] = await Promise.all([
                 puede('docentes') ? adminService.listarDocentes() : Promise.resolve([]),
                 puede('estudiantes') ? adminService.listarEstudiantes() : Promise.resolve([]),
                 puede('invitaciones') ? adminService.listarInvitaciones() : Promise.resolve([]),
@@ -141,7 +145,9 @@ export function AdminDashboard() {
                 puede('administradores') ? adminService.listarAdministradores() : Promise.resolve([]),
                 puede('auditoria') ? adminService.listarAuditoria() : Promise.resolve([]),
                 puede('papelera') ? adminService.listarPapelera() : Promise.resolve([]),
-                adminService.auditoriaReciente().catch(() => [])
+                adminService.auditoriaReciente().catch(() => []),
+                // Misiones se gestionan con el permiso 'materias' (contenido académico).
+                puede('materias') ? adminService.listarMisiones().catch(() => null) : Promise.resolve(null)
             ]);
             setDocentes(d);
             setEstudiantes(e);
@@ -152,6 +158,7 @@ export function AdminDashboard() {
             setAuditoria(au);
             setPapelera(p);
             setActividadReciente(rec);
+            if (ms) setMisionesData(ms);
         } catch (err) {
             setError(err.message);
         }
@@ -247,6 +254,7 @@ export function AdminDashboard() {
                 { id: 'estudiantes', label: 'Estudiantes', Icon: GroupsRoundedIcon, grupo: 'Gestión Académica', permiso: 'estudiantes' },
                 { id: 'materias', label: 'Materias', Icon: MenuBookRoundedIcon, grupo: 'Gestión Académica', permiso: 'materias' },
                 { id: 'cursos', label: 'Cursos', Icon: Diversity3RoundedIcon, grupo: 'Gestión Académica', permiso: 'cursos' },
+                { id: 'misiones', label: 'Misiones', Icon: EmojiEventsRoundedIcon, grupo: 'Gestión Académica', permiso: 'materias' },
                 { id: 'invitaciones', label: 'Invitaciones', Icon: VpnKeyRoundedIcon, grupo: 'Gestión Institucional', permiso: 'invitaciones' },
                 { id: 'institucion', label: 'Institución', Icon: ApartmentRoundedIcon, grupo: 'Gestión Institucional', permiso: 'institucion' },
                 { id: 'administradores', label: 'Administradores', Icon: AdminPanelSettingsRoundedIcon, grupo: 'Seguridad', permiso: 'administradores' },
@@ -575,6 +583,17 @@ export function AdminDashboard() {
                                     subtitulo="El catálogo oficial de la institución. Docentes y estudiantes ven estas materias con el color e icono que definas aquí."
                                 />
                                 <ModuloMaterias materias={materias} docentes={docentes} ejecutar={ejecutar} />
+                            </div>
+                        )}
+
+                        {/* MISIONES — catálogo de misiones y progresión (SPEC-007). */}
+                        {pagina === 'misiones' && (
+                            <div className="dash-secciones">
+                                <DashboardHeader
+                                    titulo="Misiones"
+                                    subtitulo="El catálogo de misiones que ven los estudiantes. Actívalas o desactívalas, ajusta recompensas o crea nuevas. El progreso se calcula automáticamente desde la actividad real."
+                                />
+                                <ModuloMisiones data={misionesData} ejecutar={ejecutar} />
                             </div>
                         )}
 

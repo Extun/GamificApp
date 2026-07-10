@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import mysql from 'mysql2/promise';
 import bcrypt from 'bcryptjs';
+import MISIONES from './lib/misionesSeed.js';
 
 const aquí = dirname(fileURLToPath(import.meta.url));
 const RUTA_ESQUEMA = join(aquí, '..', 'database', 'produccion_defaultdb.sql');
@@ -43,6 +44,7 @@ export const inicializarEsquema = async () => {
         await migrarCatalogoInteligente(conn);
         await migrarUnicidadPapelera(conn);
         await migrarCentroDocente(conn);
+        await migrarSistemaMisiones(conn);
         console.log('✅ Esquema verificado/creado en la base de datos.');
         await asegurarAdmin(conn);
         await asegurarAdminPrincipal(conn);
@@ -295,6 +297,102 @@ const migrarCentroDocente = async (conn) => {
             ADD COLUMN revisado    BOOLEAN      NOT NULL DEFAULT FALSE`);
         console.log('✅ Migración: observación/revisado agregados a progreso_estudiante.');
     }
+};
+
+// Migración 009 (SPEC-007) — Sistema de Misiones y Progresión.
+// 1) Racha de actividad en `estudiantes`. 2) Catálogo `misiones` (fuente única
+// de verdad) y progreso `mision_estudiante`. 3) Seed idempotente de las
+// misiones iniciales (server/lib/misionesSeed.js), incluida la resolución de la
+// cadena de desbloqueo (requiere_mision_id) por `clave`.
+const migrarSistemaMisiones = async (conn) => {
+    if (await faltaColumna(conn, 'estudiantes', 'racha_actual')) {
+        await conn.query(`ALTER TABLE estudiantes
+            ADD COLUMN racha_actual           SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            ADD COLUMN racha_maxima           SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            ADD COLUMN ultima_fecha_actividad DATE NULL`);
+        console.log('✅ Migración: racha de actividad agregada a estudiantes.');
+    }
+
+    await conn.query(`CREATE TABLE IF NOT EXISTS misiones (
+        id                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
+        clave               VARCHAR(60)  NOT NULL UNIQUE,
+        categoria           VARCHAR(20)  NOT NULL,
+        tier                VARCHAR(10)  NOT NULL,
+        titulo              VARCHAR(120) NOT NULL,
+        descripcion         VARCHAR(255) NOT NULL,
+        icono               VARCHAR(16)  NULL,
+        tipo_objetivo       VARCHAR(40)  NOT NULL,
+        objetivo_meta       INT UNSIGNED NOT NULL DEFAULT 1,
+        objetivo_filtro     JSON         NULL,
+        requiere_mision_id  INT UNSIGNED NULL,
+        recompensa_xp       INT UNSIGNED NOT NULL DEFAULT 0,
+        recompensa_insignia VARCHAR(60)  NULL,
+        recompensa_banner   VARCHAR(60)  NULL,
+        horizonte           VARCHAR(10)  NOT NULL DEFAULT 'corto',
+        orden               INT UNSIGNED NOT NULL DEFAULT 0,
+        activa              BOOLEAN      NOT NULL DEFAULT TRUE,
+        creado_en           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        INDEX idx_misiones_categoria (categoria, orden),
+        CONSTRAINT fk_mision_requiere FOREIGN KEY (requiere_mision_id)
+            REFERENCES misiones (id) ON UPDATE CASCADE ON DELETE SET NULL
+    ) ENGINE = InnoDB`);
+
+    await conn.query(`CREATE TABLE IF NOT EXISTS mision_estudiante (
+        id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+        estudiante_id   INT UNSIGNED NOT NULL,
+        mision_id       INT UNSIGNED NOT NULL,
+        progreso_actual INT UNSIGNED NOT NULL DEFAULT 0,
+        completada      BOOLEAN      NOT NULL DEFAULT FALSE,
+        completada_en   DATETIME     NULL,
+        actualizado_en  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_est_mision (estudiante_id, mision_id),
+        CONSTRAINT fk_me_estudiante FOREIGN KEY (estudiante_id)
+            REFERENCES estudiantes (id) ON UPDATE CASCADE ON DELETE CASCADE,
+        CONSTRAINT fk_me_mision FOREIGN KEY (mision_id)
+            REFERENCES misiones (id) ON UPDATE CASCADE ON DELETE CASCADE
+    ) ENGINE = InnoDB`);
+
+    // Seed idempotente. NO se toca `requiere_mision_id` aquí (se resuelve luego
+    // por clave): así el orden de inserción no importa y editar textos/umbrales
+    // desde el seed se refleja sin duplicar filas.
+    for (const mis of MISIONES) {
+        await conn.query(
+            `INSERT INTO misiones
+                (clave, categoria, tier, titulo, descripcion, icono, tipo_objetivo,
+                 objetivo_meta, objetivo_filtro, recompensa_xp, recompensa_insignia,
+                 recompensa_banner, horizonte, orden)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+                categoria = VALUES(categoria), tier = VALUES(tier),
+                titulo = VALUES(titulo), descripcion = VALUES(descripcion),
+                icono = VALUES(icono), tipo_objetivo = VALUES(tipo_objetivo),
+                objetivo_meta = VALUES(objetivo_meta), objetivo_filtro = VALUES(objetivo_filtro),
+                recompensa_xp = VALUES(recompensa_xp), recompensa_insignia = VALUES(recompensa_insignia),
+                recompensa_banner = VALUES(recompensa_banner), horizonte = VALUES(horizonte),
+                orden = VALUES(orden)`,
+            [
+                mis.clave, mis.categoria, mis.tier, mis.titulo, mis.descripcion, mis.icono,
+                mis.tipo_objetivo, mis.objetivo_meta,
+                mis.objetivo_filtro ? JSON.stringify(mis.objetivo_filtro) : null,
+                mis.recompensa_xp, mis.recompensa_insignia, mis.recompensa_banner,
+                mis.horizonte, mis.orden
+            ]
+        );
+    }
+    // Resolver la cadena de desbloqueo por clave (una vez existen todas las filas).
+    for (const mis of MISIONES) {
+        if (!mis.requiere) continue;
+        await conn.query(
+            `UPDATE misiones hijo
+             JOIN misiones padre ON padre.clave = ?
+             SET hijo.requiere_mision_id = padre.id
+             WHERE hijo.clave = ?`,
+            [mis.requiere, mis.clave]
+        );
+    }
+    console.log(`✅ Migración: sistema de misiones (${MISIONES.length} misiones semilla).`);
 };
 
 // Invariante del sistema: SIEMPRE existe al menos un Administrador Principal

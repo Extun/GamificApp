@@ -88,7 +88,11 @@ export function MisionNarrativa({ reto, estudianteId, onSalir }) {
         }
 
         servidor.then((data) => {
-            if (data) {
+            if (!data) return;
+            const mision = data.nuevas_misiones?.[0];
+            if (mision) {
+                setToast({ titulo: '¡Misión completada!', mensaje: mision.titulo });
+            } else {
                 setToast({
                     titulo: 'Progreso guardado',
                     mensaje: `+${data.xp_abonado} XP registrados en tu cuenta`,

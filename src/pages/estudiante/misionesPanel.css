@@ -1,0 +1,146 @@
+/* Panel de Misiones del estudiante (SPEC-007). CSS plano con tokens de tema. */
+
+.misiones-panel { pointer-events: auto; }
+
+/* Resumen superior: nivel, XP, racha, progreso global. */
+.misiones-resumen {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+    margin: 1rem 0 1.25rem;
+}
+.misiones-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.75rem 1rem;
+    background: var(--color-surface, #fff);
+    border: 1px solid var(--color-border, #e5e7eb);
+    border-radius: var(--radius-lg, 16px);
+    box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
+}
+.misiones-stat span { font-size: 0.8rem; color: var(--color-text-soft, #6b7280); }
+.misiones-stat strong { font-size: 1.15rem; }
+
+/* Chips de filtro por categoría. */
+.misiones-filtros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+}
+.mision-chip {
+    --cat-color: var(--color-primary, #3b82f6);
+    padding: 0.4rem 0.9rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-border, #e5e7eb);
+    background: var(--color-surface, #fff);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text, #111827);
+    cursor: pointer;
+    transition: transform 0.1s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.mision-chip:hover { transform: translateY(-1px); }
+.mision-chip.is-activo {
+    background: color-mix(in srgb, var(--cat-color) 14%, white);
+    border-color: var(--cat-color);
+    color: var(--cat-color);
+}
+
+/* Rejilla de misiones. */
+.misiones-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1rem;
+}
+
+.mision-card {
+    --cat-color: var(--color-primary, #3b82f6);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: var(--color-surface, #fff);
+    border: 1px solid var(--color-border, #e5e7eb);
+    border-left: 4px solid var(--cat-color);
+    border-radius: var(--radius-lg, 16px);
+    box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.mision-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md, 0 6px 16px rgba(0, 0, 0, 0.1)); }
+
+/* Estados. */
+.mision-card.mision-bloqueada { opacity: 0.62; filter: grayscale(0.35); }
+.mision-card.mision-completada {
+    background: color-mix(in srgb, var(--cat-color) 8%, white);
+    border-color: var(--cat-color);
+}
+
+.mision-card-top {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.mision-cat-emoji { font-size: 1.5rem; }
+.mision-tier {
+    --tier-color: #6b7280;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    color: var(--tier-color);
+    background: color-mix(in srgb, var(--tier-color) 14%, white);
+}
+.mision-check {
+    margin-left: auto;
+    color: #10b981;
+    font-weight: 900;
+    font-size: 1.1rem;
+}
+.mision-lock { margin-left: auto; font-size: 1rem; }
+
+.mision-titulo { margin: 0; font-size: 1rem; }
+.mision-desc {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--color-text-soft, #6b7280);
+    min-height: 2.2em;
+}
+
+/* Barra de progreso (reutiliza .progress-track/.progress-fill del panel). */
+.mision-progreso { display: flex; flex-direction: column; gap: 0.25rem; }
+.mision-progreso .progress-track {
+    height: 8px;
+    background: var(--color-border, #e5e7eb);
+    border-radius: 999px;
+    overflow: hidden;
+}
+.mision-progreso .progress-fill {
+    height: 100%;
+    background: var(--cat-color);
+    border-radius: 999px;
+    transition: width 0.3s ease;
+}
+.mision-progreso-txt { font-size: 0.75rem; color: var(--color-text-soft, #6b7280); }
+
+.mision-card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: auto;
+    padding-top: 0.25rem;
+    font-size: 0.75rem;
+}
+.mision-recompensa { display: flex; align-items: center; gap: 0.35rem; }
+.mision-xp { font-weight: 700; color: var(--cat-color); }
+.mision-horizonte { color: var(--color-text-soft, #6b7280); }
+.mision-hint { color: var(--color-text-soft, #6b7280); font-style: italic; text-align: right; }
+
+/* Responsive: móvil/tablet (dispositivos compartidos de la escuela). */
+@media (max-width: 640px) {
+    .misiones-resumen { grid-template-columns: repeat(2, 1fr); }
+    .misiones-grid { grid-template-columns: 1fr; }
+}

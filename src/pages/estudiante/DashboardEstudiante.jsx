@@ -5,11 +5,8 @@ import './dashboardEstudiante.css';
 import HomeFilledIcon from '@mui/icons-material/HomeFilled';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
-import LocalFireDepartmentRoundedIcon from '@mui/icons-material/LocalFireDepartmentRounded';
-import StarRoundedIcon from '@mui/icons-material/StarRounded';
 import QuizRoundedIcon from '@mui/icons-material/QuizRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
-import WorkspacePremiumRoundedIcon from '@mui/icons-material/WorkspacePremiumRounded';
 import LockRoundedIcon from '@mui/icons-material/LockRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import RocketLaunchRoundedIcon from '@mui/icons-material/RocketLaunchRounded';
@@ -21,35 +18,13 @@ import { MisionNarrativa } from '../../components/mision/MisionNarrativa';
 import AutoStoriesRoundedIcon from '@mui/icons-material/AutoStoriesRounded';
 import { obtenerRetosPublicados } from '../../services/retosService';
 import ExtensionRoundedIcon from '@mui/icons-material/ExtensionRounded';
-import gamificationService, { CATALOGO_LOGROS } from '../../services/gamificationService';
+import gamificationService from '../../services/gamificationService';
 import authService from '../../services/authService';
 import { obtenerMaterial } from '../../services/materialesService';
 import { listarMaterias, uiMateria } from '../../services/materiasService';
 import { getInstitucionCache } from '../../services/institucionService';
 import { EmptyState } from '../../components/dashboard/DashboardWidgets';
-
-// Presentación (icono + color) por cada logro del catálogo del servicio.
-const LOGRO_UI = {
-    'primer-quiz': { icon: QuizRoundedIcon, color: "gold" },
-    'maestro-materia': { icon: WorkspacePremiumRoundedIcon, color: "primary" },
-    'racha-7': { icon: LocalFireDepartmentRoundedIcon, color: "fire" },
-    'estrella-aula': { icon: StarRoundedIcon, color: "accent" },
-    'explorador': { icon: MenuBookIcon, color: "primary" }
-};
-
-function LogroCard({ logro, obtenido }) {
-    const { icon: Icon, color } = LOGRO_UI[logro.id] || { icon: StarRoundedIcon, color: "primary" };
-    return (
-        <div className={`logro-card ${obtenido ? '' : 'logro-bloqueado'}`}>
-            <span className={`logro-icon logro-icon-${color}`}>
-                {obtenido ? <Icon /> : <LockRoundedIcon />}
-            </span>
-            <h4>{logro.titulo}</h4>
-            <p>{logro.desc}</p>
-            {obtenido && <span className="logro-badge">Obtenido</span>}
-        </div>
-    );
-}
+import { PanelMisiones } from './PanelMisiones';
 
 export function DashboardEstudiante() {
     const navigate = useNavigate();
@@ -550,17 +525,7 @@ export function DashboardEstudiante() {
                     )}
 
                     {/* LOGROS */}
-                    {pagina === "logros" && (
-                        <>
-                            <h1 style={{ pointerEvents: "none" }}>🏆 Mis premios</h1>
-                            <p className="contenido-sub" style={{ pointerEvents: "none" }}>Gana insignias jugando quizzes, juegos y misiones.</p>
-                            <div className="logros-grid">
-                                {CATALOGO_LOGROS.map((logro) => (
-                                    <LogroCard key={logro.id} logro={logro} obtenido={gami.logros.includes(logro.id)} />
-                                ))}
-                            </div>
-                        </>
-                    )}
+                    {pagina === "logros" && <PanelMisiones />}
 
             <FilePreviewModal
                 archivo={archivoPreview}

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../db.js';
 import { registrarAuditoria } from '../lib/auditoria.js';
+import { actualizarRacha, evaluarMisiones } from '../lib/misiones.js';
 
 const router = Router();
 
@@ -188,6 +189,15 @@ router.post('/', async (req, res, next) => {
             );
         }
 
+        // Sistema de Misiones (SPEC-007): dentro de la MISMA transacción, con la
+        // fila del estudiante ya bloqueada. Primero la racha (constancia), luego
+        // la evaluación de misiones (que puede otorgar XP de recompensa). Se
+        // reconsulta el XP final para reportarlo con precisión.
+        await actualizarRacha(conn, estudianteId);
+        const nuevasMisiones = await evaluarMisiones(conn, estudianteId);
+        const [[fin]] = await conn.query('SELECT xp_total FROM estudiantes WHERE id = ?', [estudianteId]);
+        const xpTotalFinal = Number(fin?.xp_total ?? (estudiante.xp_total + delta));
+
         await conn.commit();
         // Auditoría (SPEC-003): solo cuando quien resuelve es el propio
         // estudiante (los registros de docente/admin son correcciones).
@@ -212,9 +222,11 @@ router.post('/', async (req, res, next) => {
             estudiante_id: estudianteId,
             reto_id: retoId,
             xp_abonado: delta,
-            xp_total: estudiante.xp_total + delta,
+            xp_total: xpTotalFinal,
             porcentaje,
-            completado: porcentaje === 100
+            completado: porcentaje === 100,
+            // Misiones recién completadas por esta acción (para el LogroToast).
+            nuevas_misiones: nuevasMisiones
         });
     } catch (err) {
         // rollback() puede fallar si la conexión murió; el error original manda.

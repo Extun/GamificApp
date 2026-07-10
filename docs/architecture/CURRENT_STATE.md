@@ -2,7 +2,7 @@
 
 # Última actualización
 
-2026-07-09
+2026-07-10
 
 # Responsable
 
@@ -11,6 +11,17 @@ Fabrizio Zurita (Extun)
 ## 1. Resumen
 
 El **MVP está completo y en producción** (Vercel + Render + Aiven). Los tres roles funcionan de punta a punta. El trabajo actual es la **Épica 1: rediseño de la experiencia del estudiante**, cuya auditoría y primera spec ya existen pero **aún no se ha implementado nada** (el estudiante sigue usando el monolito `DashboardEstudiante.jsx`).
+
+> **SPEC-007 — Sistema de Misiones y Progresión / Fase 5.5 (2026-07-10, Fase 1 implementada en código; migración 009 a Aiven se aplica sola vía initDb.js al deploy):**
+> - **Reemplaza los logros de `localStorage`** (5 hardcodeados, no compartidos entre dispositivos) por un sistema **server-backed y escalable a cientos de misiones desde BD** (nada hardcodeado en el front).
+> - **BD (migración `009-sistema-misiones.sql` + reversa, idempotente en `initDb.js`):** racha en `estudiantes` (`racha_actual`/`racha_maxima`/`ultima_fecha_actividad`, actualizada en la transacción de `POST /api/progreso` con fecha local UTC-5); catálogo `misiones` (categoría, tier, `tipo_objetivo`, `objetivo_meta`, `objetivo_filtro` JSON, `requiere_mision_id` para desbloqueo, recompensas XP/insignia/banner, horizonte, `activa`); progreso `mision_estudiante`.
+> - **Motor `server/lib/misiones.js`:** `evaluarMisiones()` con **registro de evaluadores** por `tipo_objetivo` (11 tipos: actividades_completadas/perfectas/ia, mision_narrativa, tipos_jugados, materias_distintas, xp_total, nivel_alcanzado, racha_dias, ranking_top, insignias_categoria). Todo se calcula desde datos REALES (`progreso_estudiante`/`retos`/`estudiantes`); idempotente; otorga XP de recompensa una sola vez. Se evalúa al ESCRIBIR (dentro de la transacción de progreso → `nuevas_misiones` en la respuesta para el `LogroToast`) y al LEER (`GET /api/misiones`, cubre ranking).
+> - **Seed único `server/lib/misionesSeed.js`:** 46 misiones en 8 categorías (📚🏆🔥🤝🎯🚀⭐🤖), cadenas Bronce→Diamante con umbrales/horizontes escalonados (5 min → 6 meses). Precisión = "actividades perfectas" (porcentaje=100). Aplicado idempotente por `initDb.js` (`ON DUPLICATE KEY UPDATE` por `clave`; cadena `requiere` resuelta por clave). Agregar cientos más = agregar filas, sin tocar el motor ni migrar (salvo un `tipo_objetivo` nuevo → una entrada en el registro).
+> - **Frontend:** `src/services/misionesService.js` (identidad visual de categorías/tiers, presentación) + `src/pages/estudiante/PanelMisiones.jsx` (+ `misionesPanel.css`): la página **Mis Premios** del estudiante pasó de los 5 logros de `localStorage` al panel de misiones moderno (resumen nivel/XP/racha/completadas, filtros por categoría, tarjetas con barra de progreso, %, siguiente recompensa, tiempo estimado, tier y estado bloqueada/disponible/completada). Los 6 reproductores anuncian "¡Misión completada!" vía `nuevas_misiones` (Quiz, juegosComunes → Memorama/Línea/Completar, Clasificador, Misión narrativa).
+> - **Progreso 100% automático** (sin botón de "reclamar"): se calcula al jugar y al abrir el panel. Los logros viejos de `localStorage` no se migran; el progreso real se **recalcula desde `progreso_estudiante`**, así un estudiante con historial recupera sus misiones.
+> - **Fase 2 (2026-07-10, también en código):** **Docente** — `GET /api/docente/misiones` (estadísticas AGREGADAS de solo lectura de sus estudiantes: avance por categoría, top de misiones, promedio; el admin ve el total institucional), nuevo apartado "Misiones" en el panel docente (`src/pages/docente/MisionesDocente.jsx`, StatCards + barras por categoría + top, nunca modifica). **Admin** — router `server/routes/adminMisiones.js` (`GET/POST/PUT /api/admin/misiones` + `PATCH /:id/activa`) protegido con el permiso `materias` (contenido académico; sin migrar el modelo de permisos), validación de `tipo_objetivo` contra el registro del motor, auditoría en cada cambio; módulo `ModuloMisiones` en el panel admin (TablaPro + ModalPanel: activar/desactivar, editar recompensas/umbral/textos, crear misiones nuevas con clave-slug, filtro JSON y cadena de desbloqueo). Entrada "Misiones" en el sidebar admin (Gestión Académica) y docente (Mi aula).
+> - Verificado: `npm run build` limpio (Fase 1 y 2), sintaxis de servidor OK, seed validado (46 misiones, claves únicas, cadenas íntegras, 11 tipos cubiertos). **Sin MySQL local: la verificación end-to-end (evaluación, racha, desbloqueo, toast, CRUD admin, stats docente) queda para el deploy con la migración 009.**
+> - Spec: `docs/specifications/SPEC-007-Sistema-Misiones.md`.
 
 > **Consistencia global de entidades / Papelera (2026-07-09, implementada en código; migración 007 se aplica sola vía initDb.js al deploy):**
 > - **Bug raíz corregido:** eliminar una materia (soft-delete) la dejaba visible en el panel Docentes (JOIN sin filtro de papelera) y su nombre bloqueado por el `UNIQUE` físico ("ya existe" al recrearla).
@@ -89,7 +100,7 @@ El **MVP está completo y en producción** (Vercel + Render + Aiven). Los tres r
 | Memorama / Línea del tiempo / Completar espacios (100% IA, genéricos) | ✅ Completo (2026-07-09, SPEC-006: crear con `GeneradorActividadIA` y jugar vía registro `JUEGOS_UI`) |
 | Actividad sorpresa / Adaptar con IA / Biblioteca IA con papelera y estadísticas | ✅ Completo en código (2026-07-09, SPEC-006; end-to-end pendiente de deploy) |
 | XP / niveles / ranking | ✅ Completo (transaccional, idempotente) |
-| Logros | 🟡 Parcial — 2 de 5 con lógica real (`racha-7`, `estrella-aula`, `explorador` sin desbloqueo) |
+| Logros / Misiones | ✅ Fases 1 y 2 en código (2026-07-10, SPEC-007): sistema de misiones server-backed y escalable (46 misiones semilla en 8 categorías, tiers Bronce→Diamante, progreso automático, recompensas XP/insignia/banner), reemplaza los 5 logros de `localStorage`. Panel del estudiante + estadísticas de solo lectura para el docente + CRUD para el admin. e2e pendiente de deploy (migración 009) |
 | Dashboards de los 3 roles con datos 100% reales | ✅ Completo — Panel Docente rediseñado por completo (2026-07-09, SPEC-004; Home simplificado como centro de trabajo el 2026-07-09): Home con materias como foco, Centro de actividad tipo timeline y resumen en 2 tarjetas, Biblioteca de Actividades, vista de materia en pestañas, Ranking completo, Mi Perfil y ficha rápida de estudiante con retroalimentación |
 | Libro de Calificaciones | ✅ Completo (2026-07-09, SPEC-006: detalle por intento, observación, revisado, ajuste manual de XP con auditoría) |
 | Asistente IA | ⚪ Retirado del menú (2026-07-08, Polish Sprint): la IA solo se usa dentro de los generadores de actividades. `asistenteIA.jsx` y la ruta `/api/ia/asistente` siguen existiendo pero sin entrada en la UI |
