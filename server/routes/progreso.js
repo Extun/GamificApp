@@ -40,7 +40,9 @@ router.get('/:estudiante_id', async (req, res, next) => {
                     p.actualizado_en
              FROM progreso_estudiante p
              JOIN retos    r ON r.id = p.reto_id
-             JOIN materias m ON m.id = r.materia_id
+             -- Materias en la Papelera: su historial se oculta (vuelve al
+             -- restaurarlas); el XP acumulado no se toca.
+             JOIN materias m ON m.id = r.materia_id AND m.eliminado_en IS NULL
              WHERE p.estudiante_id = ?
              ORDER BY m.orden, m.id, r.id`,
             [estudianteId]
@@ -114,6 +116,15 @@ router.post('/', async (req, res, next) => {
                 [materiaId, retoTitulo]
             );
             if (!reto) {
+                // No se crea progreso sobre una materia en la Papelera.
+                const [[materiaViva]] = await conn.query(
+                    'SELECT 1 AS si FROM materias WHERE id = ? AND eliminado_en IS NULL',
+                    [materiaId]
+                );
+                if (!materiaViva) {
+                    await conn.rollback();
+                    return res.status(404).json({ error: 'Materia no encontrada' });
+                }
                 const xpRecompensa = esIdValido(Number(req.body?.xp_recompensa))
                     ? Number(req.body.xp_recompensa)
                     : 100;

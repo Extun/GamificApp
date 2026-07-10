@@ -84,13 +84,14 @@ router.get('/', async (req, res, next) => {
     const materiaId = Number(req.query.materia_id);
     const tipo = req.query.tipo;
 
-    const condiciones = ["estado = 'publicado'"];
-    const params = [];
-    // Los estudiantes no ven retos de materias desactivadas, ni siquiera
+    // Los retos de materias en la Papelera no se listan para nadie; los
+    // estudiantes además no ven los de materias desactivadas, ni siquiera
     // pidiendo el materia_id directo (la UI oculta, el servidor protege).
-    if (req.user?.rol === 'estudiante') {
-        condiciones.push('materia_id IN (SELECT id FROM materias WHERE activa = TRUE AND eliminado_en IS NULL)');
-    }
+    const condiciones = [
+        "estado = 'publicado'",
+        `materia_id IN (SELECT id FROM materias WHERE eliminado_en IS NULL${req.user?.rol === 'estudiante' ? ' AND activa = TRUE' : ''})`
+    ];
+    const params = [];
     if (req.query.materia_id !== undefined) {
         if (!esIdValido(materiaId)) {
             return res.status(400).json({ error: 'materia_id debe ser un entero positivo' });

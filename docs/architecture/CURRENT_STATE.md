@@ -12,6 +12,12 @@ Fabrizio Zurita (Extun)
 
 El **MVP está completo y en producción** (Vercel + Render + Aiven). Los tres roles funcionan de punta a punta. El trabajo actual es la **Épica 1: rediseño de la experiencia del estudiante**, cuya auditoría y primera spec ya existen pero **aún no se ha implementado nada** (el estudiante sigue usando el monolito `DashboardEstudiante.jsx`).
 
+> **Consistencia global de entidades / Papelera (2026-07-09, implementada en código; migración 007 se aplica sola vía initDb.js al deploy):**
+> - **Bug raíz corregido:** eliminar una materia (soft-delete) la dejaba visible en el panel Docentes (JOIN sin filtro de papelera) y su nombre bloqueado por el `UNIQUE` físico ("ya existe" al recrearla).
+> - **BD (migración `007-unicidad-papelera.sql` + reversa, idempotente en `initDb.js`):** el UNIQUE de `materias.nombre` y `cursos(nombre, paralelo)` se reemplaza por índices únicos funcionales sobre `IF(eliminado_en IS NULL, …, NULL)`: las filas en papelera no reservan el nombre; los duplicados activos siguen prohibidos.
+> - **Backend:** todo JOIN/subquery contra `materias` filtra `eliminado_en IS NULL` (docentes del admin, resumen/detalle docente, progreso del estudiante, listado de retos para todos los roles); `puedeGestionarMateria` exige materia viva (nadie publica retos/material en una materia en papelera); la purga definitiva de estudiante (cuenta + ficha) ahora es transaccional.
+> - **Política documentada:** `docs/architecture/POLITICA-ELIMINACION.md` (qué significa eliminar/desactivar/purgar por entidad y las reglas para entidades futuras).
+>
 > **SPEC-002 Fase 1 — Centro de Administración Institucional (2026-07-09, implementada en código; migración a Aiven PENDIENTE):**
 > - **Materias dinámicas:** catálogo en BD (`color`, `icono`, `activa`), CRUD admin (`/api/admin/materias`), módulo Materias en el panel admin. `src/constants/materias.js` **eliminado**; toda la app consume `src/services/materiasService.js` (caché memoria+localStorage, la API siempre pisa). Colores/emoji de los "mundos" de estudiante y docente vienen de la BD (style inline; las clases de tonos `-1..-5` se eliminaron del CSS).
 > - **Cursos:** tabla `cursos` + `curso_id` en `estudiantes`/`invitaciones_estudiante` (el VARCHAR `curso` se conserva denormalizado), CRUD admin + `GET /api/cursos` para docentes, módulo Cursos, y el docente elige el curso de un `<select>` al generar invitaciones (ya no texto libre).

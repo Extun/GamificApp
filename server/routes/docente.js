@@ -180,7 +180,12 @@ const estudianteDelDocente = async (user, usuarioId) => {
 const idsMateriasDelDocente = async (user) => {
     const [filas] = user.rol === 'admin'
         ? await pool.query('SELECT id FROM materias WHERE eliminado_en IS NULL')
-        : await pool.query('SELECT materia_id AS id FROM docente_materia WHERE docente_id = ?', [user.id]);
+        : await pool.query(
+            `SELECT dm.materia_id AS id FROM docente_materia dm
+             JOIN materias m ON m.id = dm.materia_id AND m.eliminado_en IS NULL
+             WHERE dm.docente_id = ?`,
+            [user.id]
+        );
     return filas.map((f) => f.id);
 };
 
@@ -291,7 +296,7 @@ router.get('/estudiantes/:usuarioId/detalle', async (req, res, next) => {
                     p.xp_obtenido, p.completado, p.actualizado_en
              FROM progreso_estudiante p
              JOIN retos r ON r.id = p.reto_id
-             JOIN materias m ON m.id = r.materia_id
+             JOIN materias m ON m.id = r.materia_id AND m.eliminado_en IS NULL
              WHERE p.estudiante_id = ?
              ORDER BY p.actualizado_en DESC LIMIT 10`,
             [estudiante.estudiante_id]
@@ -302,7 +307,7 @@ router.get('/estudiantes/:usuarioId/detalle', async (req, res, next) => {
                     ROUND(AVG(p.porcentaje)) AS promedio
              FROM progreso_estudiante p
              JOIN retos r ON r.id = p.reto_id
-             JOIN materias m ON m.id = r.materia_id
+             JOIN materias m ON m.id = r.materia_id AND m.eliminado_en IS NULL
              WHERE p.estudiante_id = ?
              GROUP BY m.id ORDER BY m.orden, m.id`,
             [estudiante.estudiante_id]

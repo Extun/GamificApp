@@ -32,7 +32,7 @@ router.get('/docentes', conPermiso('docentes'), async (_req, res, next) => {
                     ), JSON_ARRAY()) AS materias
              FROM usuarios u
              LEFT JOIN docente_materia dm ON dm.docente_id = u.id
-             LEFT JOIN materias m ON m.id = dm.materia_id
+             LEFT JOIN materias m ON m.id = dm.materia_id AND m.eliminado_en IS NULL
              WHERE u.rol = 'docente' AND u.eliminado_en IS NULL
              GROUP BY u.id
              ORDER BY u.username`
@@ -993,9 +993,21 @@ router.delete('/papelera/:tipo/:id', conPermiso('papelera'), async (req, res, ne
         );
         if (!cuenta) return res.status(404).json({ error: 'Elemento no encontrado en la papelera' });
         // Estudiante: aquí sí desaparece la ficha con su progreso (cascada).
-        await pool.query('DELETE FROM usuarios WHERE id = ?', [id]);
-        if (tipo === 'estudiante' && cuenta.estudiante_id) {
-            await pool.query('DELETE FROM estudiantes WHERE id = ?', [cuenta.estudiante_id]);
+        // Transacción: cuenta y ficha se borran juntas o no se borra nada
+        // (una ficha huérfana reaparecería en el ranking).
+        const conn = await pool.getConnection();
+        try {
+            await conn.beginTransaction();
+            await conn.query('DELETE FROM usuarios WHERE id = ?', [id]);
+            if (tipo === 'estudiante' && cuenta.estudiante_id) {
+                await conn.query('DELETE FROM estudiantes WHERE id = ?', [cuenta.estudiante_id]);
+            }
+            await conn.commit();
+        } catch (err) {
+            await conn.rollback().catch(() => {});
+            throw err;
+        } finally {
+            conn.release();
         }
         auditar(req, `purgo-${tipo}`, `Eliminó definitivamente al ${tipo} "${cuenta.nombre}"`, { [tipo]: cuenta.nombre });
         res.json({ ok: true });

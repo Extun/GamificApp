@@ -156,13 +156,21 @@ export const soloDocente = (req, res, next) => {
 };
 
 // ¿Puede este usuario crear/editar contenido de esta materia?
-// El admin siempre; el docente solo si el admin se la asignó (docente_materia).
+// El admin siempre que la materia exista y no esté en la Papelera; el
+// docente además solo si el admin se la asignó (docente_materia). Nadie
+// publica contenido en una materia eliminada.
 export const puedeGestionarMateria = async (user, materiaId) => {
-    if (user?.rol === 'admin') return true;
-    if (user?.rol !== 'docente') return false;
-    const [filas] = await pool.query(
-        'SELECT 1 FROM docente_materia WHERE docente_id = ? AND materia_id = ?',
-        [user.id, materiaId]
-    );
+    if (user?.rol !== 'admin' && user?.rol !== 'docente') return false;
+    const [filas] = user.rol === 'admin'
+        ? await pool.query(
+            'SELECT 1 FROM materias WHERE id = ? AND eliminado_en IS NULL',
+            [materiaId]
+        )
+        : await pool.query(
+            `SELECT 1 FROM docente_materia dm
+             JOIN materias m ON m.id = dm.materia_id AND m.eliminado_en IS NULL
+             WHERE dm.docente_id = ? AND dm.materia_id = ?`,
+            [user.id, materiaId]
+        );
     return filas.length > 0;
 };

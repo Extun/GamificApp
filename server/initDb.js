@@ -41,6 +41,7 @@ export const inicializarEsquema = async () => {
         await migrarFase2Admin(conn);
         await migrarPanelDocente(conn);
         await migrarCatalogoInteligente(conn);
+        await migrarUnicidadPapelera(conn);
         console.log('✅ Esquema verificado/creado en la base de datos.');
         await asegurarAdmin(conn);
         await asegurarAdminPrincipal(conn);
@@ -221,6 +222,43 @@ const migrarCatalogoInteligente = async (conn) => {
         console.log('✅ Migración: catálogo inteligente (orden/identidad/protegida) en materias.');
     }
     await conn.query('UPDATE materias SET orden = id WHERE orden = 0');
+};
+
+// ¿El índice ya existe en esta tabla?
+const faltaIndice = async (conn, tabla, indice) => {
+    const [[fila]] = await conn.query(
+        `SELECT COUNT(*) AS n FROM information_schema.statistics
+         WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?`,
+        [tabla, indice]
+    );
+    return fila.n === 0;
+};
+
+// Migración 007 — Unicidad compatible con la Papelera (SPEC-003).
+// El UNIQUE físico de materias.nombre y cursos(nombre, paralelo) chocaba con
+// filas en la papelera: eliminar "Inglés" y volver a crearla respondía
+// "ya existe". Se reemplaza por índices únicos FUNCIONALES que solo aplican a
+// filas vivas (eliminado_en IS NULL): las filas eliminadas dejan de reservar
+// el nombre, y dos materias/cursos ACTIVOS homónimos siguen prohibidos.
+const migrarUnicidadPapelera = async (conn) => {
+    if (await faltaIndice(conn, 'materias', 'uq_materia_nombre_activa')) {
+        if (!await faltaIndice(conn, 'materias', 'nombre')) {
+            await conn.query('ALTER TABLE materias DROP INDEX nombre');
+        }
+        await conn.query(`ALTER TABLE materias
+            ADD UNIQUE KEY uq_materia_nombre_activa ((IF(eliminado_en IS NULL, nombre, NULL)))`);
+        console.log('✅ Migración: unicidad de materias ahora ignora la papelera.');
+    }
+    if (await faltaIndice(conn, 'cursos', 'uq_curso_activo')) {
+        if (!await faltaIndice(conn, 'cursos', 'uq_curso')) {
+            await conn.query('ALTER TABLE cursos DROP INDEX uq_curso');
+        }
+        await conn.query(`ALTER TABLE cursos
+            ADD UNIQUE KEY uq_curso_activo (
+                (IF(eliminado_en IS NULL, nombre, NULL)),
+                (IF(eliminado_en IS NULL, paralelo, NULL)))`);
+        console.log('✅ Migración: unicidad de cursos ahora ignora la papelera.');
+    }
 };
 
 // Invariante del sistema: SIEMPRE existe al menos un Administrador Principal
