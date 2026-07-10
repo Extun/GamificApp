@@ -43,6 +43,13 @@ export const actualizarMateria = (id, datos) =>
     pedir(`/api/admin/materias/${id}`, { method: 'PUT', body: JSON.stringify(datos) });
 export const eliminarMateria = (id) =>
     pedir(`/api/admin/materias/${id}`, { method: 'DELETE' });
+export const reordenarMaterias = (ids) =>
+    pedir('/api/admin/materias/orden', { method: 'PUT', body: JSON.stringify({ ids }) });
+export const asignarMateria = (id, modo, docentes) =>
+    pedir(`/api/admin/materias/${id}/asignacion`, {
+        method: 'POST',
+        body: JSON.stringify({ modo, docentes })
+    });
 
 // ---- Cursos (SPEC-002) ----
 export const listarCursos = () => pedir('/api/admin/cursos');
@@ -91,6 +98,8 @@ export default {
     crearMateria,
     actualizarMateria,
     eliminarMateria,
+    reordenarMaterias,
+    asignarMateria,
     listarCursos,
     crearCurso,
     actualizarCurso,

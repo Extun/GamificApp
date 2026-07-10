@@ -47,15 +47,10 @@ import { RankingCompleto } from '../docente/RankingCompleto';
 import { PerfilDocente } from '../docente/PerfilDocente';
 import { FichaEstudiante } from '../docente/FichaEstudiante';
 
-// Etiquetas legibles de los tipos de reto publicables.
 const TIPO_RETO_LABEL = { quiz: 'Quiz', clasificador: 'Juego', mision: 'Misión' };
 
-// El catálogo dinámico de materias (SPEC-002) vive en materiasService:
-// color e icono los define el admin. El id se resuelve desde su caché,
-// que este panel calienta al montar (ver efecto de misMaterias).
 const materiaIdPorNombre = (nombre) => idPorNombre(nombre);
 
-// Lee un File como dataURL (base64) para persistirlo y poder descargarlo luego.
 const leerComoDataUrl = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
@@ -73,7 +68,6 @@ import { SidebarLayout } from '../../components/dashboard/SidebarLayout';
 function WidgetsRendimiento({ materia, topEstudiantes, retosPublicados, siguientePaso, onAccion }) {
     return (
         <Grid container spacing={2.5} className="widgets-rendimiento">
-            {/* Widget 1 · Top estudiantes */}
             <Grid size={{ xs: 12, md: 4 }}>
                 <Card elevation={0} className="widget-card">
                     <div className="widget-head">
@@ -92,7 +86,6 @@ function WidgetsRendimiento({ materia, topEstudiantes, retosPublicados, siguient
                 </Card>
             </Grid>
 
-            {/* Widget 2 · Retos publicados (dato real de la BD) */}
             <Grid size={{ xs: 12, md: 4 }}>
                 <Card elevation={0} className="widget-card widget-card-center">
                     <div className="widget-head">
@@ -104,7 +97,6 @@ function WidgetsRendimiento({ materia, topEstudiantes, retosPublicados, siguient
                 </Card>
             </Grid>
 
-            {/* Widget 3 · Acción rápida / siguiente paso */}
             <Grid size={{ xs: 12, md: 4 }}>
                 <Card elevation={0} className="widget-card widget-card-action">
                     <div className="widget-head">
@@ -122,8 +114,6 @@ function WidgetsRendimiento({ materia, topEstudiantes, retosPublicados, siguient
     );
 }
 
-// Contenedor de material con uploader minimalista en la cabecera. La privacidad
-// es implícita: cada contenedor sube con su propio `isPrivate` sin pedirlo al docente.
 function MaterialContenedor({ titulo, subtitulo, Icon, vacioMsg, archivos, isPrivate, onUpload, onPreview }) {
     const inputRef = useRef(null);
     const [subiendo, setSubiendo] = useState(false);
@@ -185,17 +175,11 @@ export function Dashboard() {
     const navigate = useNavigate();
     const [pagina, setPagina] = useState("");
     const [materiaSeleccionada, setMateriaSeleccionada] = useState(null);
-    // Al entrar a una materia siempre hay una herramienta de creación visible
-    // (quiz por defecto): crear actividades es la acción principal del docente.
     const [subVistaMateria, setSubVistaMateria] = useState('quiz');
-    // Material de estudio: la fuente de verdad es MySQL (vía API). Este mapa
-    // { nombreMateria: Archivo[] } es solo el reflejo de la última consulta.
     const [archivosPorMateria, setArchivosPorMateria] = useState({});
     const [archivoPreview, setArchivoPreview] = useState(null);
     const [errorMaterial, setErrorMaterial] = useState('');
 
-    // Refresca la lista de una materia CONSULTANDO AL SERVIDOR (no estados
-    // locales): así web y móvil siempre muestran el mismo material.
     const refrescarMaterial = async (materia) => {
         const materiaId = materiaIdPorNombre(materia);
         if (!materiaId) return;
@@ -203,18 +187,12 @@ export function Dashboard() {
         setArchivosPorMateria((prev) => ({ ...prev, [materia]: archivos }));
     };
 
-    // Al abrir una materia se descarga su material desde la BD central.
     useEffect(() => {
         if (materiaSeleccionada) refrescarMaterial(materiaSeleccionada);
     }, [materiaSeleccionada]);
 
-    // Materias ASIGNADAS a este docente por el admin: definen todo lo que
-    // este panel muestra y permite editar (el servidor lo vuelve a validar).
     const [materias, setMaterias] = useState([]);
     useEffect(() => {
-        // Primero el catálogo global (calienta la caché de ids y colores del
-        // materiasService) y después las asignadas: cuando el panel pinta,
-        // todo lookup por nombre ya resuelve.
         listarMaterias()
             .catch(() => [])
             .then(() => docenteService.misMaterias())
@@ -222,12 +200,9 @@ export function Dashboard() {
             .catch((err) => setErrorMaterial(`No se pudieron cargar tus materias: ${err.message}`));
     }, []);
 
-    // Gestión de estudiantes e invitaciones del docente.
     const [misEstudiantes, setMisEstudiantes] = useState([]);
     const [invitaciones, setInvitaciones] = useState([]);
     const [codigosNuevos, setCodigosNuevos] = useState([]);
-    // Cursos del catálogo institucional (SPEC-002): el docente ya no tipea
-    // el curso, lo elige de la lista que administra el admin.
     const [cursos, setCursos] = useState([]);
     const [invCursoId, setInvCursoId] = useState('');
     const [invCantidad, setInvCantidad] = useState(10);
@@ -248,8 +223,6 @@ export function Dashboard() {
         }
     };
 
-    // El Home necesita los datos del aula desde el arranque; al entrar a la
-    // sección "Mis Estudiantes" se refrescan por si cambiaron.
     useEffect(() => {
         cargarEstudiantes();
     }, []);
@@ -258,8 +231,6 @@ export function Dashboard() {
         if (pagina === 'estudiantes') cargarEstudiantes();
     }, [pagina]);
 
-    // Retos publicados por materia asignada: alimentan el Home ("Contenido",
-    // "Actividad reciente") y el widget real del detalle de materia.
     const [retosPorMateria, setRetosPorMateria] = useState({});
     useEffect(() => {
         if (!materias.length) return;
@@ -274,8 +245,6 @@ export function Dashboard() {
         return () => { vigente = false; };
     }, [materias]);
 
-    // Último borrador de quiz del historial local del generador: es la señal
-    // más directa de "trabajo a medio hacer" con la que cuenta el docente.
     const borradorReciente = useMemo(() => {
         try {
             const data = JSON.parse(localStorage.getItem('edu_historialQuizzes')) || {};
@@ -289,7 +258,6 @@ export function Dashboard() {
         }
     }, [materias]);
 
-    // Materia con menos retos publicados: sugerencia de dónde crear contenido.
     const materiaSugerida = useMemo(() => {
         if (!materias.length) return null;
         return [...materias].sort(
@@ -297,7 +265,6 @@ export function Dashboard() {
         )[0];
     }, [materias, retosPorMateria]);
 
-    // Últimos retos publicados en cualquiera de sus materias.
     const retosRecientes = useMemo(() => (
         Object.entries(retosPorMateria)
             .flatMap(([nombre, retos]) => retos.map((r) => ({ ...r, materia: nombre })))
@@ -305,8 +272,6 @@ export function Dashboard() {
             .slice(0, 5)
     ), [retosPorMateria]);
 
-    // Salto directo desde el Home a una materia (y opcionalmente a una
-    // sub-vista concreta, p. ej. el generador de quiz).
     const irAMateria = (nombre, subvista = 'quiz', tab = 'crear') => {
         if (!nombre) return;
         setPagina('materias');
@@ -347,7 +312,6 @@ export function Dashboard() {
         navigate('/');
     };
 
-    // Top 3 real de estudiantes por XP (GET /api/ranking).
     const [ranking, setRanking] = useState([]);
     useEffect(() => {
         obtenerRanking(3).then((filas) =>
@@ -355,8 +319,6 @@ export function Dashboard() {
         );
     }, []);
 
-    // Resumen real del Home (SPEC-004): stats + Centro de Actividad. Se
-    // refresca al volver al Inicio para reflejar lo último publicado/jugado.
     const [resumen, setResumen] = useState(null);
     useEffect(() => {
         if (pagina === '' || pagina === 'perfil') {
@@ -364,10 +326,8 @@ export function Dashboard() {
         }
     }, [pagina]);
 
-    // Ficha rápida (SPEC-004): estudiante seleccionado en "Mis Estudiantes".
     const [fichaEstudiante, setFichaEstudiante] = useState(null);
 
-    // Pestaña activa dentro de la vista de materia (SPEC-004).
     const [tabMateria, setTabMateria] = useState('crear');
 
     const handleUploadMateria = async (materia, file, { isPrivate = false } = {}) => {
@@ -382,12 +342,9 @@ export function Dashboard() {
             dataUrl: null
         };
 
-        // Guardamos el archivo original (dataURL) para permitir su descarga, y
-        // para PDFs obtenemos además páginas y miniatura reales antes de persistir.
         try {
             archivo.dataUrl = await leerComoDataUrl(file);
         } catch {
-            // Sin dataURL no habrá descarga, pero el resto del flujo continúa.
         }
         if (kind === "pdf") {
             try {
@@ -395,12 +352,9 @@ export function Dashboard() {
                 archivo.pageCount = pageCount;
                 archivo.thumbnail = thumbnail;
             } catch {
-                // Si el procesamiento falla, se guarda el archivo sin metadatos extra.
             }
         }
 
-        // POST al servidor (debe responder 201) y luego SIEMPRE se refresca
-        // la lista desde el API: ningún archivo existe solo en este navegador.
         try {
             setErrorMaterial('');
             await subirMaterial(materiaIdPorNombre(materia), archivo);
@@ -442,12 +396,8 @@ export function Dashboard() {
             ]}
         >
 
-                {/* HOME — orden RFC-004: bienvenida → continuar trabajando →
-                    mi aula → contenido → actividad reciente. Solo datos reales. */}
                 {pagina === "" && (
                     <div className="home-doc">
-                        {/* Bienvenida útil (SPEC-004): nombre, materias,
-                            estudiantes y el pulso real de la semana. */}
                         <header className="doc-hero">
                             <span className="doc-hero-avatar" aria-hidden="true">
                                 {(authService.getUsuario()?.nombre_completo || authService.getUsuario()?.username || 'D').charAt(0).toUpperCase()}
@@ -471,7 +421,6 @@ export function Dashboard() {
                             </div>
                         </header>
 
-                        {/* Estadísticas rápidas con datos reales. */}
                         {resumen?.stats && (
                             <div className="stats-row">
                                 <StatCard Icon={TaskAltRoundedIcon} valor={resumen.stats.actividades} etiqueta="Actividades creadas" tono="primary" />
@@ -489,7 +438,6 @@ export function Dashboard() {
                             </div>
                         )}
 
-                        {/* Acciones rápidas: atajos, no reemplazan el menú. */}
                         <section>
                             <h2 style={{ marginBottom: 12 }}>Acciones rápidas</h2>
                             <div className="doc-rapidas">
@@ -593,9 +541,6 @@ export function Dashboard() {
                             <ArrowForwardRoundedIcon className="home-doc-aula-flecha" />
                         </button>
 
-                        {/* Centro de Actividad (SPEC-004): cronología real de
-                            la auditoría — lo que hiciste tú y lo que hicieron
-                            TUS estudiantes. */}
                         <SectionCard
                             titulo="Centro de Actividad"
                             Icon={TaskAltRoundedIcon}
@@ -645,7 +590,6 @@ export function Dashboard() {
                     </div>
                 )}
 
-                {/* MATERIAS GRID */}
                 {pagina === "materias" && !materiaSeleccionada && (
                     <div className="home-doc">
                         <div>
@@ -678,7 +622,6 @@ export function Dashboard() {
                     </div>
                 )}
 
-                {/* MATERIA DETALLE */}
                 {pagina === "materias" && materiaSeleccionada && (() => {
                     const ui = uiMateria(materiaSeleccionada);
                     const retosMateria = retosPorMateria[materiaSeleccionada] || [];
@@ -692,11 +635,11 @@ export function Dashboard() {
                             ← Volver a mis materias
                         </button>
 
-                        {/* Cabecera con la identidad pastel de la materia */}
                         <header className="materia-hero" style={ui.estilo}>
                             <span className="materia-hero-emoji" aria-hidden="true">{ui.icono}</span>
                             <div className="materia-hero-meta">
                                 <h1>{materiaSeleccionada}</h1>
+                                {ui.descripcion && <p style={{ marginTop: 0 }}>{ui.descripcion}</p>}
                                 <p>
                                     {retosMateria.length
                                         ? `${retosMateria.length} ${retosMateria.length === 1 ? 'actividad publicada' : 'actividades publicadas'} para tus estudiantes`
@@ -713,8 +656,6 @@ export function Dashboard() {
                             </div>
                         )}
 
-                        {/* Espacio de aprendizaje (SPEC-004): todo lo de la
-                            materia en un solo lugar, organizado por pestañas. */}
                         <nav className="doc-tabs" aria-label="Secciones de la materia">
                             {[
                                 ['resumen', '📊 Resumen'],
@@ -734,7 +675,6 @@ export function Dashboard() {
                             ))}
                         </nav>
 
-                        {/* RESUMEN — cómo va el aula en esta materia. */}
                         {tabMateria === 'resumen' && (
                             <>
                                 <WidgetsRendimiento
@@ -779,7 +719,6 @@ export function Dashboard() {
                             </>
                         )}
 
-                        {/* ACTIVIDADES — lo publicado en esta materia. */}
                         {tabMateria === 'actividades' && (
                             <SectionCard
                                 titulo={`Actividades de ${materiaSeleccionada}`}
@@ -811,7 +750,6 @@ export function Dashboard() {
                             </SectionCard>
                         )}
 
-                        {/* CREAR ACTIVIDAD — generadores (sin cambios de lógica). */}
                         {tabMateria === 'crear' && (
                         <section className="materia-crear">
                             <div className="materia-crear-head">
@@ -860,7 +798,6 @@ export function Dashboard() {
                         </section>
                         )}
 
-                        {/* MATERIAL — dividido por audiencia. */}
                         {tabMateria === 'material' && (
                         <>
                         <div className="materia-crear-head">
@@ -893,7 +830,6 @@ export function Dashboard() {
                         </>
                         )}
 
-                        {/* CALIFICACIONES — seguimiento por estudiante. */}
                         {tabMateria === 'calificaciones' && (
                             <section className="card materia-subvista">
                                 <h3>Libro de Calificaciones de {materiaSeleccionada}</h3>
@@ -904,7 +840,6 @@ export function Dashboard() {
                     );
                 })()}
 
-                {/* MIS ESTUDIANTES: invitaciones de registro y reseteo de PIN */}
                 {pagina === "estudiantes" && (
                     <div className="home-doc">
                         <div>
@@ -1017,7 +952,6 @@ export function Dashboard() {
                     </div>
                 )}
 
-                {/* BIBLIOTECA — todas las actividades (SPEC-004). */}
                 {pagina === 'biblioteca' && (
                     <div className="home-doc">
                         <DashboardHeader
@@ -1040,7 +974,6 @@ export function Dashboard() {
                     </div>
                 )}
 
-                {/* RANKING COMPLETO (SPEC-004). */}
                 {pagina === 'ranking' && (
                     <div className="home-doc">
                         <DashboardHeader
@@ -1057,7 +990,6 @@ export function Dashboard() {
                     </div>
                 )}
 
-                {/* MI PERFIL (SPEC-004). */}
                 {pagina === 'perfil' && (
                     <div className="home-doc">
                         <DashboardHeader
@@ -1092,7 +1024,6 @@ export function Dashboard() {
                 onDelete={(a) => handleEliminarArchivo(materiaSeleccionada, a.id)}
             />
 
-            {/* Ficha rápida del estudiante: modal, sin abandonar la página. */}
             {fichaEstudiante && (
                 <FichaEstudiante
                     estudiante={fichaEstudiante}

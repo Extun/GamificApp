@@ -1,0 +1,205 @@
+/* Catálogo Inteligente (SPEC-005) — gestor de materias del admin. */
+
+.matcat-lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 10px;
+}
+
+.matcat-fila {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    background: var(--color-surface);
+}
+
+.matcat-fila.is-oculta {
+    opacity: 0.6;
+}
+
+.matcat-orden {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.matcat-orden button {
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-alt);
+    border-radius: 6px;
+    width: 26px;
+    height: 22px;
+    font-size: 0.75rem;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--color-text-muted);
+}
+
+.matcat-orden button:hover:not(:disabled) {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.matcat-orden button:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.matcat-num {
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    min-width: 20px;
+    text-align: center;
+}
+
+/* Banner: imagen subida o autogenerado con el color + emoji de la materia. */
+.matcat-banner {
+    width: 84px;
+    height: 48px;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    font-size: 1.5rem;
+    border: 1px solid var(--color-border);
+    overflow: hidden;
+}
+
+.matcat-banner img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.matcat-info {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.matcat-info strong {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.matcat-desc {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.matcat-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.matcat-estado {
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.matcat-estado.is-activa { background: #dcfce7; color: #15803d; }
+.matcat-estado.is-oculta { background: #e2e8f0; color: #475569; }
+
+.matcat-protegida {
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: var(--color-accent-soft);
+    color: var(--color-accent-dark);
+}
+
+.matcat-acciones {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+/* Form: banner preview y asignación al crear. */
+.matcat-banner-preview {
+    height: 84px;
+    border-radius: var(--radius-md);
+    display: grid;
+    place-items: center;
+    font-size: 2.2rem;
+    border: 1px solid var(--color-border);
+    overflow: hidden;
+    position: relative;
+}
+
+.matcat-banner-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.matcat-asignar {
+    display: grid;
+    gap: 8px;
+    border-top: 1px solid var(--color-border);
+    padding-top: 12px;
+}
+
+.matcat-asignar label.matcat-radio {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88rem;
+    cursor: pointer;
+}
+
+.matcat-docentes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-left: 24px;
+}
+
+.matcat-docente-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    background: var(--color-surface-alt);
+}
+
+.matcat-docente-check.is-sel {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
+    font-weight: 600;
+}
+
+@media (max-width: 640px) {
+    .matcat-fila {
+        flex-wrap: wrap;
+    }
+
+    .matcat-info {
+        min-width: 60%;
+    }
+
+    .matcat-acciones {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}

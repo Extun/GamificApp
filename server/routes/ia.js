@@ -51,9 +51,6 @@ const QUIZ_SCHEMA = {
     }
 };
 
-// Esquema de una Misión Narrativa: una historia por episodios donde cada
-// desafío matemático avanza la trama. Lo consume el reproductor RPG del
-// estudiante tal cual, sin transformaciones.
 const MISION_SCHEMA = {
     type: Type.OBJECT,
     properties: {
@@ -65,7 +62,7 @@ const MISION_SCHEMA = {
                 type: Type.OBJECT,
                 properties: {
                     narrativa: { type: Type.STRING, description: 'Escena de la historia que plantea el problema (2-3 frases)' },
-                    pregunta: { type: Type.STRING, description: 'El desafío matemático concreto' },
+                    pregunta: { type: Type.STRING, description: 'El desafío concreto de la materia' },
                     alternativas: {
                         type: Type.OBJECT,
                         properties: {
@@ -220,30 +217,28 @@ const parsearMision = (texto = '', cantidad = 3) => {
 };
 
 // ---- POST /api/ia/mision ----
-// Body: { materia?, tema, tematica, cantidad? } → misión narrativa completa.
-// tema = contenido matemático ("sumas con llevadas"); tematica = ambientación
-// de la aventura ("piratas", "espacio", "cocina", ...).
 router.post('/mision', soloDocente, async (req, res) => {
-    const materia = String(req.body?.materia || 'Matemáticas').trim().slice(0, 60);
+    const materia = String(req.body?.materia || '').trim().slice(0, 60);
     const tema = String(req.body?.tema || '').trim().slice(0, 200);
     const tematica = String(req.body?.tematica || '').trim().slice(0, 60);
     const cantidad = Math.min(Math.max(Number(req.body?.cantidad) || 3, 3), 5);
 
-    if (!tema || !tematica) {
-        return res.status(400).json({ error: 'Se requieren tema y temática de la aventura' });
+    if (!materia || !tema || !tematica) {
+        return res.status(400).json({ error: 'Se requieren materia, tema y temática de la aventura' });
     }
 
     const prompt =
         `Eres un escritor de cuentos infantiles y docente experto en ${materia} para niños de 6 a 9 años. ` +
         `Crea una MISIÓN NARRATIVA: una mini-aventura de temática "${tematica}" donde el estudiante es el héroe ` +
-        `(nárrala en segunda persona) y debe superar EXACTAMENTE ${cantidad} desafíos secuenciales sobre '${tema}'.\n\n` +
+        `(nárrala en segunda persona) y debe superar EXACTAMENTE ${cantidad} desafíos secuenciales sobre '${tema}' ` +
+        `(contenido de la materia ${materia}).\n\n` +
         `REGLAS ESTRICTAS:\n` +
         `1. Continuidad: los desafíos son capítulos de UNA MISMA historia; cada 'narrativa' continúa la escena ` +
         `anterior y cada 'exito' conecta con el siguiente capítulo.\n` +
-        `2. Integración: el problema matemático debe nacer de la historia (contar cofres, repartir raciones), ` +
-        `nunca ser un ejercicio suelto.\n` +
-        `3. Dificultad creciente y adecuada a educación básica elemental; números pequeños y lenguaje sencillo en español.\n` +
-        `4. Veracidad: la alternativa marcada como 'correcta' debe ser matemáticamente exacta; verifica cada cálculo.\n` +
+        `2. Integración: el desafío debe nacer de la historia (contar cofres, identificar plantas, ordenar palabras), ` +
+        `nunca ser un ejercicio suelto, y corresponder a ${materia}.\n` +
+        `3. Dificultad creciente y adecuada a educación básica elemental; lenguaje sencillo en español.\n` +
+        `4. Veracidad: la alternativa marcada como 'correcta' debe ser exacta y verificable; comprueba cada respuesta.\n` +
         `5. Las 3 alternativas deben ser plausibles (errores típicos de niños), sin repetirse.\n` +
         `6. La 'pista' guía el razonamiento sin revelar la respuesta.`;
 

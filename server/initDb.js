@@ -40,6 +40,7 @@ export const inicializarEsquema = async () => {
         await migrarColumnasAdmins(conn);
         await migrarFase2Admin(conn);
         await migrarPanelDocente(conn);
+        await migrarCatalogoInteligente(conn);
         console.log('✅ Esquema verificado/creado en la base de datos.');
         await asegurarAdmin(conn);
         await asegurarAdminPrincipal(conn);
@@ -206,6 +207,20 @@ const migrarPanelDocente = async (conn) => {
             REFERENCES estudiantes (id) ON UPDATE CASCADE ON DELETE CASCADE,
         INDEX idx_retro_estudiante (estudiante_id)
     ) ENGINE = InnoDB`);
+};
+
+const migrarCatalogoInteligente = async (conn) => {
+    if (await faltaColumna(conn, 'materias', 'orden')) {
+        await conn.query(`ALTER TABLE materias
+            ADD COLUMN orden        INT UNSIGNED NOT NULL DEFAULT 0,
+            ADD COLUMN descripcion  VARCHAR(200) NULL,
+            ADD COLUMN banner_data  MEDIUMTEXT   NULL,
+            ADD COLUMN competencias TEXT         NULL,
+            ADD COLUMN nivel        VARCHAR(60)  NULL,
+            ADD COLUMN protegida    BOOLEAN      NOT NULL DEFAULT FALSE`);
+        console.log('✅ Migración: catálogo inteligente (orden/identidad/protegida) en materias.');
+    }
+    await conn.query('UPDATE materias SET orden = id WHERE orden = 0');
 };
 
 // Invariante del sistema: SIEMPRE existe al menos un Administrador Principal

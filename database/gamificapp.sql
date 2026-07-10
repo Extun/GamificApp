@@ -31,11 +31,17 @@ USE gamificapp;
 -- Materias dinámicas (SPEC-002): el admin las gestiona desde su panel.
 -- `activa = FALSE` oculta la materia sin romper retos/materiales asociados.
 CREATE TABLE IF NOT EXISTS materias (
-    id          TINYINT UNSIGNED NOT NULL,
-    nombre      VARCHAR(60)      NOT NULL UNIQUE,
-    color       VARCHAR(7)       NOT NULL DEFAULT '#e0f2fe',
-    icono       VARCHAR(8)       NOT NULL DEFAULT '📚',
-    activa      BOOLEAN          NOT NULL DEFAULT TRUE,
+    id           TINYINT UNSIGNED NOT NULL,
+    nombre       VARCHAR(60)      NOT NULL UNIQUE,
+    color        VARCHAR(7)       NOT NULL DEFAULT '#e0f2fe',
+    icono        VARCHAR(8)       NOT NULL DEFAULT '📚',
+    activa       BOOLEAN          NOT NULL DEFAULT TRUE,
+    orden        INT UNSIGNED     NOT NULL DEFAULT 0,
+    descripcion  VARCHAR(200)     NULL,
+    banner_data  MEDIUMTEXT       NULL,
+    competencias TEXT             NULL,
+    nivel        VARCHAR(60)      NULL,
+    protegida    BOOLEAN          NOT NULL DEFAULT FALSE,
     PRIMARY KEY (id)
 ) ENGINE = InnoDB;
 

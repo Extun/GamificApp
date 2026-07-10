@@ -20,11 +20,12 @@ router.get('/mis-materias', async (req, res, next) => {
         // Solo materias activas: si el admin desactiva una, desaparece del
         // panel del docente sin perder la asignación ni el contenido.
         const [materias] = req.user.rol === 'admin'
-            ? await pool.query('SELECT id, nombre, color, icono FROM materias WHERE activa = TRUE AND eliminado_en IS NULL ORDER BY id')
+            ? await pool.query(`SELECT id, nombre, color, icono, descripcion, banner_data FROM materias
+                 WHERE activa = TRUE AND eliminado_en IS NULL ORDER BY orden, id`)
             : await pool.query(
-                `SELECT m.id, m.nombre, m.color, m.icono FROM materias m
+                `SELECT m.id, m.nombre, m.color, m.icono, m.descripcion, m.banner_data FROM materias m
                  JOIN docente_materia dm ON dm.materia_id = m.id
-                 WHERE dm.docente_id = ? AND m.activa = TRUE AND m.eliminado_en IS NULL ORDER BY m.id`,
+                 WHERE dm.docente_id = ? AND m.activa = TRUE AND m.eliminado_en IS NULL ORDER BY m.orden, m.id`,
                 [req.user.id]
             );
         res.json(materias);
@@ -303,7 +304,7 @@ router.get('/estudiantes/:usuarioId/detalle', async (req, res, next) => {
              JOIN retos r ON r.id = p.reto_id
              JOIN materias m ON m.id = r.materia_id
              WHERE p.estudiante_id = ?
-             GROUP BY m.id ORDER BY m.id`,
+             GROUP BY m.id ORDER BY m.orden, m.id`,
             [estudiante.estudiante_id]
         );
         const [[hitos]] = await pool.query(

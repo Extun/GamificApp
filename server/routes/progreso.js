@@ -42,7 +42,7 @@ router.get('/:estudiante_id', async (req, res, next) => {
              JOIN retos    r ON r.id = p.reto_id
              JOIN materias m ON m.id = r.materia_id
              WHERE p.estudiante_id = ?
-             ORDER BY m.id, r.id`,
+             ORDER BY m.orden, m.id, r.id`,
             [estudianteId]
         );
 

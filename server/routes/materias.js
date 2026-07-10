@@ -12,9 +12,11 @@ router.get('/', async (req, res, next) => {
         // solo aparecen en el módulo Papelera del admin.
         const soloActivas = req.user?.rol !== 'admin';
         const [materias] = await pool.query(
-            `SELECT id, nombre, color, icono, activa FROM materias
+            `SELECT id, nombre, color, icono, activa, orden, descripcion,
+                    banner_data, competencias, nivel, protegida
+             FROM materias
              WHERE eliminado_en IS NULL ${soloActivas ? 'AND activa = TRUE' : ''}
-             ORDER BY id`
+             ORDER BY orden, id`
         );
         res.json(materias);
     } catch (err) {

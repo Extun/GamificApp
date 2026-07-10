@@ -9,8 +9,6 @@ export function AsistenteIA() {
     const [responseIA, setResponseIA] = useState("");
     const [cargando, setCargando] = useState(false);
 
-    // La consulta viaja al backend (POST /api/ia/asistente), que es quien
-    // habla con Gemini: la API key nunca llega al navegador.
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!message.trim() || cargando) return;

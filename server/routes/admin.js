@@ -268,34 +268,126 @@ const validarMateria = (body) => {
     const color = String(body?.color || '#e0f2fe');
     if (!HEX_VALIDO.test(color)) return { error: 'Color inválido (formato #rrggbb)' };
     const icono = String(body?.icono || '📚').slice(0, 8);
-    return { nombre, color, icono };
+    const descripcion = String(body?.descripcion || '').trim().slice(0, 200) || null;
+    const competencias = String(body?.competencias || '').trim().slice(0, 2000) || null;
+    const nivel = String(body?.nivel || '').trim().slice(0, 60) || null;
+    const banner = body?.banner_data === undefined || body?.banner_data === null
+        ? null
+        : String(body.banner_data);
+    if (banner && !banner.startsWith('data:image/')) return { error: 'El banner debe ser una imagen' };
+    if (banner && banner.length > 2_000_000) return { error: 'El banner es demasiado grande (máx. ~1.5 MB)' };
+    const protegida = Boolean(body?.protegida);
+    return { nombre, color, icono, descripcion, competencias, nivel, banner_data: banner, protegida };
 };
 
-// POST /api/admin/materias — crea una materia nueva.
+const asignarMateriaADocentes = async (conn, materiaId, docentes, modo = 'agregar') => {
+    let ids = [];
+    if (docentes === 'todos') {
+        const [filas] = await conn.query(
+            "SELECT id FROM usuarios WHERE rol = 'docente' AND eliminado_en IS NULL"
+        );
+        ids = filas.map((f) => f.id);
+    } else if (Array.isArray(docentes)) {
+        ids = docentes.map(Number).filter((n) => Number.isInteger(n) && n > 0);
+    }
+    for (const docenteId of ids) {
+        if (modo === 'quitar') {
+            await conn.query(
+                'DELETE FROM docente_materia WHERE docente_id = ? AND materia_id = ?',
+                [docenteId, materiaId]
+            );
+        } else {
+            await conn.query(
+                'INSERT IGNORE INTO docente_materia (docente_id, materia_id) VALUES (?, ?)',
+                [docenteId, materiaId]
+            );
+        }
+    }
+    return ids.length;
+};
+
 router.post('/materias', conPermiso('materias'), async (req, res, next) => {
+    const conn = await pool.getConnection();
     try {
         const datos = validarMateria(req.body);
         if (datos.error) return res.status(400).json({ error: datos.error });
-        // IDs manuales (TINYINT sin AUTO_INCREMENT por herencia del esquema):
-        // el siguiente libre se calcula aquí.
-        const [[{ siguiente }]] = await pool.query(
-            'SELECT COALESCE(MAX(id), 0) + 1 AS siguiente FROM materias'
+        await conn.beginTransaction();
+        const [[{ siguiente, ordenNuevo }]] = await conn.query(
+            'SELECT COALESCE(MAX(id), 0) + 1 AS siguiente, COALESCE(MAX(orden), 0) + 1 AS ordenNuevo FROM materias'
         );
-        await pool.query(
-            'INSERT INTO materias (id, nombre, color, icono) VALUES (?, ?, ?, ?)',
-            [siguiente, datos.nombre, datos.color, datos.icono]
+        await conn.query(
+            `INSERT INTO materias (id, nombre, color, icono, orden, descripcion, banner_data, competencias, nivel, protegida)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [siguiente, datos.nombre, datos.color, datos.icono, ordenNuevo,
+             datos.descripcion, datos.banner_data, datos.competencias, datos.nivel, datos.protegida]
         );
-        auditar(req, 'creo-materia', `Creó la materia "${datos.nombre}"`, { materia: datos.nombre }, datos.nombre);
-        res.status(201).json({ id: siguiente, ...datos });
+        const asignados = req.body?.asignar
+            ? await asignarMateriaADocentes(conn, siguiente, req.body.asignar)
+            : 0;
+        await conn.commit();
+        auditar(req, 'creo-materia', `Creó la materia "${datos.nombre}"${asignados ? ` y la asignó a ${asignados} ${asignados === 1 ? 'docente' : 'docentes'}` : ''}`,
+            { materia: datos.nombre, docentes_asignados: asignados }, datos.nombre);
+        res.status(201).json({ id: siguiente, orden: ordenNuevo, docentes_asignados: asignados, ...datos });
     } catch (err) {
+        await conn.rollback().catch(() => {});
         if (err.code === 'ER_DUP_ENTRY') {
             return res.status(409).json({ error: 'Ya existe una materia con ese nombre' });
         }
         next(err);
+    } finally {
+        conn.release();
     }
 });
 
-// PUT /api/admin/materias/:id — edita nombre, color, icono y/o estado.
+router.put('/materias/orden', conPermiso('materias'), async (req, res, next) => {
+    const conn = await pool.getConnection();
+    try {
+        const ids = Array.isArray(req.body?.ids)
+            ? req.body.ids.map(Number).filter((n) => Number.isInteger(n) && n > 0)
+            : [];
+        if (!ids.length) return res.status(400).json({ error: 'Envía la lista de ids en el nuevo orden' });
+        await conn.beginTransaction();
+        for (const [indice, id] of ids.entries()) {
+            await conn.query(
+                'UPDATE materias SET orden = ? WHERE id = ? AND eliminado_en IS NULL',
+                [indice + 1, id]
+            );
+        }
+        await conn.commit();
+        auditar(req, 'reordeno-materias', 'Reorganizó el orden institucional de las materias', { orden: ids });
+        res.json({ ok: true });
+    } catch (err) {
+        await conn.rollback().catch(() => {});
+        next(err);
+    } finally {
+        conn.release();
+    }
+});
+
+router.post('/materias/:id/asignacion', conPermiso('materias'), async (req, res, next) => {
+    const conn = await pool.getConnection();
+    try {
+        const id = Number(req.params.id);
+        const modo = req.body?.modo === 'quitar' ? 'quitar' : 'agregar';
+        const [[materia]] = await conn.query(
+            'SELECT nombre FROM materias WHERE id = ? AND eliminado_en IS NULL', [id]
+        );
+        if (!materia) return res.status(404).json({ error: 'Materia no encontrada' });
+        await conn.beginTransaction();
+        const afectados = await asignarMateriaADocentes(conn, id, req.body?.docentes, modo);
+        await conn.commit();
+        auditar(req, `${modo === 'quitar' ? 'quito' : 'asigno'}-materia-docentes`,
+            `${modo === 'quitar' ? 'Quitó' : 'Asignó'} la materia "${materia.nombre}" ${modo === 'quitar' ? 'a' : 'para'} ${afectados} ${afectados === 1 ? 'docente' : 'docentes'}`,
+            { materia: materia.nombre, modo, docentes: afectados }, materia.nombre);
+        res.json({ ok: true, docentes_afectados: afectados });
+    } catch (err) {
+        await conn.rollback().catch(() => {});
+        next(err);
+    } finally {
+        conn.release();
+    }
+});
+
 router.put('/materias/:id', conPermiso('materias'), async (req, res, next) => {
     try {
         const id = Number(req.params.id);
@@ -303,11 +395,14 @@ router.put('/materias/:id', conPermiso('materias'), async (req, res, next) => {
         if (datos.error) return res.status(400).json({ error: datos.error });
         const activa = req.body?.activa === undefined ? true : Boolean(req.body.activa);
         const [resultado] = await pool.query(
-            'UPDATE materias SET nombre = ?, color = ?, icono = ?, activa = ? WHERE id = ? AND eliminado_en IS NULL',
-            [datos.nombre, datos.color, datos.icono, activa, id]
+            `UPDATE materias SET nombre = ?, color = ?, icono = ?, activa = ?,
+                    descripcion = ?, banner_data = ?, competencias = ?, nivel = ?, protegida = ?
+             WHERE id = ? AND eliminado_en IS NULL`,
+            [datos.nombre, datos.color, datos.icono, activa,
+             datos.descripcion, datos.banner_data, datos.competencias, datos.nivel, datos.protegida, id]
         );
         if (!resultado.affectedRows) return res.status(404).json({ error: 'Materia no encontrada' });
-        auditar(req, 'edito-materia', `Editó la materia "${datos.nombre}"`, { materia: datos.nombre, activa }, datos.nombre);
+        auditar(req, 'edito-materia', `Editó la materia "${datos.nombre}"`, { materia: datos.nombre, activa, protegida: datos.protegida }, datos.nombre);
         res.json({ ok: true });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
@@ -325,9 +420,14 @@ router.delete('/materias/:id', conPermiso('materias'), async (req, res, next) =>
     try {
         const id = Number(req.params.id);
         const [[materia]] = await pool.query(
-            'SELECT nombre FROM materias WHERE id = ? AND eliminado_en IS NULL', [id]
+            'SELECT nombre, protegida FROM materias WHERE id = ? AND eliminado_en IS NULL', [id]
         );
         if (!materia) return res.status(404).json({ error: 'Materia no encontrada' });
+        if (materia.protegida) {
+            return res.status(409).json({
+                error: `"${materia.nombre}" es una materia protegida: no puede eliminarse. Si necesitas retirarla, ocúltala.`
+            });
+        }
         await pool.query(
             'UPDATE materias SET eliminado_en = NOW(), eliminado_por = ? WHERE id = ?',
             [req.user.username, id]

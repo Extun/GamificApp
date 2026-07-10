@@ -574,7 +574,7 @@ export function AdminDashboard() {
                                     titulo="Materias"
                                     subtitulo="El catálogo oficial de la institución. Docentes y estudiantes ven estas materias con el color e icono que definas aquí."
                                 />
-                                <ModuloMaterias materias={materias} ejecutar={ejecutar} />
+                                <ModuloMaterias materias={materias} docentes={docentes} ejecutar={ejecutar} />
                             </div>
                         )}
 

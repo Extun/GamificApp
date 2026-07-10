@@ -50,7 +50,9 @@ export const uiMateria = (nombre) => {
     const materia = materiaPorNombre(nombre);
     return {
         icono: materia?.icono || '📚',
-        estilo: estiloMateria(materia)
+        estilo: estiloMateria(materia),
+        descripcion: materia?.descripcion || '',
+        banner: materia?.banner_data || null
     };
 };
 
