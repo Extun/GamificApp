@@ -5,6 +5,10 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 const CACHE_KEY = 'institucion_cache';
 
+// Nombre institucional por defecto: se usa como respaldo cuando la caché aún
+// no cargó (una sola fuente, en vez de repetir el literal por la app).
+export const NOMBRE_INSTITUCION_DEFECTO = 'Unidad Educativa Fiscal Clemencia Coronel de Pincay';
+
 let cache = null;
 try {
     cache = JSON.parse(localStorage.getItem(CACHE_KEY)) || null;
@@ -13,6 +17,9 @@ try {
 }
 
 export const getInstitucionCache = () => cache;
+
+// Nombre institucional listo para pintar: caché si existe, si no el respaldo.
+export const nombreInstitucion = () => cache?.nombre || NOMBRE_INSTITUCION_DEFECTO;
 
 export const obtenerInstitucion = async () => {
     const res = await fetch(`${API_URL}/api/institucion`);
@@ -85,6 +92,8 @@ export const iniciarInstitucion = () => {
 export default {
     obtenerInstitucion,
     getInstitucionCache,
+    nombreInstitucion,
+    NOMBRE_INSTITUCION_DEFECTO,
     aplicarInstitucion,
     iniciarInstitucion
 };

@@ -19,7 +19,7 @@ import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import { FileChip, FilePreviewModal, getKind, formatSize, descargarArchivo } from '../../components/archivos/ArchivoChip';
 import { procesarPdf } from '../../services/pdfService';
 import { listarMaterias, idPorNombre, uiMateria } from '../../services/materiasService';
-import { getInstitucionCache } from '../../services/institucionService';
+import { nombreInstitucion } from '../../services/institucionService';
 import { obtenerMaterial, subirMaterial, eliminarMaterial } from '../../services/materialesService';
 import authService from '../../services/authService';
 import docenteService from '../../services/docenteService';
@@ -249,12 +249,6 @@ export function Dashboard() {
         return () => { vigente = false; };
     }, [materias]);
 
-    const materiaSugerida = useMemo(() => {
-        if (!materias.length) return null;
-        return [...materias].sort(
-            (a, b) => (retosPorMateria[a]?.length || 0) - (retosPorMateria[b]?.length || 0)
-        )[0];
-    }, [materias, retosPorMateria]);
 
     const retosRecientes = useMemo(() => (
         Object.entries(retosPorMateria)
@@ -390,15 +384,13 @@ export function Dashboard() {
 
         try {
             archivo.dataUrl = await leerComoDataUrl(file);
-        } catch {
-        }
+        } catch { /* archivo ilegible: se sube sin previsualización */ }
         if (kind === "pdf") {
             try {
                 const { pageCount, thumbnail } = await procesarPdf(file);
                 archivo.pageCount = pageCount;
                 archivo.thumbnail = thumbnail;
-            } catch {
-            }
+            } catch { /* PDF sin miniatura: se sube igual */ }
         }
 
         try {
@@ -423,7 +415,7 @@ export function Dashboard() {
 
     return (
         <SidebarLayout
-            titulo={getInstitucionCache()?.nombre || 'Unidad Educativa Fiscal Clemencia Coronel de Pincay'}
+            titulo={nombreInstitucion()}
             items={[
                 { id: '', label: 'Inicio', Icon: HomeFilledIcon },
                 { id: 'materias', label: 'Materias', Icon: MenuBookIcon, grupo: 'Enseñanza' },

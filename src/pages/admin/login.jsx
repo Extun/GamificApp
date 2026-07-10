@@ -6,7 +6,7 @@ import SchoolRoundedIcon from '@mui/icons-material/SchoolRounded';
 import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
 import './login.css';
 import authService from '../../services/authService';
-import { getInstitucionCache, obtenerInstitucion } from '../../services/institucionService';
+import { getInstitucionCache, obtenerInstitucion, NOMBRE_INSTITUCION_DEFECTO } from '../../services/institucionService';
 
 // El rol NUNCA se elige aquí: lo determina el servidor según la cuenta y
 // viaja firmado dentro del JWT. Las pestañas solo cambian el formulario:
@@ -250,7 +250,7 @@ export function Login(){
                     )}
                 </div>
 
-                <span className="login-pie">{institucion?.nombre || 'Unidad Educativa Fiscal Clemencia Coronel de Pincay'}</span>
+                <span className="login-pie">{institucion?.nombre || NOMBRE_INSTITUCION_DEFECTO}</span>
             </main>
         </div>
     )

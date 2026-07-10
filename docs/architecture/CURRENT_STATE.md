@@ -8,6 +8,14 @@
 
 Fabrizio Zurita (Extun)
 
+> **Auditoría integral pre-tesis (2026-07-10, solo frontend + doc; sin migración):**
+> - **Consistencia XP/premios del estudiante:** la tarjeta "Mis premios" del Home usaba `gami.totalLogros` (contador viejo de `localStorage`, máx 5, local al dispositivo) mientras la página "Mis Premios" usa las misiones del servidor (SPEC-007). Ahora el Home lee `resumen.completadas` de `GET /api/misiones` y cae al conteo en caché solo si el servidor no responde (pre-migración 009): un solo número consistente. El sistema viejo de logros (`gamificationService.verificarLogros`) se **conserva a propósito** como fallback de toast en los 4 reproductores hasta que la migración 009 despliegue `nuevas_misiones`.
+> - **Nombre institucional centralizado:** el literal por defecto estaba duplicado en Login, Home admin y Home estudiante. Nuevos `NOMBRE_INSTITUCION_DEFECTO` + `nombreInstitucion()` en `institucionService`; los 3 consumidores los usan.
+> - **Código muerto / lint:** eliminado `materiaSugerida` (useMemo sin uso) y comentados 3 `catch {}` vacíos. Errores de ESLint 33 → 29 (los 29 restantes son los patrones `set-state-in-effect` ya documentados en MASTER_PLAN §3).
+> - **SPEC-008 — Sistema RESET ("Restablecer aplicación"):** redactada + `server/routes/adminReset.js` implementado pero **INACTIVO** (no montado en `server.js` + exige `RESET_HABILITADO='true'`; sin UI). Solo Principal, doble confirmación + palabra RESET, backup JSON previo, transacción con DELETE (no TRUNCATE), conserva institución/Principal/catálogo de misiones. Pendiente de aprobación y verificación contra BD de pruebas antes de habilitar. Spec: `docs/specifications/SPEC-008-Sistema-Reset.md`.
+> - **Pospuesto (documentado):** perfiles públicos + banners equipables + récords (feature grande con cambios de BD, fuera de alcance pre-tesis); habilitación del RESET; las 8 migraciones 002–009 siguen pendientes de deploy a Aiven (bloqueante para la verificación e2e de casi todo).
+> - Verificado: `npm run build` limpio; `node --check` del router de reset OK. Sin MySQL local: la verificación e2e de la consistencia de premios queda para el deploy.
+
 ## 1. Resumen
 
 El **MVP está completo y en producción** (Vercel + Render + Aiven). Los tres roles funcionan de punta a punta. El trabajo actual es la **Épica 1: rediseño de la experiencia del estudiante**, cuya auditoría y primera spec ya existen pero **aún no se ha implementado nada** (el estudiante sigue usando el monolito `DashboardEstudiante.jsx`).

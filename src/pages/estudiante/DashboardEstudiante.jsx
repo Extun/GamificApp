@@ -22,7 +22,8 @@ import gamificationService from '../../services/gamificationService';
 import authService from '../../services/authService';
 import { obtenerMaterial } from '../../services/materialesService';
 import { listarMaterias, uiMateria } from '../../services/materiasService';
-import { getInstitucionCache } from '../../services/institucionService';
+import { nombreInstitucion } from '../../services/institucionService';
+import { obtenerMisiones } from '../../services/misionesService';
 import { EmptyState } from '../../components/dashboard/DashboardWidgets';
 import { PanelMisiones } from './PanelMisiones';
 
@@ -70,6 +71,21 @@ export function DashboardEstudiante() {
     // Datos reales de gamificación: se leen en cada render, así que reflejan el
     // XP/los logros más recientes al cambiar de página o al salir de un quiz.
     const gami = gamificationService.getResumen();
+
+    // Resumen de misiones del servidor (SPEC-007): fuente de verdad del conteo
+    // de premios, compartida con la página "Mis Premios". Se prefiere sobre el
+    // contador local de logros; si el servidor aún no responde (p. ej. antes de
+    // la migración 009), la tarjeta cae al conteo en caché sin romperse.
+    const [misionesResumen, setMisionesResumen] = useState(null);
+    useEffect(() => {
+        let vigente = true;
+        obtenerMisiones()
+            .then((res) => { if (vigente && res?.resumen) setMisionesResumen(res.resumen); })
+            .catch(() => { /* sin red: la tarjeta usa el conteo en caché */ });
+        return () => { vigente = false; };
+    }, []);
+    // Conteo de premios consistente con la página de Premios.
+    const premiosGanados = misionesResumen ? misionesResumen.completadas : gami.totalLogros;
 
     // Al entrar: trae de la BD el XP oficial del estudiante, su avance por
     // reto y los retos publicados; refresca al llegar.
@@ -184,7 +200,7 @@ export function DashboardEstudiante() {
 
     return (
         <SidebarLayout
-            titulo={getInstitucionCache()?.nombre || 'Unidad Educativa Fiscal Clemencia Coronel de Pincay'}
+            titulo={nombreInstitucion()}
             items={[
                 { id: '', label: 'Inicio', Icon: HomeFilledIcon },
                 { id: 'materias', label: 'Mis Mundos', Icon: MenuBookIcon },
@@ -276,8 +292,8 @@ export function DashboardEstudiante() {
                                 <span className="home-logros-texto">
                                     <strong>Mis premios</strong>
                                     <span>
-                                        {gami.totalLogros > 0
-                                            ? `¡Ya ganaste ${gami.totalLogros} ${gami.totalLogros === 1 ? 'insignia' : 'insignias'}!`
+                                        {premiosGanados > 0
+                                            ? `¡Ya ganaste ${premiosGanados} ${premiosGanados === 1 ? 'insignia' : 'insignias'}!`
                                             : 'Juega para ganar tu primera insignia'}
                                     </span>
                                 </span>

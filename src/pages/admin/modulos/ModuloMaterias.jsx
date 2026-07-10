@@ -153,8 +153,7 @@ export function ModuloMaterias({ materias, docentes = [], ejecutar }) {
         try {
             const banner = await procesarBanner(file);
             setForm((f) => ({ ...f, banner_data: banner }));
-        } catch {
-        }
+        } catch { /* imagen inválida: se conserva el banner anterior */ }
     };
 
     return (
