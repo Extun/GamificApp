@@ -94,6 +94,13 @@ export const actualizarMision = (id, datos) =>
 export const activarMision = (id, activa) =>
     pedir(`/api/admin/misiones/${id}/activa`, { method: 'PATCH', body: JSON.stringify({ activa }) });
 
+// ---- Restablecer aplicación (SPEC-008) ----
+// Borra todos los datos generados por usuarios y deja el sistema como una
+// instalación nueva. Solo el Administrador Principal (verificado en servidor);
+// exige escribir la palabra "RESET" como segunda confirmación.
+export const restablecerAplicacion = () =>
+    pedir('/api/admin/reset', { method: 'POST', body: JSON.stringify({ confirmacion: 'RESET' }) });
+
 export default {
     listarDocentes,
     crearDocente,
@@ -126,5 +133,6 @@ export default {
     listarMisiones,
     crearMision,
     actualizarMision,
-    activarMision
+    activarMision,
+    restablecerAplicacion
 };

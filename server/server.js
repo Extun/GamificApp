@@ -18,6 +18,7 @@ import institucionRouter from './routes/institucion.js';
 import cursosRouter from './routes/cursos.js';
 import misionesRouter from './routes/misiones.js';
 import adminMisionesRouter from './routes/adminMisiones.js';
+import adminResetRouter from './routes/adminReset.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -88,8 +89,9 @@ app.use('/api/institucion', institucionRouter);
 // ---- A partir de aquí, TODA la API exige un JWT válido ----
 app.use('/api', autenticar);
 
-// Antes de adminRouter para que esta sub-ruta tenga precedencia.
+// Antes de adminRouter para que estas sub-rutas tengan precedencia.
 app.use('/api/admin/misiones', adminMisionesRouter);
+app.use('/api/admin/reset', adminResetRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/docente', docenteRouter);
 app.use('/api/materias/:id/material', materialesRouter);

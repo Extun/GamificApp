@@ -6,9 +6,11 @@ import ApartmentRoundedIcon from '@mui/icons-material/ApartmentRounded';
 import ImageRoundedIcon from '@mui/icons-material/ImageRounded';
 import PaletteRoundedIcon from '@mui/icons-material/PaletteRounded';
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded';
+import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
 import adminService from '../../../services/adminService';
+import authService from '../../../services/authService';
 import { obtenerInstitucion, aplicarInstitucion, getInstitucionCache } from '../../../services/institucionService';
-import { SectionCard } from '../../../components/dashboard/DashboardWidgets';
+import { SectionCard, ModalPanel } from '../../../components/dashboard/DashboardWidgets';
 
 const FORM_VACIO = {
     nombre: '', ciudad: '', provincia: '', pais: '',
@@ -53,6 +55,22 @@ const generarFavicon = (dataUrl) => new Promise((resolve, reject) => {
 export function ModuloInstitucion({ ejecutar }) {
     const [form, setForm] = useState(() => ({ ...FORM_VACIO, ...(getInstitucionCache() || {}) }));
     const [errorImagen, setErrorImagen] = useState('');
+
+    // ---- Restablecer aplicación (SPEC-008): solo el Administrador Principal ----
+    const [resetPaso, setResetPaso] = useState(0); // 0 cerrado · 1 advertencia · 2 confirmación textual
+    const [resetTexto, setResetTexto] = useState('');
+    const [resetCargando, setResetCargando] = useState(false);
+    const [resetResultado, setResetResultado] = useState(null);
+    const cerrarReset = () => { setResetPaso(0); setResetTexto(''); setResetResultado(null); };
+    const confirmarReset = () => {
+        if (resetTexto.trim() !== 'RESET') return;
+        setResetCargando(true);
+        ejecutar(async () => {
+            const data = await adminService.restablecerAplicacion();
+            setResetResultado(data);
+            return data;
+        }, 'Aplicación restablecida a una instalación nueva.').finally(() => setResetCargando(false));
+    };
 
     useEffect(() => {
         let vigente = true;
@@ -217,6 +235,94 @@ export function ModuloInstitucion({ ejecutar }) {
                     Guardar cambios
                 </button>
             </div>
+
+            {/* Zona peligrosa (SPEC-008): solo el Administrador Principal la ve.
+                El servidor revalida el rol en cada petición, esto solo oculta. */}
+            {authService.esPrincipal() && (
+                <div className="institucion-zona-peligrosa">
+                    <SectionCard titulo="Zona peligrosa" Icon={WarningRoundedIcon}>
+                        <p className="institucion-nota">
+                            Restablecer la aplicación borra estudiantes, docentes, cursos, materias, actividades,
+                            material, progreso, XP, ranking, misiones y auditoría. Conserva únicamente tu cuenta
+                            de Administrador Principal y la configuración institucional. Se genera un respaldo
+                            antes de borrar, pero la acción no se puede deshacer desde la app.
+                        </p>
+                        <button
+                            type="button"
+                            className="preview-action institucion-btn-peligro"
+                            onClick={() => setResetPaso(1)}
+                        >
+                            <WarningRoundedIcon />
+                            Restablecer aplicación
+                        </button>
+                    </SectionCard>
+                </div>
+            )}
+
+            {resetPaso === 1 && (
+                <ModalPanel
+                    titulo="¿Restablecer la aplicación?"
+                    subtitulo="Esta acción borra casi todos los datos generados por usuarios."
+                    onCerrar={cerrarReset}
+                    pie={(
+                        <>
+                            <button type="button" className="docente-btn-editar" onClick={cerrarReset}>Cancelar</button>
+                            <button type="button" className="institucion-btn-peligro" onClick={() => setResetPaso(2)}>
+                                Entiendo, continuar
+                            </button>
+                        </>
+                    )}
+                >
+                    <p>
+                        Se eliminarán: estudiantes, docentes y administradores secundarios, cursos, materias,
+                        actividades, biblioteca, material, progreso, XP, ranking, misiones y auditoría.
+                    </p>
+                    <p>Se conservan: tu cuenta de Administrador Principal y la configuración institucional.</p>
+                    <p><strong>Se genera un respaldo antes de borrar, pero esta acción no tiene "deshacer" en la app.</strong></p>
+                </ModalPanel>
+            )}
+
+            {resetPaso === 2 && (
+                <ModalPanel
+                    titulo="Confirmación final"
+                    subtitulo='Escribe la palabra "RESET" para confirmar.'
+                    onCerrar={cerrarReset}
+                    pie={resetResultado ? (
+                        <button type="button" className="preview-action preview-action-primary" onClick={cerrarReset}>
+                            Cerrar
+                        </button>
+                    ) : (
+                        <>
+                            <button type="button" className="docente-btn-editar" onClick={cerrarReset} disabled={resetCargando}>
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                className="institucion-btn-peligro"
+                                disabled={resetTexto.trim() !== 'RESET' || resetCargando}
+                                onClick={confirmarReset}
+                            >
+                                {resetCargando ? 'Restableciendo…' : 'Restablecer definitivamente'}
+                            </button>
+                        </>
+                    )}
+                >
+                    {resetResultado ? (
+                        <>
+                            <p>✅ Aplicación restablecida. Respaldo guardado como <code>{resetResultado.backup?.archivo}</code>.</p>
+                            <p>Cierra sesión y vuelve a entrar para ver el panel limpio.</p>
+                        </>
+                    ) : (
+                        <input
+                            type="text"
+                            value={resetTexto}
+                            onChange={(e) => setResetTexto(e.target.value)}
+                            placeholder="Escribe RESET"
+                            autoFocus
+                        />
+                    )}
+                </ModalPanel>
+            )}
         </>
     );
 }

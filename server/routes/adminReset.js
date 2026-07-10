@@ -1,13 +1,12 @@
 // SPEC-008 — "Restablecer aplicación" (Sistema RESET).
 //
-// ⚠️  INACTIVO A PROPÓSITO. Este router NO está montado en server.js y, aun si
-// se montara, se rechaza a menos que la variable de entorno RESET_HABILITADO
-// valga exactamente 'true'. Es la operación más destructiva del sistema y NO
-// debe habilitarse hasta poder probarse contra una BD de pruebas (ver la spec
-// docs/specifications/SPEC-008-Sistema-Reset.md, sección "Habilitación").
-//
-// Doble salvaguarda (código + entorno): habilitarlo requiere dos decisiones
-// deliberadas y separadas, imposibles de gatillar por accidente.
+// Es la operación más destructiva del sistema: borra casi toda la base de
+// datos. Salvaguardas en capas: (1) exige RESET_HABILITADO='true' en el
+// entorno — por defecto NO está definida, así que la ruta responde 403 hasta
+// que se active a propósito; (2) solo el Administrador Principal
+// (verificado contra la BD); (3) segunda confirmación textual ("RESET");
+// (4) backup completo antes de borrar; (5) transacción con rollback ante
+// cualquier error. Ver docs/specifications/SPEC-008-Sistema-Reset.md.
 //
 // Deja el sistema como una instalación nueva:
 //   · CONSERVA  → institución (config), catálogo de misiones (re-sembrado por

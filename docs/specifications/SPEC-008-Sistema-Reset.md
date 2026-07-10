@@ -1,9 +1,13 @@
 # SPEC-008 — Sistema RESET ("Restablecer aplicación")
 
-> Estado: **Redactada + infraestructura implementada e INACTIVA.** Pendiente de
-> aprobación y de verificación end-to-end contra una BD de pruebas antes de
-> habilitarse. NO usar en producción hasta entonces.
-> Autor: auditoría integral pre-tesis (2026-07-10).
+> Estado: **Implementada y montada en el servidor + botón operativo en el
+> panel Institución (solo Administrador Principal).** Sigue protegida por la
+> variable de entorno `RESET_HABILITADO`: **no se activa sola con el deploy**,
+> requiere que la definas explícitamente en Render (ver §5). Sin esa variable
+> en `'true'`, el botón de la UI existe pero el servidor responde 403.
+> Autor: auditoría integral pre-tesis (2026-07-10). Activada a petición
+> explícita de Fabrizio el mismo día, tras confirmar que las migraciones
+> 002–009 ya estaban desplegadas en Aiven.
 
 ## 1. Objetivo
 
@@ -12,17 +16,32 @@ exactamente como una instalación nueva, conservando únicamente la
 configuración inicial y su propia cuenta. Pensado para el traspaso del sistema
 a la institución después de la sustentación (limpiar los datos de prueba).
 
-## 2. Por qué está INACTIVO
+## 2. Riesgo aceptado y por qué se activó igual
 
 Es la operación más destructiva del sistema (borra casi toda la BD). No hay
 MySQL local en el entorno de desarrollo, así que **no se pudo probar
-end-to-end**. Activarla sin verificación contra una BD de pruebas es un riesgo
-inaceptable justo antes de la defensa. Por eso se entrega:
+end-to-end contra una BD de pruebas** — solo verificación estática
+(`node --check`, `npm run build`, lectura de código). Fabrizio pidió
+explícitamente activarla ya, con las migraciones 002–009 confirmadas en
+Aiven, para poder limpiar los datos de prueba antes de la sustentación.
 
-- El código completo (`server/routes/adminReset.js`), **no montado** en
-  `server.js` y protegido además por la variable `RESET_HABILITADO`.
-- Esta especificación.
-- Sin botón en la UI.
+Se entrega con la mayor cantidad de salvaguardas posibles dado ese riesgo:
+
+- Router montado en `server.js`, pero **detrás de `RESET_HABILITADO`**
+  (no definida por defecto en `.env.example` → 403 hasta que se active a
+  propósito en el entorno real).
+- Botón real en el módulo Institución, visible **solo** si
+  `authService.esPrincipal()` (la UI oculta; el servidor revalida con
+  `soloAdminPrincipal` contra la BD en cada request).
+- Doble confirmación en la UI (modal de advertencia → escribir la palabra
+  `RESET`) + backup JSON automático antes de borrar + transacción con
+  rollback ante cualquier error.
+
+**Recomendación que sigue en pie:** no dejar `RESET_HABILITADO=true`
+permanentemente en producción. Definirla solo el rato que se vaya a usar el
+botón, y quitarla (o dejarla en `false`) el resto del tiempo — así un login
+comprometido de un Administrador Principal no es, por sí solo, un botón para
+borrar todo.
 
 ## 3. Alcance del restablecimiento
 
@@ -48,37 +67,41 @@ catálogo de misiones semilla. El reset reproduce ese estado.
 
 1. **Permiso exclusivo**: middleware `soloAdminPrincipal` (verifica el rol
    contra la BD, no contra el token).
-2. **Doble salvaguarda de activación**: el router no se monta en `server.js`
-   **y** exige `RESET_HABILITADO === 'true'`. Dos decisiones separadas.
+2. **Salvaguarda de entorno**: el router sí está montado en `server.js`, pero
+   exige `RESET_HABILITADO === 'true'` en el entorno; sin definirla (el
+   default de `.env.example` es `false`), responde 403.
 3. **Segunda confirmación textual**: el body debe traer `confirmacion: 'RESET'`
-   exactamente (la primera confirmación es el modal de la UI, aún por construir).
-4. **Backup previo obligatorio**: antes de borrar, se vuelca un JSON completo de
+   exactamente. En la UI (`ModuloInstitucion.jsx`) esto es el segundo de dos
+   pasos: modal de advertencia → campo de texto con la palabra `RESET`.
+4. **Botón oculto para no-Principales**: la "Zona peligrosa" del módulo
+   Institución solo se renderiza si `authService.esPrincipal()`.
+5. **Backup previo obligatorio**: antes de borrar, se vuelca un JSON completo de
    las 14 tablas a `server/backups/reset-<timestamp>.json`. Si el backup falla,
-   se aborta sin tocar datos.
-5. **Transacción**: todo el borrado va en una transacción con `DELETE`
+   se aborta sin tocar datos. (Carpeta en `.gitignore`: nunca al repositorio.)
+6. **Transacción**: todo el borrado va en una transacción con `DELETE`
    (no `TRUNCATE`, que auto-commitea) y `FOREIGN_KEY_CHECKS=0/1`; cualquier
    error hace `rollback`.
-6. **Auditoría**: el propio reset queda registrado (`restablecio-aplicacion`)
+7. **Auditoría**: el propio reset queda registrado (`restablecio-aplicacion`)
    con el archivo de backup y el conteo por tabla.
 
-## 5. Habilitación (pasos, post-tesis)
+## 5. Habilitación (código ya listo — falta solo el paso de entorno)
 
-1. Aprobar esta spec.
-2. Sobre una **BD de pruebas** (nunca producción), montar el router en
-   `server.js`:
-   ```js
-   import adminResetRouter from './routes/adminReset.js';
-   // antes de adminRouter:
-   app.use('/api/admin/reset', adminResetRouter);
-   ```
-3. Definir `RESET_HABILITADO=true` en el entorno de pruebas.
-4. Construir la UI: en el módulo Institución (solo Principal), botón
-   "Restablecer aplicación" → modal con advertencia + campo para escribir
-   `RESET` → `POST /api/admin/reset { confirmacion: 'RESET' }` → refrescar.
-5. Probar: backup generado, borrado correcto, Principal e institución intactos,
-   `initDb.js` re-siembra misiones al reiniciar, rollback ante error simulado.
-6. Solo tras validar, considerar habilitarlo en producción (con backup de Aiven
-   independiente por fuera de la app).
+El router, el botón y las salvaguardas ya están en el repositorio. Lo único
+que falta para que el botón funcione en un entorno dado es:
+
+1. En el panel de Render (servicio del backend) → **Environment** → agregar
+   `RESET_HABILITADO=true`.
+2. Redeploy (Render lo hace solo al guardar la variable).
+3. El botón "Restablecer aplicación" (módulo Institución, solo visible para
+   el Administrador Principal) queda operativo.
+
+Para desactivarlo de nuevo: borrar la variable o ponerla en `false` +
+redeploy. El botón sigue en la UI, pero el servidor vuelve a responder 403.
+
+> Nota de riesgo (sin resolver): esto se activó sin poder probarse contra una
+> BD de pruebas por decisión explícita de Fabrizio. Si se quiere reducir el
+> riesgo antes del primer uso real, la vía más segura es clonar la BD de
+> Aiven a una instancia de prueba y correr el reset ahí primero.
 
 ## 6. Riesgos y notas
 
