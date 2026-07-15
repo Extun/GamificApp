@@ -6,6 +6,8 @@ import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import RocketLaunchRoundedIcon from '@mui/icons-material/RocketLaunchRounded';
 import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded';
+import LibraryAddRoundedIcon from '@mui/icons-material/LibraryAddRounded';
+import BookmarkAddRoundedIcon from '@mui/icons-material/BookmarkAddRounded';
 import './editorQuiz.css';
 
 const LETRAS = ['A', 'B', 'C', 'D'];
@@ -22,7 +24,10 @@ const preguntaVacia = () => ({
 // Editor pedagógico del quiz. Recibe el array de preguntas y notifica cada cambio
 // con `onChange(nuevasPreguntas)`. El contenedor decide cuándo publicar.
 // Layout de acordeón: todas cerradas al abrir; solo una expandida a la vez.
-export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar, publicando, publicado }) {
+// SPEC-010: `onAbrirBanco` abre el selector del banco de preguntas (tercera
+// fuente junto a manual e IA) y `onGuardarEnBanco(pregunta)` guarda una
+// pregunta del quiz en el banco para reutilizarla después; ambas opcionales.
+export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar, publicando, publicado, onAbrirBanco, onGuardarEnBanco }) {
     // Ninguna pregunta expandida al abrir el quiz (vista limpia de entrada).
     // Single-open: abrir una contrae automáticamente las demás.
     const [abierta, setAbierta] = useState(-1);
@@ -183,6 +188,19 @@ export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar,
                                     </label>
 
                                     <div className="editor-item-acciones">
+                                        {onGuardarEnBanco && (
+                                            <button
+                                                type="button"
+                                                className="editor-btn editor-btn-ghost"
+                                                title={completa
+                                                    ? 'Guardar esta pregunta en tu banco para reutilizarla en otros quizzes'
+                                                    : 'Completa la pregunta para poder guardarla en el banco'}
+                                                disabled={!completa}
+                                                onClick={() => onGuardarEnBanco(p)}
+                                            >
+                                                <BookmarkAddRoundedIcon sx={{ fontSize: '1.1rem' }} /> Guardar en el banco
+                                            </button>
+                                        )}
                                         <button
                                             type="button"
                                             className="editor-btn editor-btn-ghost editor-btn-peligro"
@@ -208,6 +226,17 @@ export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar,
                 >
                     <AddRoundedIcon sx={{ fontSize: '1.2rem' }} /> Añadir pregunta manual
                 </button>
+
+                {onAbrirBanco && (
+                    <button
+                        type="button"
+                        className="editor-btn editor-btn-ghost editor-btn-añadir"
+                        onClick={onAbrirBanco}
+                        disabled={cargandoIA}
+                    >
+                        <LibraryAddRoundedIcon sx={{ fontSize: '1.15rem' }} /> Añadir del banco
+                    </button>
+                )}
 
                 <div className="editor-ia-wrap" ref={iaRef}>
                     <button

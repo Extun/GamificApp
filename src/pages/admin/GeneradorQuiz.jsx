@@ -4,9 +4,11 @@ import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import { EditorQuiz } from '../../components/quiz/EditorQuiz';
+import { SelectorBancoQuiz } from '../../components/quiz/SelectorBancoQuiz';
 import { publicarReto } from '../../services/retosService';
 import { authFetch } from '../../services/authService';
 import { idPorNombre } from '../../services/materiasService';
+import bancoService from '../../services/bancoService';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -38,6 +40,8 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
     const [error, setError] = useState('');
     const [aviso, setAviso] = useState('');
     const [historialTodo, setHistorialTodo] = useState(leerHistorialTodo);
+    // SPEC-010: modal del banco de preguntas (tercera fuente junto a manual e IA).
+    const [bancoAbierto, setBancoAbierto] = useState(false);
     // Solo los quizzes de la materia actual (últimos 3).
     const historial = historialTodo[materia] || [];
 
@@ -197,6 +201,43 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
         }
     };
 
+    // SPEC-010: inserta en el quiz las preguntas elegidas del banco. Llegan
+    // como copia con la misma forma que una pregunta escrita a mano (más su
+    // `_banco_id` de procedencia, que el juego ignora).
+    const agregarDelBanco = (items) => {
+        if (!quizEdit || !items.length) return;
+        actualizarPreguntas([...quizEdit.preguntas, ...items]);
+        setBancoAbierto(false);
+        setAviso(`${items.length} ${items.length === 1 ? 'pregunta añadida' : 'preguntas añadidas'} del banco.`);
+        setTimeout(() => setAviso(''), 4000);
+    };
+
+    // SPEC-010: guarda una pregunta del quiz en el banco para reutilizarla en
+    // futuros quizzes. Se guarda sin el metadato `_banco_id` (si viniera del
+    // banco, sería crear un duplicado consciente, no re-referenciarla).
+    const guardarPreguntaEnBanco = async (pregunta) => {
+        const materiaId = idPorNombre(materia);
+        if (!materiaId) {
+            setError('No se reconoce la materia actual; no se puede guardar en el banco.');
+            setTimeout(() => setError(''), 4000);
+            return;
+        }
+        try {
+            const { _banco_id, ...contenido } = pregunta;
+            await bancoService.crearPregunta({
+                materiaId,
+                tipo: 'quiz',
+                contenido,
+                tema: quizEdit?.tema || undefined
+            });
+            setAviso('Pregunta guardada en tu banco. Podrás reutilizarla con «Añadir del banco».');
+            setTimeout(() => setAviso(''), 4000);
+        } catch (err) {
+            setError(`No se pudo guardar en el banco: ${err.message}`);
+            setTimeout(() => setError(''), 4000);
+        }
+    };
+
     return (
         <section className="card materia-subvista">
             <div className="card-head">
@@ -244,6 +285,16 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                     onPublicar={publicarQuiz}
                     publicando={publicando}
                     publicado={quizEdit.estado === 'publicado'}
+                    onAbrirBanco={() => setBancoAbierto(true)}
+                    onGuardarEnBanco={guardarPreguntaEnBanco}
+                />
+            )}
+
+            {bancoAbierto && quizEdit && (
+                <SelectorBancoQuiz
+                    materiaId={idPorNombre(materia)}
+                    onInsertar={agregarDelBanco}
+                    onCerrar={() => setBancoAbierto(false)}
                 />
             )}
 
