@@ -46,6 +46,7 @@ export const inicializarEsquema = async () => {
         await migrarCentroDocente(conn);
         await migrarSistemaMisiones(conn);
         await migrarDocenteCurso(conn);
+        await migrarBancoPreguntas(conn);
         console.log('✅ Esquema verificado/creado en la base de datos.');
         await asegurarAdmin(conn);
         await asegurarAdminPrincipal(conn);
@@ -412,6 +413,38 @@ const migrarDocenteCurso = async (conn) => {
             ON UPDATE CASCADE ON DELETE CASCADE,
         CONSTRAINT fk_dc_curso FOREIGN KEY (curso_id) REFERENCES cursos (id)
             ON UPDATE CASCADE ON DELETE CASCADE
+    ) ENGINE = InnoDB`);
+};
+
+// Migración 011 (SPEC-010) — Repositorio de Preguntas: banco reutilizable de
+// preguntas por materia/tema/tipo. Aditiva: ninguna tabla existente cambia y
+// las actividades siguen guardando su configuracion_json como siempre.
+const migrarBancoPreguntas = async (conn) => {
+    await conn.query(`CREATE TABLE IF NOT EXISTS banco_preguntas (
+        id                 INT UNSIGNED     NOT NULL AUTO_INCREMENT,
+        materia_id         TINYINT UNSIGNED NOT NULL,
+        tema               VARCHAR(120)     NULL,
+        tipo               VARCHAR(30)      NOT NULL,
+        dificultad         VARCHAR(10)      NULL,
+        enunciado          VARCHAR(255)     NULL,
+        contenido_json     JSON             NOT NULL,
+        explicacion        TEXT             NULL,
+        etiquetas          VARCHAR(255)     NULL,
+        origen             VARCHAR(10)      NOT NULL DEFAULT 'manual',
+        estado             ENUM('pendiente','aprobada','archivada') NOT NULL DEFAULT 'aprobada',
+        veces_utilizada    INT UNSIGNED     NOT NULL DEFAULT 0,
+        ultima_utilizacion DATETIME         NULL,
+        tiempo_estimado    SMALLINT UNSIGNED NULL,
+        creado_por         INT UNSIGNED     NULL,
+        creado_en          TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        actualizado_en     TIMESTAMP        NULL,
+        PRIMARY KEY (id),
+        CONSTRAINT fk_banco_materia FOREIGN KEY (materia_id)
+            REFERENCES materias (id) ON UPDATE CASCADE ON DELETE RESTRICT,
+        CONSTRAINT fk_banco_creador FOREIGN KEY (creado_por)
+            REFERENCES usuarios (id) ON UPDATE CASCADE ON DELETE SET NULL,
+        INDEX idx_banco_materia_tipo (materia_id, tipo),
+        INDEX idx_banco_estado (estado)
     ) ENGINE = InnoDB`);
 };
 

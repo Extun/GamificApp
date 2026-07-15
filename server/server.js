@@ -19,6 +19,7 @@ import cursosRouter from './routes/cursos.js';
 import misionesRouter from './routes/misiones.js';
 import adminMisionesRouter from './routes/adminMisiones.js';
 import adminResetRouter from './routes/adminReset.js';
+import bancoPreguntasRouter from './routes/bancoPreguntas.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -102,6 +103,7 @@ app.use('/api/ranking', rankingRouter);
 app.use('/api/cursos', cursosRouter);
 app.use('/api/misiones', misionesRouter);
 app.use('/api/ia', iaRouter);
+app.use('/api/banco', bancoPreguntasRouter);
 
 // Manejador central de errores: nunca filtra detalles internos al cliente.
 app.use((err, _req, res, _next) => {
