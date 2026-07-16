@@ -63,7 +63,12 @@ export const cambiarEstadoPregunta = (id, estado) =>
 export const eliminarPregunta = (id) =>
     pedir(`/api/banco/${id}`, { method: 'DELETE' });
 
+// Registrar que estas preguntas se insertaron en una actividad (contador
+// "usada N veces" + fecha de última utilización).
+export const registrarUso = (ids) =>
+    pedir('/api/banco/uso', { method: 'POST', body: JSON.stringify({ ids }) });
+
 export default {
     listarPreguntas, obtenerPregunta, crearPregunta, editarPregunta,
-    duplicarPregunta, cambiarEstadoPregunta, eliminarPregunta
+    duplicarPregunta, cambiarEstadoPregunta, eliminarPregunta, registrarUso
 };

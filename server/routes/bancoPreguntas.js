@@ -329,6 +329,36 @@ router.patch('/:id/estado', soloDocente, async (req, res, next) => {
     }
 });
 
+// POST /api/banco/uso — registra que estas preguntas se insertaron en una
+// actividad: incrementa veces_utilizada y sella ultima_utilizacion. Solo
+// afecta preguntas de materias que el usuario puede gestionar (el docente,
+// las suyas; el admin, todas). Body: { ids: [1, 2, ...] }.
+router.post('/uso', soloDocente, async (req, res, next) => {
+    try {
+        const ids = Array.isArray(req.body?.ids)
+            ? [...new Set(req.body.ids.map(Number).filter(esIdValido))]
+            : [];
+        if (!ids.length) {
+            return res.status(400).json({ error: 'ids debe ser un arreglo de enteros positivos' });
+        }
+        const condiciones = ['id IN (?)'];
+        const params = [ids];
+        if (req.user.rol !== 'admin') {
+            condiciones.push('materia_id IN (SELECT materia_id FROM docente_materia WHERE docente_id = ?)');
+            params.push(req.user.id);
+        }
+        const [resultado] = await pool.query(
+            `UPDATE banco_preguntas
+             SET veces_utilizada = veces_utilizada + 1, ultima_utilizacion = NOW()
+             WHERE ${condiciones.join(' AND ')}`,
+            params
+        );
+        res.json({ ok: true, actualizadas: resultado.affectedRows });
+    } catch (err) {
+        next(err);
+    }
+});
+
 // DELETE /api/banco/:id — regla SPEC-010: con uso registrado se ARCHIVA (las
 // actividades guardan su snapshot, así que nada se rompe); sin uso, borrado
 // físico permitido.

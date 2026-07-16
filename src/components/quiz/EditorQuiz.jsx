@@ -27,10 +27,7 @@ const preguntaVacia = () => ({
 // SPEC-010: `onAbrirBanco` abre el selector del banco de preguntas (tercera
 // fuente junto a manual e IA) y `onGuardarEnBanco(pregunta)` guarda una
 // pregunta del quiz en el banco para reutilizarla después; ambas opcionales.
-// `guardarBancoAuto`/`onCambiarGuardarBanco`: toggle "Guardar también en mi
-// Banco" — con él activo, las preguntas nuevas (manuales o de IA) alimentan
-// automáticamente el banco del docente.
-export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar, publicando, publicado, onAbrirBanco, onGuardarEnBanco, guardarBancoAuto, onCambiarGuardarBanco }) {
+export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar, publicando, publicado, onAbrirBanco, onGuardarEnBanco }) {
     // Ninguna pregunta expandida al abrir el quiz (vista limpia de entrada).
     // Single-open: abrir una contrae automáticamente las demás.
     const [abierta, setAbierta] = useState(-1);
@@ -269,21 +266,6 @@ export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar,
                         </div>
                     )}
                 </div>
-
-                {onCambiarGuardarBanco && (
-                    <label
-                        className="editor-banco-auto"
-                        title="Las preguntas nuevas que crees (a mano o con IA) se guardarán también en tu banco para reutilizarlas en otros quizzes"
-                    >
-                        <input
-                            type="checkbox"
-                            checked={!!guardarBancoAuto}
-                            onChange={(e) => onCambiarGuardarBanco(e.target.checked)}
-                        />
-                        <BookmarkAddRoundedIcon sx={{ fontSize: '1.05rem' }} />
-                        Guardar también en mi Banco
-                    </label>
-                )}
             </div>
 
             <div className="editor-publicar-barra">

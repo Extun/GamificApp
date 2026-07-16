@@ -279,19 +279,6 @@
 }
 .editor-btn-añadir { flex: 1; min-width: 200px; border-style: dashed; }
 
-/* Toggle "Guardar también en mi Banco" (alimenta el banco al crear preguntas). */
-.editor-banco-auto {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    flex-basis: 100%;
-    font-size: 0.85rem;
-    color: var(--color-text-soft, #6b7280);
-    cursor: pointer;
-    user-select: none;
-}
-.editor-banco-auto input[type="checkbox"] { width: auto; margin: 0; }
-
 /* Dropdown de cantidad para "Añadir con IA". */
 .editor-ia-wrap { position: relative; }
 
@@ -384,36 +371,5 @@
 }
 .editor-btn-publicar:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
 
-/* ---- Selector del banco de preguntas (SPEC-010) ---- */
-.banco-filtros {
-    display: flex;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.85rem;
-}
-.banco-filtros input[type="search"] { flex: 1; min-width: 12rem; }
-.banco-lista {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    max-height: 50vh;
-    overflow-y: auto;
-}
-.banco-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.7rem;
-    padding: 0.6rem 0.75rem;
-    background: var(--color-surface-soft, #f9fafb);
-    border: 1px solid var(--color-border, #e5e7eb);
-    border-radius: var(--radius-md, 12px);
-    cursor: pointer;
-}
-.banco-item:hover { border-color: var(--color-primary, #6366f1); }
-.banco-item input[type="checkbox"] { width: auto; margin-top: 0.2rem; }
-.banco-item-cuerpo { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
-.banco-item-enunciado { font-weight: 600; overflow-wrap: anywhere; }
-.banco-item-meta { font-size: 0.8rem; color: var(--color-text-soft, #6b7280); }
+/* Los estilos del selector del banco (SPEC-010) viven en
+   src/components/juegos/selectorBanco.css — modal compartido entre juegos. */

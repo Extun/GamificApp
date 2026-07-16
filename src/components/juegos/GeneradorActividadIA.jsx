@@ -12,12 +12,15 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import ArrowUpwardRoundedIcon from '@mui/icons-material/ArrowUpwardRounded';
 import ArrowDownwardRoundedIcon from '@mui/icons-material/ArrowDownwardRounded';
+import LibraryAddRoundedIcon from '@mui/icons-material/LibraryAddRounded';
 import { idPorNombre } from '../../services/materiasService';
 import { generarActividadIA } from '../../services/iaService';
 import { publicarReto } from '../../services/retosService';
 import { PUNTOS_POR_ACIERTO } from '../../services/gamificationService';
 import docenteService from '../../services/docenteService';
+import bancoService from '../../services/bancoService';
 import { TIPOS_ACTIVIDAD } from './registroJuegos';
+import { SelectorBanco } from './SelectorBanco';
 import { useHistorialActividades, nuevaEntradaHistorial, HistorialActividades } from './HistorialActividades';
 
 export const DIFICULTADES_UI = [
@@ -47,6 +50,12 @@ const contarItems = (tipo, config) => {
     return config?.frases?.length || 0;
 };
 
+// SPEC-010 — Banco de Preguntas: clave del arreglo de ítems dentro de la
+// configuración y máximo de ítems que acepta el validador del servidor
+// (validadoresRetos.js); el tope evita insertar del banco más de lo publicable.
+const CLAVE_ITEMS = { memorama: 'parejas', 'linea-tiempo': 'eventos', completar: 'frases' };
+const MAX_ITEMS = { memorama: 10, 'linea-tiempo': 8, completar: 8 };
+
 export function GeneradorActividadIA({ materia, tipo }) {
     const [tema, setTema] = useState('');
     const [cantidad, setCantidad] = useState(CANTIDADES[tipo]?.[1] || 5);
@@ -60,6 +69,8 @@ export function GeneradorActividadIA({ materia, tipo }) {
     const [publicado, setPublicado] = useState(false);
     const [error, setError] = useState('');
     const [aviso, setAviso] = useState('');
+    // SPEC-010: modal del banco para reutilizar ítems ya creados.
+    const [bancoAbierto, setBancoAbierto] = useState(false);
     // Historial "Últimas actividades generadas" (mismo patrón que el quiz):
     // últimas 3 por materia, en localStorage bajo una clave propia del tipo.
     const { historial, guardar: guardarHistorial, actualizar: actualizarHistorial, eliminar: eliminarHistorial } =
@@ -72,8 +83,33 @@ export function GeneradorActividadIA({ materia, tipo }) {
     }, []);
 
     const etiqueta = TIPOS_ACTIVIDAD[tipo]?.etiqueta || tipo;
+    const claveItems = CLAVE_ITEMS[tipo];
+    const maxItems = MAX_ITEMS[tipo] || 10;
     const items = contarItems(tipo, actividad?.configuracion);
     const xp = Math.max(items, 1) * PUNTOS_POR_ACIERTO;
+
+    // SPEC-010 — guarda en el banco (siempre automático, igual que el quiz)
+    // los ítems que aún no vienen de él (sin `_banco_id`) y devuelve el array
+    // con los ids asignados. Los fallos individuales no bloquean el flujo.
+    const guardarLoteEnBanco = async (lote, temaTxt) => {
+        const materiaId = idPorNombre(materia);
+        if (!materiaId) return lote;
+        return Promise.all(lote.map(async (item) => {
+            if (item._banco_id) return item;
+            try {
+                const creada = await bancoService.crearPregunta({
+                    materiaId,
+                    tipo,
+                    contenido: item,
+                    tema: temaTxt || undefined,
+                    dificultad
+                });
+                return { ...item, _banco_id: creada.id };
+            } catch {
+                return item;
+            }
+        }));
+    };
 
     const generar = async (e) => {
         e.preventDefault();
@@ -95,6 +131,10 @@ export function GeneradorActividadIA({ materia, tipo }) {
                 dificultad,
                 cursoId: cursoId ? Number(cursoId) : undefined
             });
+            // Los ítems generados alimentan el banco automáticamente (SPEC-010).
+            const itemsConBanco = await guardarLoteEnBanco(
+                data.configuracion?.[claveItems] || [], tema.trim()
+            );
             // La actividad nace como BORRADOR y se guarda en el historial para
             // poder retomarla/editarla aunque el docente cambie de vista.
             const entrada = nuevaEntradaHistorial({
@@ -104,7 +144,7 @@ export function GeneradorActividadIA({ materia, tipo }) {
                 cursoId,
                 titulo: data.titulo,
                 descripcion: data.descripcion,
-                configuracion: data.configuracion
+                configuracion: { ...data.configuracion, [claveItems]: itemsConBanco }
             });
             guardarHistorial(entrada);
             setActividad(entrada);
@@ -155,19 +195,28 @@ export function GeneradorActividadIA({ materia, tipo }) {
         setGuardando(true);
         setError('');
         try {
+            // Al publicar, los ítems que aún no estén en el banco (p. ej. si el
+            // guardado al generar falló) se guardan también (SPEC-010).
+            let configuracion = actividad.configuracion;
+            if (estado === 'publicado') {
+                const itemsConBanco = await guardarLoteEnBanco(
+                    configuracion?.[claveItems] || [], actividad.tema || tema.trim()
+                );
+                configuracion = { ...configuracion, [claveItems]: itemsConBanco };
+            }
             await publicarReto({
                 materiaId,
                 titulo: actividad.titulo.trim(),
                 tipo,
                 descripcion: actividad.descripcion,
-                configuracion: actividad.configuracion,
+                configuracion,
                 xpRecompensa: xp,
                 estado,
                 origen: 'ia',
                 dificultad,
                 cursoId: cursoId ? Number(cursoId) : undefined
             });
-            const actualizado = { ...actividad, estado };
+            const actualizado = { ...actividad, configuracion, estado };
             setActividad(actualizado);
             actualizarHistorial(actualizado);
             if (estado === 'publicado') {
@@ -182,6 +231,26 @@ export function GeneradorActividadIA({ materia, tipo }) {
         } finally {
             setGuardando(false);
         }
+    };
+
+    // SPEC-010 — inserta ítems elegidos del banco. Llegan como copia con la
+    // misma forma que un ítem generado (+ `_banco_id`, que el juego ignora).
+    // Se respeta el máximo del validador del servidor: si no caben todos, se
+    // insertan los primeros y se avisa cuántos quedaron fuera.
+    const agregarDelBanco = (nuevos) => {
+        setBancoAbierto(false);
+        if (!actividad || !nuevos.length) return;
+        const actuales = actividad.configuracion?.[claveItems] || [];
+        const espacio = Math.max(maxItems - actuales.length, 0);
+        const insertados = nuevos.slice(0, espacio);
+        if (insertados.length) {
+            editarConfig({ [claveItems]: [...actuales, ...insertados] });
+        }
+        const fuera = nuevos.length - insertados.length;
+        setAviso(fuera > 0
+            ? `Se añadieron ${insertados.length} del banco; ${fuera} no ${fuera === 1 ? 'cupo' : 'cupieron'} (máximo ${maxItems} por actividad).`
+            : `${insertados.length} ${insertados.length === 1 ? 'ítem añadido' : 'ítems añadidos'} del banco.`);
+        setTimeout(() => setAviso(''), 5000);
     };
 
     // ---- Edición por tipo -------------------------------------------------
@@ -379,6 +448,18 @@ export function GeneradorActividadIA({ materia, tipo }) {
                         </div>
                     )}
 
+                    <button
+                        type="button"
+                        className="preview-action"
+                        disabled={guardando || items >= maxItems}
+                        title={items >= maxItems
+                            ? `Ya está el máximo de ${maxItems} ítems para esta actividad`
+                            : 'Reutiliza ítems que ya creaste antes (se insertan como copia)'}
+                        onClick={() => setBancoAbierto(true)}
+                    >
+                        <LibraryAddRoundedIcon sx={{ fontSize: '1.1rem' }} /> Añadir del banco
+                    </button>
+
                     <div className="clasificador-publicar-barra">
                         <p className="clasificador-publicar-hint">
                             {publicado
@@ -408,6 +489,15 @@ export function GeneradorActividadIA({ materia, tipo }) {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {bancoAbierto && actividad && (
+                <SelectorBanco
+                    tipo={tipo}
+                    materiaId={idPorNombre(materia)}
+                    onInsertar={agregarDelBanco}
+                    onCerrar={() => setBancoAbierto(false)}
+                />
             )}
 
             <HistorialActividades

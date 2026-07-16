@@ -4,7 +4,7 @@ import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import { EditorQuiz } from '../../components/quiz/EditorQuiz';
-import { SelectorBancoQuiz } from '../../components/quiz/SelectorBancoQuiz';
+import { SelectorBanco } from '../../components/juegos/SelectorBanco';
 import { publicarReto } from '../../services/retosService';
 import { authFetch } from '../../services/authService';
 import { idPorNombre } from '../../services/materiasService';
@@ -42,9 +42,6 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
     const [historialTodo, setHistorialTodo] = useState(leerHistorialTodo);
     // SPEC-010: modal del banco de preguntas (tercera fuente junto a manual e IA).
     const [bancoAbierto, setBancoAbierto] = useState(false);
-    // "Guardar también en mi Banco" (activado por defecto): las preguntas de IA
-    // se guardan al generarse; las manuales, al publicar (cuando ya están completas).
-    const [guardarBancoAuto, setGuardarBancoAuto] = useState(true);
     // Solo los quizzes de la materia actual (últimos 3).
     const historial = historialTodo[materia] || [];
 
@@ -105,9 +102,10 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
         actualizarEnHistorial(actualizado);
     };
 
-    // Guarda en el banco las preguntas que aún no vienen de él (sin `_banco_id`)
-    // y devuelve el array con los `_banco_id` asignados. Los fallos individuales
-    // no bloquean el flujo: alimentar el banco es un extra, no un requisito.
+    // Guarda en el banco (siempre, sin opción de apagarlo) las preguntas que aún
+    // no vienen de él (sin `_banco_id`) y devuelve el array con los `_banco_id`
+    // asignados. Los fallos individuales no bloquean el flujo: alimentar el
+    // banco es un extra, no un requisito para generar/publicar.
     const guardarLoteEnBanco = async (items, temaTxt) => {
         const materiaId = idPorNombre(materia);
         if (!materiaId) return items;
@@ -140,11 +138,9 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
         setPublicando(true);
         try {
             setError('');
-            // Con el toggle activo, las preguntas manuales (ya completas al
-            // publicar) se guardan también en el banco antes de publicar.
-            const preguntas = guardarBancoAuto
-                ? await guardarLoteEnBanco(quizEdit.preguntas, quizEdit.tema)
-                : quizEdit.preguntas;
+            // Las preguntas manuales (ya completas al publicar) se guardan
+            // también en el banco antes de publicar.
+            const preguntas = await guardarLoteEnBanco(quizEdit.preguntas, quizEdit.tema);
             await publicarReto({
                 materiaId,
                 titulo: quizEdit.tema,
@@ -194,7 +190,7 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
 
         try {
             let quiz = await pedirPreguntasIA(tema.trim(), cantidad);
-            if (guardarBancoAuto) quiz = await guardarLoteEnBanco(quiz, tema.trim());
+            quiz = await guardarLoteEnBanco(quiz, tema.trim());
             // El quiz nace como BORRADOR: el docente lo edita y solo se publica
             // cuando pulsa "Publicar quiz para estudiantes".
             const entrada = {
@@ -224,7 +220,7 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
         if (!quizEdit) return;
         try {
             let nuevas = await pedirPreguntasIA(quizEdit.tema, n, quizEdit.preguntas);
-            if (guardarBancoAuto) nuevas = await guardarLoteEnBanco(nuevas, quizEdit.tema);
+            nuevas = await guardarLoteEnBanco(nuevas, quizEdit.tema);
             actualizarPreguntas([...quizEdit.preguntas, ...nuevas]);
         } catch (err) {
             console.error('Error al añadir preguntas con IA:', err);
@@ -319,13 +315,12 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                     publicado={quizEdit.estado === 'publicado'}
                     onAbrirBanco={() => setBancoAbierto(true)}
                     onGuardarEnBanco={guardarPreguntaEnBanco}
-                    guardarBancoAuto={guardarBancoAuto}
-                    onCambiarGuardarBanco={setGuardarBancoAuto}
                 />
             )}
 
             {bancoAbierto && quizEdit && (
-                <SelectorBancoQuiz
+                <SelectorBanco
+                    tipo="quiz"
                     materiaId={idPorNombre(materia)}
                     onInsertar={agregarDelBanco}
                     onCerrar={() => setBancoAbierto(false)}

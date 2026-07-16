@@ -47,6 +47,7 @@ export const inicializarEsquema = async () => {
         await migrarSistemaMisiones(conn);
         await migrarDocenteCurso(conn);
         await migrarBancoPreguntas(conn);
+        await migrarBackfillBanco(conn);
         console.log('✅ Esquema verificado/creado en la base de datos.');
         await asegurarAdmin(conn);
         await asegurarAdminPrincipal(conn);
@@ -446,6 +447,97 @@ const migrarBancoPreguntas = async (conn) => {
         INDEX idx_banco_materia_tipo (materia_id, tipo),
         INDEX idx_banco_estado (estado)
     ) ENGINE = InnoDB`);
+};
+
+// Backfill único (SPEC-010) — antes de que el guardado automático existiera,
+// los ítems (preguntas, parejas, eventos, frases) solo vivían dentro de
+// `retos.configuracion_json`. Se copian al banco para que también aparezcan
+// como reutilizables. Se ejecuta UNA sola vez: se guarda con origen='backfill'
+// y esa marca es el candado (si ya hay filas con ese origen, no se repite).
+const migrarBackfillBanco = async (conn) => {
+    const [[yaHecho]] = await conn.query(
+        "SELECT COUNT(*) AS n FROM banco_preguntas WHERE origen = 'backfill'"
+    );
+    if (yaHecho.n > 0) return;
+
+    // Por tipo con ítems atómicos: clave del arreglo en la configuración,
+    // validación mínima del ítem y enunciado buscable (misma lógica que los
+    // validadores de routes/bancoPreguntas.js).
+    const EXTRACTORES = {
+        quiz: {
+            clave: 'preguntas',
+            valido: (p) => {
+                const correcta = String(p?.correcta || '').trim().toUpperCase().charAt(0);
+                return typeof p?.pregunta === 'string' && p.pregunta.trim() &&
+                    p?.alternativas?.A && p?.alternativas?.B && p?.alternativas?.[correcta];
+            },
+            enunciado: (p) => p.pregunta
+        },
+        memorama: {
+            clave: 'parejas',
+            valido: (p) => typeof p?.a === 'string' && p.a.trim() && typeof p?.b === 'string' && p.b.trim(),
+            enunciado: (p) => `${p.a} ↔ ${p.b}`
+        },
+        'linea-tiempo': {
+            clave: 'eventos',
+            valido: (p) => typeof p?.texto === 'string' && p.texto.trim(),
+            enunciado: (p) => (p.etiqueta ? `${p.etiqueta}: ${p.texto}` : p.texto)
+        },
+        completar: {
+            clave: 'frases',
+            valido: (p) => typeof p?.texto === 'string' && p.texto.includes('___') &&
+                Array.isArray(p?.opciones) && p.opciones.length >= 2 &&
+                typeof p?.correcta === 'string' && p.opciones.includes(p.correcta),
+            enunciado: (p) => p.texto
+        }
+    };
+
+    const [retosConItems] = await conn.query(
+        `SELECT id, materia_id, tipo, dificultad, configuracion_json, docente_id
+         FROM retos WHERE tipo IN (?) AND eliminado_en IS NULL`,
+        [Object.keys(EXTRACTORES)]
+    );
+    if (!retosConItems.length) return;
+
+    // Ítems que ya están en el banco (guardados antes de este backfill),
+    // para no duplicar el mismo contenido.
+    const [existentes] = await conn.query(
+        'SELECT materia_id, tipo, LOWER(TRIM(enunciado)) AS enunciado FROM banco_preguntas'
+    );
+    const yaEnBanco = new Set(existentes.map((e) => `${e.materia_id}:${e.tipo}:${e.enunciado}`));
+
+    const filas = [];
+    for (const reto of retosConItems) {
+        const extractor = EXTRACTORES[reto.tipo];
+        let config;
+        try {
+            config = typeof reto.configuracion_json === 'string'
+                ? JSON.parse(reto.configuracion_json) : reto.configuracion_json;
+        } catch { continue; }
+        const items = Array.isArray(config?.[extractor.clave]) ? config[extractor.clave] : [];
+        for (const item of items) {
+            if (!extractor.valido(item)) continue;
+            const enunciado = String(extractor.enunciado(item) || '').trim().slice(0, 255);
+            if (!enunciado) continue;
+            const claveDedupe = `${reto.materia_id}:${reto.tipo}:${enunciado.toLowerCase()}`;
+            if (yaEnBanco.has(claveDedupe)) continue;
+            yaEnBanco.add(claveDedupe); // el mismo ítem puede repetirse en varias actividades
+            filas.push([
+                reto.materia_id, null, reto.tipo, reto.dificultad || null, enunciado,
+                JSON.stringify(item), null, null, 'backfill', 'aprobada', reto.docente_id
+            ]);
+        }
+    }
+    if (!filas.length) return;
+
+    await conn.query(
+        `INSERT INTO banco_preguntas
+            (materia_id, tema, tipo, dificultad, enunciado, contenido_json,
+             explicacion, etiquetas, origen, estado, creado_por)
+         VALUES ?`,
+        [filas]
+    );
+    console.log(`✅ Migración: ${filas.length} ítems de actividades existentes copiados al banco (backfill).`);
 };
 
 // Invariante del sistema: SIEMPRE existe al menos un Administrador Principal
