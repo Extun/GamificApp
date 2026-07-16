@@ -279,6 +279,19 @@
 }
 .editor-btn-añadir { flex: 1; min-width: 200px; border-style: dashed; }
 
+/* Toggle "Guardar también en mi Banco" (alimenta el banco al crear preguntas). */
+.editor-banco-auto {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-basis: 100%;
+    font-size: 0.85rem;
+    color: var(--color-text-soft, #6b7280);
+    cursor: pointer;
+    user-select: none;
+}
+.editor-banco-auto input[type="checkbox"] { width: auto; margin: 0; }
+
 /* Dropdown de cantidad para "Añadir con IA". */
 .editor-ia-wrap { position: relative; }
 

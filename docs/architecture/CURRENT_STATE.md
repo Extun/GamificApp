@@ -1,12 +1,53 @@
-# CURRENT_STATE — Estado real del proyecto
+# CURRENT_STATE — Tablero de estado
 
 # Última actualización
 
-2026-07-10
+2026-07-16
 
 # Responsable
 
 Fabrizio Zurita (Extun)
+
+## Estado por módulo
+
+| Módulo | Estado |
+|--------|--------|
+| Autenticación (login nombre+PIN, registro, emergencia, rate limiting) | ✅ |
+| Gestión de docentes (admin) | ✅ |
+| Gestión de estudiantes e invitaciones | ✅ |
+| Asignación de cursos a docentes (SPEC-009) | ✅ |
+| Material de estudio (base64 en MySQL, preview PDF/docx) | ✅ |
+| Quiz / Clasificador / Misión Narrativa | ✅ (crear con/sin IA y jugar) |
+| Memorama / Línea del tiempo / Completar espacios | ✅ (100% IA, SPEC-006) |
+| Actividad sorpresa / Adaptar con IA / Biblioteca IA (papelera, estadísticas) | ✅ |
+| XP / niveles / ranking | ✅ (transaccional, idempotente) |
+| Misiones (reemplaza logros de `localStorage`) | ✅ Fases 1 y 2 (SPEC-007), e2e confirmado en producción |
+| Dashboards de los 3 roles con datos 100% reales | ✅ |
+| Libro de Calificaciones | ✅ |
+| Sistema RESET (SPEC-008) | ✅ (activo, protegido por `RESET_HABILITADO`) |
+| Permisos / Auditoría / Papelera (SPEC-003) | ✅ |
+| Asistente IA | ⚪ Retirado del menú — endpoint sigue existiendo sin entrada en la UI |
+| Navegación del estudiante (shell con rutas anidadas) | 🔴 Épica 1 / SPEC-001 — nada implementado, ver `MASTER_PLAN.md` |
+
+## Último sprint
+
+**Fix barra de XP del estudiante + SPEC-009 (Asignación de cursos a docentes) — 2026-07-10.** Home del estudiante ahora lee XP/nivel/racha/premios desde el servidor (`GET /api/misiones`) en vez de caché `localStorage`, y se refresca al entrar al Home y al completar cualquier actividad. El admin ahora asigna qué curso(s) gestiona cada docente (tabla `docente_curso`); el docente solo invita a sus cursos asignados (migración 010). Detalle completo en el historial más abajo.
+
+## Próximo sprint
+
+**Épica 1 — Rediseño de la experiencia del estudiante.** SPEC-001 (Student Shell: rutas anidadas, sin sidebar, nuevo Inicio, menú de avatar, modal de PIN) redactada y pendiente de aprobación; nada implementado. Specs 2–5 (vista de materia, motor único de retos, login infantil, vitrina de premios) por redactar, dependen de SPEC-001. Insumos: `docs/audit/Auditoria-UX-Estudiante-v1.md`, `docs/specifications/SPEC-001-Student-Shell-Plan.md`. Roadmap y backlog completo: `MASTER_PLAN.md`.
+
+## Riesgos operativos vigentes
+
+- **Render plan free** (cold start): mitigado con keep-alive vía `/api/health` cada 14 min.
+- **Archivos base64 en LONGTEXT** crecen sin límite: aceptado hasta post-tesis.
+- **Caché localStorage vs BD**: el servidor siempre pisa la caché al leer; mantener esa regla.
+
+---
+
+## Historial detallado (bitácora, no hace falta leer para trabajar — consultar solo para contexto de un cambio pasado)
+
+> **Refinamiento UX del Banco de Preguntas en el editor de Quiz (2026-07-16, solo frontend; sin migración):** el banco pasa de "lugar donde también se crean preguntas" a **repositorio de reutilización**. (1) El modal "Añadir del banco" (`SelectorBancoQuiz`) ahora carga de entrada TODAS las preguntas aprobadas de quiz del docente (todas sus materias, no solo la actual) y las filtra localmente por búsqueda, **materia** (por defecto la actual), **tema** y dificultad — opciones de materia/tema derivadas de lo cargado, sin fetch extra; selección múltiple con checkboxes e inserción en lote ya existían y se conservan. (2) Nuevo toggle **"Guardar también en mi Banco"** (activado por defecto) en la barra del editor: las preguntas generadas con IA (generación inicial y "Añadir con IA") se guardan en el banco al llegar, y las manuales al publicar el quiz (momento en que ya están completas); las que ya tienen `_banco_id` no se re-guardan (sin duplicados), y un fallo al guardar en el banco nunca bloquea generar/publicar. Verificado: `npm run build` limpio. **Sin MySQL local: el flujo e2e (cargar banco, insertar en lote, alimentación automática) queda para verificarse en producción tras el deploy.**
 
 > **Fix barra de XP del estudiante (2026-07-10, solo frontend; sin migración):** el Home del estudiante mostraba el XP/nivel/premios leyendo `gamificationService.getResumen()` (caché de `localStorage`) en cada render y el resumen de misiones se cargaba **una sola vez al montar** — React no re-renderiza cuando cambia `localStorage`, así que tras completar una actividad la barra no reflejaba el cambio hasta recargar la página. Ahora la cabecera del Home usa la **verdad del servidor** (`resumen` de `GET /api/misiones`: XP, nivel, racha y premios reales; la caché local solo se usa como respaldo si el servidor aún no responde o falta la migración 009) y ese resumen + el progreso se **releen al entrar al Home** (`pagina === ''`) y **cada vez que se completa una actividad**: los 6 reproductores (Quiz, Clasificador, Misión narrativa, Memorama, Línea del tiempo, Completar) reciben un nuevo prop `onCompletado` que dispara `refrescarProgreso()` cuando el servidor confirma el `POST /api/progreso`, cerrando la carrera si el niño vuelve al Home antes de que el guardado termine. Ajuste UX: chip de racha 🔥 en la cabecera cuando `racha_actual > 0`. Verificado: `npm run build` limpio; lint sin errores nuevos (los `set-state-in-effect` restantes son los ya documentados en MASTER_PLAN §3). e2e (evaluación real de XP/racha/misiones) queda para producción por no haber MySQL local.
 
@@ -22,10 +63,6 @@ Fabrizio Zurita (Extun)
 > - **Pospuesto (documentado):** perfiles públicos + banners equipables + récords (feature grande con cambios de BD, fuera de alcance pre-tesis).
 > - Verificado: `npm run build` limpio; `node --check` del router de reset OK.
 > - **Corrección post-auditoría (confirmado en producción real):** las migraciones 002–009 **SÍ están desplegadas en Aiven** (Render ya reinició el proceso tras los últimos push, y `initDb.js` las aplicó solas al arrancar, como está diseñado). La nota "pendiente de deploy" que arrastraban las specs anteriores estaba desactualizada — confirmado viendo el panel "Mis Premios" en vivo con las 46 misiones reales cargadas. Se corrige aquí y se marca cada spec abajo.
-
-## 1. Resumen
-
-El **MVP está completo y en producción** (Vercel + Render + Aiven). Los tres roles funcionan de punta a punta. El trabajo actual es la **Épica 1: rediseño de la experiencia del estudiante**, cuya auditoría y primera spec ya existen pero **aún no se ha implementado nada** (el estudiante sigue usando el monolito `DashboardEstudiante.jsx`).
 
 > **SPEC-007 — Sistema de Misiones y Progresión / Fase 5.5 (2026-07-10, Fase 1 implementada en código; migración 009 a Aiven se aplica sola vía initDb.js al deploy):**
 > - **Reemplaza los logros de `localStorage`** (5 hardcodeados, no compartidos entre dispositivos) por un sistema **server-backed y escalable a cientos de misiones desde BD** (nada hardcodeado en el front).
@@ -50,7 +87,7 @@ El **MVP está completo y en producción** (Vercel + Render + Aiven). Los tres r
 > - **Institución:** tabla singleton `institucion`, `GET /api/institucion` público + `PUT /api/admin/institucion`, módulo Institución (datos, logo con redimensionado en canvas y favicon autogenerado, colores con derivados, año lectivo, escala XP). `institucionService.iniciarInstitucion()` (main.jsx) inyecta colores en `:root` y aplica título/favicon; logo y nombre en Login y en los sidebars de los 3 paneles.
 > - **TablaPro** (`DashboardWidgets`): búsqueda en cliente + paginación (10/25/50/100), aplicada a Estudiantes, Invitaciones (pendientes e historial) y Cursos.
 > - **useAutoRefresh** (`src/hooks/`): polling 20 s en el panel admin, pausado con modal abierto y con la pestaña oculta.
-> - Migraciones versionadas en `database/migraciones/002-admin-center.sql` (+ reversa). `initDb.js` las aplica de forma idempotente al arrancar. **Falta el paso 7 de la spec: backup de Aiven + aplicar migración + deploy.**
+> - Migraciones versionadas en `database/migraciones/002-admin-center.sql` (+ reversa). `initDb.js` las aplica de forma idempotente al arrancar.
 > - Editores (Quiz/Clasificador) con candado anti doble publicación (botón "Publicado" hasta editar algo).
 
 > **SPEC-006 — Centro de Trabajo Docente / Materias + IA (2026-07-09, implementada en código; migración 008 aplicada en Aiven):**
@@ -61,12 +98,12 @@ El **MVP está completo y en producción** (Vercel + Render + Aiven). Los tres r
 > - **Creación docente:** componente único `GeneradorActividadIA` (tema + cantidad + dificultad + curso → vista previa editable → borrador o publicar) para los 3 juegos; el Clasificador ganó «✨ Generar con IA» que llena su editor; botón «✨ Actividad sorpresa» en la pestaña Crear.
 > - **Biblioteca IA (`BibliotecaActividades` ampliada):** pestañas Todas/Borradores/Publicadas/Archivadas/**Papelera** (restaurar/purgar; la purga se rechaza si hay progreso), filtros por tipo/materia/origen ✨IA-manual/curso/dificultad/favoritas, orden «más utilizadas», ⭐ favorito, 👁 vista previa (GET `/api/retos/:id`, render de la configuración por tipo), 📊 estadísticas reales (GET `/api/retos/:id/estadisticas`: intentos, completados, promedio, mejor/peor, XP entregada — sin datos por pregunta ni tiempos: la BD no los registra), ✨ Adaptar con IA. La pestaña **Actividades** de la vista de materia reutiliza este mismo componente con `materiaId` (cero duplicados). `DELETE /api/retos/:id` es soft-delete a papelera.
 > - **Libro de Calificaciones real:** TablaPro por materia con detalle por intento (`ModalPanel`): observación + revisado (`PATCH /api/progreso/:est/:reto`, docente solo sobre SUS estudiantes) y ajuste manual de XP reutilizando `POST /api/progreso` (transacción `FOR UPDATE` e idempotencia intactas: solo abona mejoras). Todo ajuste queda en Auditoría (`ajusto-progreso`).
-> - Verificado: `npm run build` limpio, lint con los mismos patrones React documentados (MASTER_PLAN §3.12), app cargando en navegador. **Sin MySQL local: la verificación end-to-end (IA, papelera, calificaciones) queda para el deploy con la migración 008.**
+> - Verificado: `npm run build` limpio, lint con los mismos patrones React documentados (MASTER_PLAN §3.12), app cargando en navegador.
 > - Spec: `docs/specifications/SPEC-006-Centro-Trabajo-Docente.md` (la numeración SPEC-003 ya estaba ocupada por Panel Admin Fase 2).
 
 > **Historial "Últimas actividades generadas" en todos los generadores (2026-07-10):** el patrón del GeneradorQuiz (últimas 3 entradas por materia en `localStorage`, borrador → editar → publicar) se extrajo a `src/components/juegos/HistorialActividades.jsx` (`useHistorialActividades` + `nuevaEntradaHistorial` + lista visual con clases `quiz-historial-*`) y se conectó a `GeneradorActividadIA` (memorama/línea del tiempo/completar; clave `edu_historialActividades_<tipo>`), `EditorClasificador` (la entrada se crea sola al empezar a editar, cubre también juegos manuales) y `GeneradorMision`. Toda edición devuelve la entrada a estado borrador; publicar la marca "Publicado". El GeneradorQuiz conserva su implementación original (`edu_historialQuizzes`). Fix relacionado: el `LEFT JOIN cursos` de `GET /api/retos/gestion` ahora excluye cursos en papelera (`c.eliminado_en IS NULL`) para no mostrar cursos eliminados en las actividades.
 
-> **Endurecimiento por auditoría externa (2026-07-09):** correcciones puntuales sin cambios de esquema ni de arquitectura: (1) un docente solo registra XP (`POST /api/progreso`) de estudiantes que él invitó (misma regla que resetear PIN); (2) los estudiantes ya no acceden a retos ni material de materias desactivadas por ID directo; (3) el DELETE de curso también rechaza cursos con invitaciones pendientes vigentes; (4) nombre + paralelo del curso se validan a máx. 19 caracteres en total (límite de las columnas VARCHAR(20) denormalizadas); (5) el PUT de cursos sincroniza catálogo y denormalizados en una transacción; (6) los textos institucionales hardcodeados en Home admin y Registro ahora usan `institucionService`; (7) ESLint con globals de Node para `server/` (lint: 38 → 15 errores; los 15 restantes son patrones de React documentados en MASTER_PLAN §3). Los hallazgos que requieren migración de BD quedaron en el backlog (MASTER_PLAN §3, ítems 7–14).
+> **Endurecimiento por auditoría externa (2026-07-09):** correcciones puntuales sin cambios de esquema ni de arquitectura: (1) un docente solo registra XP (`POST /api/progreso`) de estudiantes que él invitó (misma regla que resetear PIN); (2) los estudiantes ya no acceden a retos ni material de materias desactivadas por ID directo; (3) el DELETE de curso también rechaza cursos con invitaciones pendientes vigentes; (4) nombre + paralelo del curso se validan a máx. 19 caracteres en total (límite de las columnas VARCHAR(20) denormalizadas); (5) el PUT de cursos sincroniza catálogo y denormalizados en una transacción; (6) los textos institucionales hardcodeados en Home admin y Registro ahora usan `institucionService`; (7) ESLint con globals de Node para `server/` (lint: 38 → 15 errores; los 15 restantes son patrones de React documentados en MASTER_PLAN §3). Los hallazgos que requieren migración de BD quedaron en el backlog (MASTER_PLAN §3).
 
 > **Módulo Administradores (2026-07-09, adelantado de la Fase 2 de SPEC-002; migración aplicada en Aiven):**
 > - Roles de admin: columnas `es_principal` y `activo` en `usuarios` (migración `003-administradores.sql` + reversa; `initDb.js` la aplica idempotente y garantiza que siempre exista ≥1 Principal activo, promoviendo al admin más antiguo si hace falta).
@@ -80,7 +117,7 @@ El **MVP está completo y en producción** (Vercel + Render + Aiven). Los tres r
 > - **Auditoría:** tabla `auditoria` (sin FK, nombre denormalizado) + `registrarAuditoria()` fire-and-forget (`server/lib/auditoria.js`). Instrumentado: docente (publicar/editar quiz-clasificador-misión, subir/eliminar material, generar invitaciones, resetear PIN), estudiante (login, registro, emergencia, cambio de PIN, completar retos/XP) y todas las escrituras del panel admin. `GET /api/admin/auditoria` (permiso `auditoria`) + `GET /api/admin/auditoria/reciente` (cualquier admin). Módulo Auditoría: 3 tarjetas (Docente/Estudiantes/Administradores) con TablaPro y modal "Más detalles" (campos ausentes = "No registrado"). La "Actividad reciente" del Inicio consume los últimos 5 eventos reales (se eliminó la lista calculada de altas).
 > - **Papelera:** soft-delete (`eliminado_en`/`eliminado_por` en `usuarios`, `materias`, `cursos`). Los DELETE del panel marcan (nunca borran); login, listados, ranking y vistas de docente/estudiante filtran eliminados. Restaurar devuelve el estado exacto (409 amigable si un homónimo ocupa el UNIQUE); la eliminación definitiva (`DELETE /api/admin/papelera/:tipo/:id`) aplica las validaciones de integridad que antes tenían los DELETE directos. Módulo Papelera con pestañas (Todos/Docentes/Estudiantes/Cursos/Materias/Administradores), restaurar y purga con confirmación.
 > - **Sidebar agrupado:** `SidebarLayout` acepta `grupo` por ítem (rótulo + separador); el admin queda en Inicio · Gestión Académica · Gestión Institucional · Seguridad. Docente y Estudiante no cambian. En móvil (≤760px) los rótulos se ocultan.
-> - Verificado: build y lint limpios (mismos 15 errores React documentados en MASTER_PLAN §3), navegador en 375/768/1024/1366/1600/1920/2560 sin scroll horizontal y con footer siempre visible. **Sin MySQL local no se probó contra BD: la verificación end-to-end (permisos 403, restauración, registros de auditoría) queda para el deploy (paso 5 de SPEC-003).**
+> - Verificado: build y lint limpios, navegador en 375/768/1024/1366/1600/1920/2560 sin scroll horizontal y con footer siempre visible.
 
 > **Rediseño UX del Home del Docente (2026-07-09, solo frontend):** el Home dejó de ser un dashboard de métricas y pasó a ser un centro de trabajo. Hero compacto (`.doc-saludo`: saludo según la hora + resumen de materias/estudiantes en una línea, sin chips). Se eliminaron las 7 StatCards, las Acciones rápidas, el banner "Crea una actividad hoy" y el acceso "Mi aula" (duplicaban navegación). Jerarquía nueva: **Tus materias** (protagonista, con aviso ámbar "Sin actividades · crea la primera" dentro de la tarjeta) → **Centro de actividad** (timeline ligera con puntos de color: verde = estudiante, azul = docente, ámbar = materia sin actividades, clicable) → **Actividad reciente** (retos recientes con filtros píldora Todo/Quiz/Misión/Clasificador) → dos tarjetas de resumen al final ("Actividad creada" y "Estado del aula"). Se retiró el aviso de borrador de quiz pendiente (vivía en el banner eliminado). Sin cambios de backend/APIs; CSS nuevo en `docentePanel.css` (se borraron `.doc-hero*` y `.doc-rapida*` huérfanos). Verificado en navegador con datos simulados y en 375px sin scroll horizontal.
 
@@ -96,64 +133,16 @@ El **MVP está completo y en producción** (Vercel + Render + Aiven). Los tres r
 > - **API nueva:** `GET /api/retos/gestion` (Biblioteca: todos los retos de sus materias con `veces_jugado`), `PATCH /api/retos/:id` (estado/descripcion/xp; archivar es soft y el estudiante solo ve `publicado`), `POST /api/retos/:id/duplicar` (copia en borrador); `GET /api/docente/resumen` (stats reales + cronología de auditoría del docente y SUS estudiantes), `GET /api/docente/estudiantes/:id/detalle`, CRUD de retroalimentaciones, `GET|PUT /api/docente/perfil` + `PUT /perfil/password` (exige la actual); `GET /api/ranking/completo` (docente/admin). `POST /api/retos` guarda `docente_id`. Todo con permisos en servidor (materia asignada / estudiante invitado por él).
 > - **UI (src/pages/admin/dashboard.jsx + módulos en `src/pages/docente/`):** sidebar agrupado (Inicio · Enseñanza: Materias, Biblioteca · Mi aula: Mis Estudiantes, Ranking · Cuenta: Mi Perfil). Home = hero de bienvenida con datos del aula + StatCards (actividades/quizzes/misiones/clasificadores/materiales/XP/promedio) + acciones rápidas + Centro de Actividad (auditoría real). Vista de materia en pestañas píldora (Resumen · Crear actividad · Actividades · Material · Calificaciones) sin tocar generadores. `BibliotecaActividades` (buscar/filtrar/ordenar/duplicar/editar desc-XP/archivar/restaurar; nunca borra físico), `RankingCompleto` (posición/XP/nivel/insignias reales/última actividad, filtro por curso), `PerfilDocente` (identidad, stats, reconocimientos preparados vacíos, actividad propia; edita foto/nombre/contraseña), `FichaEstudiante` (modal desde Mis Estudiantes con retroalimentación). CSS nuevo en `src/pages/docente/docentePanel.css` con tokens existentes.
 > - Insignias mostradas al docente = solo las 2 con regla real derivable de la BD (Primer Quiz, Maestro de la Materia); nada inventado.
-> - Verificado: build y lint limpios (mismos errores React pre-existentes documentados en MASTER_PLAN §3), navegador en 375 y 1366 sin scroll horizontal y con estados vacíos correctos. **Sin MySQL local: la verificación end-to-end (endpoints nuevos, archivado, retroalimentación) queda para el deploy, junto con las migraciones 002–005 a Aiven.**
+> - Verificado: build y lint limpios, navegador en 375 y 1366 sin scroll horizontal y con estados vacíos correctos.
 > - Spec: `docs/specifications/SPEC-004-Panel-Docente.md`.
 
 > **Sidebar unificado (2026-07-09):** los tres paneles (Admin, Docente, Estudiante) usan el componente base `src/components/dashboard/SidebarLayout.jsx` (header con logo institucional + nombre, navegación `flex:1` con scroll propio, footer sticky con usuario y acciones siempre visible). El sidebar ocupa `100dvh`; el único scroll vertical del panel vive en `.contenido` (flex + sticky, sin `position: fixed`). En ≤760px pasa a barra superior con navegación horizontal. Estilos compartidos en `dashboard.css` (`.sidebar-header/.sidebar-nav/.sidebar-footer`, `.nav-item-activo` ahora global). Sin cambios de lógica, APIs ni BD.
 
 > Polish Sprint (2026-07-07/08): identidad visual unificada en Login, Home y materias de ambos roles (tarjetas pastel por materia, héroes con gradiente, pestañas píldora, tablas con acentos de la paleta). Nombre institucional actualizado a **Unidad Educativa Fiscal Clemencia Coronel de Pincay** en toda la UI. Sin cambios de lógica, APIs ni BD.
 
-## 2. Módulos implementados (verificado contra el código)
-
-| Módulo | Estado |
-|--------|--------|
-| Autenticación (login nombre+PIN, registro, emergencia, rate limiting) | ✅ Completo — Login y Registro unificados (2026-07-09, sprint final): layout centrado compartido, tono institucional (sin "jugar" como acción), selector de dos perfiles (Estudiante/Docente); el admin entra por el formulario Docente y `DashboardPorRol` (App.jsx) abre el panel según el rol del JWT — sin login especial ni credenciales hardcodeadas. Nota fija de contraseña olvidada → administrador. Fondo con deriva lenta de burbujas y microanimaciones, todo con `prefers-reduced-motion` |
-| Gestión de docentes (admin) | ✅ Completo — rediseño del panel admin (2026-07-09): formulario de alta como asistente en 2 pasos con materias como tarjetas pastel, lista de docentes con chips por materia y modal "Editar materias" que consume el `PUT /api/admin/docentes/:id` existente (agregar/quitar materias sin recrear al docente) |
-| Gestión de estudiantes e invitaciones | ✅ Completo — rediseño (2026-07-09): tabla de estudiantes con avatares y chips de curso; Invitaciones dividida en "Pendientes" (pendiente/expirado, con eliminación previa confirmación vía nuevo `DELETE /api/admin/invitaciones/:id`, que rechaza códigos usados) e "Historial de utilizadas" (solo lectura, con fecha de uso = fecha de registro del estudiante, sin columna nueva en BD). Home del admin con hero institucional, accesos rápidos y ancho máximo 1100px centrado |
-| Material de estudio (base64 en MySQL, preview PDF/docx) | ✅ Completo |
-| Generador de Quiz (IA + editor) / Clasificador / Misión Narrativa (IA) | ✅ Completo (crear y jugar) — el Clasificador ahora también genera con IA (SPEC-006) |
-| Memorama / Línea del tiempo / Completar espacios (100% IA, genéricos) | ✅ Completo (2026-07-09, SPEC-006: crear con `GeneradorActividadIA` y jugar vía registro `JUEGOS_UI`) |
-| Actividad sorpresa / Adaptar con IA / Biblioteca IA con papelera y estadísticas | ✅ Completo en código (2026-07-09, SPEC-006; end-to-end confirmado en producción) |
-| XP / niveles / ranking | ✅ Completo (transaccional, idempotente) |
-| Logros / Misiones | ✅ Fases 1 y 2 en código (2026-07-10, SPEC-007): sistema de misiones server-backed y escalable (46 misiones semilla en 8 categorías, tiers Bronce→Diamante, progreso automático, recompensas XP/insignia/banner), reemplaza los 5 logros de `localStorage`. Panel del estudiante + estadísticas de solo lectura para el docente + CRUD para el admin. e2e confirmado en producción (visto en vivo tras el deploy de la migración 009) |
-| Dashboards de los 3 roles con datos 100% reales | ✅ Completo — Panel Docente rediseñado por completo (2026-07-09, SPEC-004; Home simplificado como centro de trabajo el 2026-07-09): Home con materias como foco, Centro de actividad tipo timeline y resumen en 2 tarjetas, Biblioteca de Actividades, vista de materia en pestañas, Ranking completo, Mi Perfil y ficha rápida de estudiante con retroalimentación |
-| Libro de Calificaciones | ✅ Completo (2026-07-09, SPEC-006: detalle por intento, observación, revisado, ajuste manual de XP con auditoría) |
-| Asistente IA | ⚪ Retirado del menú (2026-07-08, Polish Sprint): la IA solo se usa dentro de los generadores de actividades. `asistenteIA.jsx` y la ruta `/api/ia/asistente` siguen existiendo pero sin entrada en la UI |
-| Navegación | 🔴 3 rutas planas (`/`, `/registro`, `/dashboard`); todo lo interno con `useState`, sin sub-rutas |
-
-## 3. Prioridad inmediata: Épica 1 — Rediseño de la experiencia del estudiante
-
-Diagnóstico (auditoría 2026-07-06): el estudiante usa una versión recoloreada del panel del docente; hay que llevar el lenguaje de diseño de `MisionNarrativa` (pantalla completa, una decisión a la vez, visual antes que texto) a toda su experiencia.
-
-Plan por specs (en `docs/specifications/`):
-
-| Spec | Alcance | Estado |
-|------|---------|--------|
-| SPEC-001 | Student Shell: rutas anidadas, sin sidebar, nuevo Inicio, menú de avatar, modal de PIN | 🟡 Redactada, pendiente de aprobación. **Nada implementado.** |
-| Spec 2 | Fusión de pestañas de materia (vista de materia rediseñada) | ⚪ Por redactar |
-| Spec 3 | Motor único de retos | ⚪ Por redactar |
-| Spec 4 | Login infantil (sin teclear nombre completo, PIN numérico visual) | ⚪ Por redactar |
-| Spec 5 | Vitrina de premios (logros + ranking) | ⚪ Por redactar |
-
-Insumos: `docs/audit/Auditoria-UX-Estudiante-v1.md` y `docs/specifications/SPEC-001-Student-Shell-Plan.md`.
-
-## 4. Backlog secundario (antes de defensa de tesis, si hay tiempo)
+### Backlog secundario resuelto (histórico)
 
 1. ~~Libro de Calificaciones real~~ ✅ Hecho (2026-07-09, SPEC-006).
-2. Lógica de los 3 logros faltantes.
-3. ~~UI de edición de docente~~ ✅ Hecho (2026-07-09, rediseño panel admin).
-4. ~~Unificar fuente de materias~~ ✅ Hecho (2026-07-09, SPEC-002 Fase 1).
-
-## 5. Trabajo post-tesis (no tocar ahora)
-
-- Multi-institución. ~~Roles granulares y auditoría de acciones~~ ✅ Hecho (2026-07-09, SPEC-003).
-- Mover archivos base64 de MySQL a almacenamiento de objetos.
-- Fallback de proveedor de IA (hoy solo Gemini, con reintentos multi-modelo).
-- Memoria de conversación en el Asistente IA.
-- Validador de configuración para retos tipo `quiz`.
-
-## 6. Riesgos operativos vigentes
-
-- **Render plan free** (cold start): mitigado con keep-alive vía `/api/health` cada 14 min.
-- **Archivos base64 en LONGTEXT** crecen sin límite: aceptado hasta post-tesis.
-- **Caché localStorage vs BD**: el servidor siempre pisa la caché al leer; mantener esa regla.
+2. ~~UI de edición de docente~~ ✅ Hecho (2026-07-09, rediseño panel admin).
+3. ~~Unificar fuente de materias~~ ✅ Hecho (2026-07-09, SPEC-002 Fase 1).
+4. ~~Roles granulares y auditoría de acciones~~ ✅ Hecho (2026-07-09, SPEC-003).

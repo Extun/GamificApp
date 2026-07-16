@@ -42,6 +42,9 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
     const [historialTodo, setHistorialTodo] = useState(leerHistorialTodo);
     // SPEC-010: modal del banco de preguntas (tercera fuente junto a manual e IA).
     const [bancoAbierto, setBancoAbierto] = useState(false);
+    // "Guardar también en mi Banco" (activado por defecto): las preguntas de IA
+    // se guardan al generarse; las manuales, al publicar (cuando ya están completas).
+    const [guardarBancoAuto, setGuardarBancoAuto] = useState(true);
     // Solo los quizzes de la materia actual (últimos 3).
     const historial = historialTodo[materia] || [];
 
@@ -102,6 +105,28 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
         actualizarEnHistorial(actualizado);
     };
 
+    // Guarda en el banco las preguntas que aún no vienen de él (sin `_banco_id`)
+    // y devuelve el array con los `_banco_id` asignados. Los fallos individuales
+    // no bloquean el flujo: alimentar el banco es un extra, no un requisito.
+    const guardarLoteEnBanco = async (items, temaTxt) => {
+        const materiaId = idPorNombre(materia);
+        if (!materiaId) return items;
+        return Promise.all(items.map(async (p) => {
+            if (p._banco_id) return p;
+            try {
+                const creada = await bancoService.crearPregunta({
+                    materiaId,
+                    tipo: 'quiz',
+                    contenido: p,
+                    tema: temaTxt || undefined
+                });
+                return { ...p, _banco_id: creada.id };
+            } catch {
+                return p;
+            }
+        }));
+    };
+
     // Publica el quiz EN LA BASE DE DATOS (tabla `retos`, tipo 'quiz'): así lo
     // ven los estudiantes desde cualquier navegador/dispositivo. El historial
     // local queda solo como espacio de trabajo/borradores del docente.
@@ -115,14 +140,19 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
         setPublicando(true);
         try {
             setError('');
+            // Con el toggle activo, las preguntas manuales (ya completas al
+            // publicar) se guardan también en el banco antes de publicar.
+            const preguntas = guardarBancoAuto
+                ? await guardarLoteEnBanco(quizEdit.preguntas, quizEdit.tema)
+                : quizEdit.preguntas;
             await publicarReto({
                 materiaId,
                 titulo: quizEdit.tema,
                 tipo: 'quiz',
-                configuracion: { preguntas: quizEdit.preguntas },
-                xpRecompensa: quizEdit.preguntas.length * 100
+                configuracion: { preguntas },
+                xpRecompensa: preguntas.length * 100
             });
-            const publicado = { ...quizEdit, estado: 'publicado' };
+            const publicado = { ...quizEdit, preguntas, estado: 'publicado' };
             setQuizEdit(publicado);
             actualizarEnHistorial(publicado);
             setAviso('¡Quiz publicado! Ya es visible para los estudiantes.');
@@ -163,7 +193,8 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
         setQuizEdit(null);
 
         try {
-            const quiz = await pedirPreguntasIA(tema.trim(), cantidad);
+            let quiz = await pedirPreguntasIA(tema.trim(), cantidad);
+            if (guardarBancoAuto) quiz = await guardarLoteEnBanco(quiz, tema.trim());
             // El quiz nace como BORRADOR: el docente lo edita y solo se publica
             // cuando pulsa "Publicar quiz para estudiantes".
             const entrada = {
@@ -192,7 +223,8 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
     const agregarConIA = async (n) => {
         if (!quizEdit) return;
         try {
-            const nuevas = await pedirPreguntasIA(quizEdit.tema, n, quizEdit.preguntas);
+            let nuevas = await pedirPreguntasIA(quizEdit.tema, n, quizEdit.preguntas);
+            if (guardarBancoAuto) nuevas = await guardarLoteEnBanco(nuevas, quizEdit.tema);
             actualizarPreguntas([...quizEdit.preguntas, ...nuevas]);
         } catch (err) {
             console.error('Error al añadir preguntas con IA:', err);
@@ -287,6 +319,8 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                     publicado={quizEdit.estado === 'publicado'}
                     onAbrirBanco={() => setBancoAbierto(true)}
                     onGuardarEnBanco={guardarPreguntaEnBanco}
+                    guardarBancoAuto={guardarBancoAuto}
+                    onCambiarGuardarBanco={setGuardarBancoAuto}
                 />
             )}
 
