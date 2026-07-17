@@ -28,7 +28,7 @@ const preguntaVacia = () => ({
 // pregunta del quiz en el banco para reutilizarla después; ambas opcionales.
 // `onVistaPrevia` (SPEC-012): abre el quiz en el reproductor real, en modo
 // prueba (sin XP ni progreso), para revisarlo antes de publicar.
-export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar, publicando, publicado, onAbrirBanco, onGuardarEnBanco, onVistaPrevia }) {
+export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar, publicando, publicado, onAbrirBanco, onGuardarEnBanco, onVistaPrevia, onCerrar, mezclarPreguntas, mezclarRespuestas, onCambiarMezcla }) {
     // Ninguna pregunta expandida al abrir el quiz (vista limpia de entrada).
     // Single-open: abrir una contrae automáticamente las demás.
     const [abierta, setAbierta] = useState(-1);
@@ -91,6 +91,16 @@ export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar,
                 <span className="editor-quiz-progreso" data-listo={listaParaPublicar}>
                     {completas}/{total} preguntas listas
                 </span>
+                {onCerrar && (
+                    <button
+                        type="button"
+                        className="editor-cerrar-btn"
+                        onClick={onCerrar}
+                        title="Cierra el editor; el quiz queda en «Últimos generados»"
+                    >
+                        ✕ Cerrar
+                    </button>
+                )}
             </div>
 
             <div className="editor-acordeon">
@@ -257,6 +267,33 @@ export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar,
                     }
                 ]}
             />
+
+            {/* SPEC-013 Fase 1: opciones del quiz, entre el contenido y Publicar
+                (colapsadas; no estorban el flujo principal). */}
+            {onCambiarMezcla && (
+                <details className="quiz-config">
+                    <summary>⚙ Configuración</summary>
+                    <label className="quiz-config-opcion">
+                        <input
+                            type="checkbox"
+                            checked={mezclarPreguntas !== false}
+                            onChange={(e) => onCambiarMezcla('mezclarPreguntas', e.target.checked)}
+                        />
+                        <span>Mezclar el orden de las preguntas en cada intento</span>
+                    </label>
+                    <label className="quiz-config-opcion">
+                        <input
+                            type="checkbox"
+                            checked={mezclarRespuestas !== false}
+                            onChange={(e) => onCambiarMezcla('mezclarRespuestas', e.target.checked)}
+                        />
+                        <span>Mezclar el orden de las opciones en cada intento</span>
+                    </label>
+                    <p className="quiz-config-ayuda">
+                        Así cada estudiante ve un Quiz distinto, aunque sea el mismo para todos.
+                    </p>
+                </details>
+            )}
 
             <div className="editor-publicar-barra">
                 <p className="editor-publicar-hint">

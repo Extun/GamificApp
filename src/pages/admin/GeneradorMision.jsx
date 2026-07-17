@@ -128,9 +128,27 @@ export function GeneradorMision({ materia = 'la materia' }) {
         editarMision({ desafios: desafios.filter((_, idx) => idx !== i) });
     };
 
+    // Cierra la misión abierta; el borrador ya vive en la BD (y en "Últimos
+    // generados"), así que no se pierde nada.
+    const cerrarEditor = () => {
+        cancelarSincronizacion(entradaId);
+        setMision(null);
+        setEntradaId(null);
+        setPublicada(false);
+        setPublicadoEnBD(false);
+        setAviso('');
+        setError('');
+    };
+
     const handleGenerar = async (e) => {
         e.preventDefault();
         if (!tema.trim() || cargando) return;
+        // Generar REEMPLAZA la misión abierta en el editor; se avisa para no
+        // perder trabajo por accidente (el borrador queda en "Últimos generados").
+        if (mision && !window.confirm(
+            'Esto crea una aventura NUEVA y cierra la que tienes abierta '
+            + `(${entradaId ? 'queda guardada en «Últimos generados»' : 'no alcanzó a guardarse'}). ¿Continuar?`
+        )) return;
         setCargando(true);
         setError('');
         setAviso('');
@@ -278,6 +296,17 @@ export function GeneradorMision({ materia = 'la materia' }) {
 
             {mision && (
                 <div className="mision-preview mision-editor">
+                    <div className="editor-abierto-head">
+                        <span className="editor-abierto-etiqueta">Editando: {mision.titulo || 'sin título'}</span>
+                        <button
+                            type="button"
+                            className="editor-cerrar-btn"
+                            onClick={cerrarEditor}
+                            title="Cierra el editor; la misión queda en «Últimos generados»"
+                        >
+                            ✕ Cerrar
+                        </button>
+                    </div>
                     <label className="quiz-field">
                         <span>Título de la misión</span>
                         <input

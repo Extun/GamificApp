@@ -4,7 +4,7 @@
 // → vista previa editable → «Guardar borrador» o «Publicar».
 // El contenido SIEMPRE lo genera la IA en el servidor (POST /api/ia/generar),
 // que ya conoce materia, curso, dificultad e institución desde la BD.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import RocketLaunchRoundedIcon from '@mui/icons-material/RocketLaunchRounded';
 import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
@@ -61,6 +61,14 @@ const MAX_ITEMS = { memorama: 10, 'linea-tiempo': 8, completar: 8 };
 // Nombre del ítem en plural para el botón "Agregar…" (SPEC-013, Fase 2).
 const NOMBRE_ITEM_PLURAL = { memorama: 'parejas', 'linea-tiempo': 'eventos', completar: 'frases' };
 
+// Firma de un ítem para detectar duplicados al "Añadir con IA" (se compara
+// solo el texto visible, sin mayúsculas ni espacios).
+const firmaItem = (tipo, item) => {
+    const t = (s) => (s || '').trim().toLowerCase();
+    if (tipo === 'memorama') return `${t(item.a)}|${t(item.b)}`;
+    return t(item.texto);
+};
+
 // Plantillas de ítem vacío para "Añadir manual" (SPEC-012, Fase 3): el ítem
 // aparece en la lista editable y el docente lo completa ahí mismo.
 const ITEM_VACIO = {
@@ -71,13 +79,6 @@ const ITEM_VACIO = {
 
 export function GeneradorActividadIA({ materia, tipo }) {
     const [tema, setTema] = useState('');
-    // SPEC-013 Fase 2: la entrada "Generar de nuevo" del menú lleva al
-    // formulario de IA (hasta que la Fase 7 lo convierta en modal).
-    const temaRef = useRef(null);
-    const irAlFormularioIA = () => {
-        temaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        temaRef.current?.focus({ preventScroll: true });
-    };
     const [cantidad, setCantidad] = useState(CANTIDADES[tipo]?.[1] || 5);
     const [dificultad, setDificultad] = useState('media');
     const [cursoId, setCursoId] = useState('');
@@ -86,6 +87,8 @@ export function GeneradorActividadIA({ materia, tipo }) {
     const [actividad, setActividad] = useState(null);
     const [cargando, setCargando] = useState(false);
     const [guardando, setGuardando] = useState(false);
+    // "Añadir con IA" incremental (menú Agregar): suma ítems sin borrar nada.
+    const [agregandoIA, setAgregandoIA] = useState(false);
     const [publicado, setPublicado] = useState(false);
     const [error, setError] = useState('');
     const [aviso, setAviso] = useState('');
@@ -141,6 +144,14 @@ export function GeneradorActividadIA({ materia, tipo }) {
             setError('No se reconoce la materia actual; recarga la página.');
             return;
         }
+        // Generar desde el formulario REEMPLAZA lo abierto en el editor. Se
+        // avisa para no perder trabajo por accidente (para sumar ítems está
+        // "Añadir con IA" en el menú Agregar).
+        if (items > 0 && !window.confirm(
+            'Esto crea una actividad NUEVA y cierra la que tienes abierta '
+            + `(${actividad?.retoId ? 'queda guardada en «Últimos generados»' : 'sin título no queda guardada'}). `
+            + 'Para agregar más ítems a la actual usa el botón «Agregar» de abajo. ¿Continuar?'
+        )) return;
         setCargando(true);
         setError('');
         setAviso('');
@@ -214,6 +225,67 @@ export function GeneradorActividadIA({ materia, tipo }) {
     };
     const editarConfig = (cambio) =>
         editar({ configuracion: { ...actividad.configuracion, ...cambio } });
+
+    // "Añadir con IA" (SPEC-013): pide una tanda nueva sobre el mismo tema y
+    // ANEXA solo los ítems que no estén ya (por texto), respetando el máximo.
+    // No borra nada de lo que el docente ya tiene.
+    const agregarMasConIA = async (n) => {
+        if (agregandoIA || !actividad) return;
+        const materiaId = idPorNombre(materia);
+        const temaBase = tema.trim() || actividad.titulo || '';
+        if (!materiaId || !temaBase) {
+            setError('Escribe el tema en el formulario de arriba para pedirle más a la IA.');
+            setTimeout(() => setError(''), 5000);
+            return;
+        }
+        setAgregandoIA(true);
+        setError('');
+        setAviso('');
+        try {
+            // Se pide una tanda dentro del rango válido del tipo; los repetidos
+            // se descartan y se anexan hasta `n` (o hasta llenar el máximo).
+            const rango = CANTIDADES[tipo] || [3, 5, 8];
+            const pedir = Math.min(Math.max(n + 2, rango[0]), rango[rango.length - 1]);
+            const data = await generarActividadIA({
+                tipo,
+                materiaId,
+                tema: temaBase,
+                cantidad: pedir,
+                dificultad,
+                cursoId: cursoId ? Number(cursoId) : undefined
+            });
+            const actuales = actividad.configuracion?.[claveItems] || [];
+            const firmas = new Set(actuales.map((it) => firmaItem(tipo, it)));
+            const nuevos = (data.configuracion?.[claveItems] || [])
+                .filter((it) => !firmas.has(firmaItem(tipo, it)))
+                .slice(0, Math.min(n, maxItems - actuales.length));
+            if (!nuevos.length) {
+                setAviso('La IA no encontró ítems distintos a los que ya tienes. Prueba afinando el tema.');
+                setTimeout(() => setAviso(''), 5000);
+                return;
+            }
+            const conBanco = await guardarLoteEnBanco(nuevos, temaBase);
+            editarConfig({ [claveItems]: [...actuales, ...conBanco] });
+            setAviso(`${conBanco.length} ${conBanco.length === 1
+                ? NOMBRE_ITEM_PLURAL[tipo].replace(/s$/, '')
+                : NOMBRE_ITEM_PLURAL[tipo]} más, sin tocar lo que ya tenías.`);
+            setTimeout(() => setAviso(''), 5000);
+        } catch (err) {
+            setError(`No se pudo añadir con la IA: ${err.message}`);
+            setTimeout(() => setError(''), 5000);
+        } finally {
+            setAgregandoIA(false);
+        }
+    };
+
+    // Cierra el editor sin perder nada: el borrador ya vive en la BD (y en
+    // "Últimos generados"); se puede reabrir desde ahí cuando se quiera.
+    const cerrarEditor = () => {
+        setActividad(null);
+        setPublicado(false);
+        setAviso('');
+        setError('');
+    };
 
     // Reabre una entrada del historial: trae del servidor el reto completo
     // (la lista es ligera, sin configuración) y lo monta en el editor.
@@ -356,7 +428,6 @@ export function GeneradorActividadIA({ materia, tipo }) {
                     <span>Tema</span>
                     <input
                         type="text"
-                        ref={temaRef}
                         value={tema}
                         onChange={(e) => setTema(e.target.value)}
                         placeholder="Ej. Las partes de la planta"
@@ -401,6 +472,17 @@ export function GeneradorActividadIA({ materia, tipo }) {
 
             {actividad && (
                 <div className="gen-ia-preview">
+                    <div className="editor-abierto-head">
+                        <span className="editor-abierto-etiqueta">Editando: {actividad.titulo || 'sin título'}</span>
+                        <button
+                            type="button"
+                            className="editor-cerrar-btn"
+                            onClick={cerrarEditor}
+                            title="Cierra el editor; la actividad queda en «Últimos generados»"
+                        >
+                            ✕ Cerrar
+                        </button>
+                    </div>
                     <label className="quiz-field">
                         <span>Título de la actividad</span>
                         <input
@@ -525,9 +607,9 @@ export function GeneradorActividadIA({ materia, tipo }) {
                     {/* SPEC-013 Fase 2: botón único "Agregar" con menú por acciones. */}
                     <BarraAccionesEditor
                         agregar={{
-                            label: `Agregar ${NOMBRE_ITEM_PLURAL[tipo]}`,
+                            label: agregandoIA ? 'Generando…' : `Agregar ${NOMBRE_ITEM_PLURAL[tipo]}`,
                             pregunta: tipo === 'linea-tiempo' ? '¿Cómo deseas agregarlos?' : '¿Cómo deseas agregarlas?',
-                            disabled: guardando,
+                            disabled: guardando || agregandoIA,
                             opciones: [
                                 {
                                     id: 'escribir',
@@ -544,9 +626,17 @@ export function GeneradorActividadIA({ materia, tipo }) {
                                 {
                                     id: 'generar',
                                     emoji: '🤖',
-                                    titulo: 'Generar de nuevo',
-                                    detalle: 'Dale otro tema o cantidad y la IA crea una actividad nueva.',
-                                    onClick: irAlFormularioIA
+                                    titulo: 'Añadir con IA',
+                                    detalle: items >= maxItems
+                                        ? `Ya está el máximo de ${maxItems} para esta actividad.`
+                                        : 'La IA suma más sobre el mismo tema, sin borrar lo que tienes.',
+                                    disabled: items >= maxItems,
+                                    sub: {
+                                        pregunta: `¿Cuántas ${NOMBRE_ITEM_PLURAL[tipo]} más?`,
+                                        opciones: [1, 2, 3]
+                                            .filter((n) => n <= maxItems - items)
+                                            .map((n) => ({ label: String(n), onClick: () => agregarMasConIA(n) }))
+                                    }
                                 },
                                 {
                                     id: 'reutilizar',

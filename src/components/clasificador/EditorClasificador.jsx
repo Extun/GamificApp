@@ -42,6 +42,8 @@ export function EditorClasificador({ materia }) {
     // que memorama/línea del tiempo/completar).
     const [temaIA, setTemaIA] = useState('');
     const [generandoIA, setGenerandoIA] = useState(false);
+    // "Añadir con IA" incremental (menú Agregar): fusiona sin borrar nada.
+    const [agregandoIA, setAgregandoIA] = useState(false);
     // SPEC-013 Fase 2: la entrada "Generarlas automáticamente" del menú lleva
     // al formulario de IA (hasta que la Fase 7 lo convierta en modal).
     const temaIARef = useRef(null);
@@ -145,6 +147,14 @@ export function EditorClasificador({ materia }) {
             setError('No se reconoce la materia actual; recarga la página.');
             return;
         }
+        // Generar desde el formulario REEMPLAZA el juego abierto. Se avisa para
+        // no perder trabajo por accidente (para sumar contenido está "Añadir
+        // con IA" en el menú Agregar).
+        if (totalElementos > 0 && !window.confirm(
+            'Esto crea un juego NUEVO y cierra el que tienes abierto '
+            + `(${entradaId ? 'queda guardado en «Últimos generados»' : 'sin título no queda guardado'}). `
+            + 'Para sumar categorías o elementos al actual usa el botón «Agregar» de abajo. ¿Continuar?'
+        )) return;
         setGenerandoIA(true);
         setError('');
         setAviso('');
@@ -173,6 +183,76 @@ export function EditorClasificador({ materia }) {
         } finally {
             setGenerandoIA(false);
         }
+    };
+
+    // "Añadir con IA" (SPEC-013): genera sobre el mismo tema y FUSIONA con lo
+    // actual — a las categorías con el mismo nombre les suma elementos nuevos,
+    // y las categorías desconocidas se agregan enteras. No borra nada.
+    const agregarConIA = async () => {
+        if (agregandoIA || generandoIA) return;
+        const temaBase = temaIA.trim() || titulo.trim();
+        if (!materiaId || !temaBase) {
+            setError('Escribe el tema (arriba) o el título del reto para pedirle ideas a la IA.');
+            setTimeout(() => setError(''), 5000);
+            irAlFormularioIA();
+            return;
+        }
+        setAgregandoIA(true);
+        setError('');
+        setAviso('');
+        try {
+            const data = await generarActividadIA({ tipo: 'clasificador', materiaId, tema: temaBase });
+            const generadas = data.configuracion?.categorias || [];
+            const norm = (s) => (s || '').trim().toLowerCase();
+            const fusion = categorias.map((c) => ({ ...c, elementos: [...c.elementos] }));
+            let sumados = 0;
+            for (const gen of generadas) {
+                const existente = fusion.find((c) => norm(c.nombre) === norm(gen.nombre));
+                if (existente) {
+                    for (const el of gen.elementos || []) {
+                        if (!existente.elementos.some((e) => norm(e) === norm(el))) {
+                            existente.elementos.push(el);
+                            sumados++;
+                        }
+                    }
+                } else if (gen.nombre?.trim()) {
+                    fusion.push({ id: idUnico(), nombre: gen.nombre, elementos: gen.elementos || [] });
+                    sumados += (gen.elementos || []).length || 1;
+                }
+            }
+            if (!sumados) {
+                setAviso('La IA no encontró contenido distinto al que ya tienes. Prueba afinando el tema.');
+                setTimeout(() => setAviso(''), 5000);
+                return;
+            }
+            setPublicado(false);
+            setCategorias(fusion);
+            setAviso(`La IA sumó ${sumados} ${sumados === 1 ? 'elemento' : 'elementos'} sin tocar lo que ya tenías.`);
+            setTimeout(() => setAviso(''), 5000);
+        } catch (err) {
+            setError(`No se pudo añadir con la IA: ${err.message}`);
+            setTimeout(() => setError(''), 5000);
+        } finally {
+            setAgregandoIA(false);
+        }
+    };
+
+    // Cierra el juego abierto y deja el editor en blanco. Si tiene título, el
+    // borrador ya vive en la BD y se reabre desde "Últimos generados".
+    const cerrarEditor = () => {
+        if (!entradaId && totalElementos > 0 && !window.confirm(
+            'Este juego no tiene título, así que no quedó guardado. ¿Cerrarlo de todos modos?'
+        )) return;
+        cancelarSincronizacion(entradaId);
+        setEntradaId(null);
+        setPublicadoEnBD(false);
+        setTitulo('');
+        setCategorias([categoriaVacia(), categoriaVacia()]);
+        setTemaIA('');
+        setNuevoElemento({});
+        setPublicado(false);
+        setAviso('');
+        setError('');
     };
 
     const publicar = async () => {
@@ -243,6 +323,20 @@ export function EditorClasificador({ materia }) {
                     {generandoIA ? 'Generando…' : 'Generar con IA'}
                 </button>
             </form>
+
+            {(titulo.trim() || totalElementos > 0) && (
+                <div className="editor-abierto-head">
+                    <span className="editor-abierto-etiqueta">Editando: {titulo.trim() || 'sin título'}</span>
+                    <button
+                        type="button"
+                        className="editor-cerrar-btn"
+                        onClick={cerrarEditor}
+                        title="Cierra este juego y deja el editor en blanco; con título queda en «Últimos generados»"
+                    >
+                        ✕ Cerrar
+                    </button>
+                </div>
+            )}
 
             <label className="quiz-field clasificador-titulo-field">
                 <span>Título del reto</span>
@@ -319,9 +413,9 @@ export function EditorClasificador({ materia }) {
                 esas entradas NO aparecen, en vez de mostrarse deshabilitadas. */}
             <BarraAccionesEditor
                 agregar={{
-                    label: 'Agregar categorías',
+                    label: agregandoIA ? 'Generando…' : 'Agregar categorías',
                     pregunta: '¿Cómo deseas agregarlas?',
-                    disabled: publicando,
+                    disabled: publicando || agregandoIA,
                     opciones: [
                         {
                             id: 'escribir',
@@ -333,9 +427,9 @@ export function EditorClasificador({ materia }) {
                         {
                             id: 'generar',
                             emoji: '🤖',
-                            titulo: 'Generarlas automáticamente',
-                            detalle: 'Dale un tema y la IA crea título, canastas y elementos.',
-                            onClick: irAlFormularioIA
+                            titulo: 'Añadir con IA',
+                            detalle: 'La IA suma canastas y elementos sobre el tema, sin borrar lo que tienes.',
+                            onClick: agregarConIA
                         }
                     ]
                 }}

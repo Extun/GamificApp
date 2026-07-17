@@ -325,32 +325,11 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                     onAbrirBanco={() => setBancoAbierto(true)}
                     onGuardarEnBanco={guardarPreguntaEnBanco}
                     onVistaPrevia={() => setPreviewAbierta(true)}
+                    onCerrar={() => setQuizEdit(null)}
+                    mezclarPreguntas={quizEdit.mezclarPreguntas}
+                    mezclarRespuestas={quizEdit.mezclarRespuestas}
+                    onCambiarMezcla={cambiarMezcla}
                 />
-            )}
-
-            {quizEdit && (
-                <details className="quiz-config">
-                    <summary>⚙ Configuración</summary>
-                    <label className="quiz-config-opcion">
-                        <input
-                            type="checkbox"
-                            checked={quizEdit.mezclarPreguntas !== false}
-                            onChange={(e) => cambiarMezcla('mezclarPreguntas', e.target.checked)}
-                        />
-                        <span>Mezclar el orden de las preguntas en cada intento</span>
-                    </label>
-                    <label className="quiz-config-opcion">
-                        <input
-                            type="checkbox"
-                            checked={quizEdit.mezclarRespuestas !== false}
-                            onChange={(e) => cambiarMezcla('mezclarRespuestas', e.target.checked)}
-                        />
-                        <span>Mezclar el orden de las opciones en cada intento</span>
-                    </label>
-                    <p className="quiz-config-ayuda">
-                        Así cada estudiante ve un Quiz distinto, aunque sea el mismo para todos.
-                    </p>
-                </details>
             )}
 
             {previewAbierta && quizEdit && (
