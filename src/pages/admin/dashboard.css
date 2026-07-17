@@ -1464,6 +1464,38 @@
     color: #dc2626;
 }
 
+/* Paginación del historial (hasta 15 entradas, 5 por página). */
+.quiz-historial-paginas {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+.quiz-historial-pagina-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.quiz-historial-pagina-btn:hover:not(:disabled) {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+.quiz-historial-pagina-btn:disabled { opacity: 0.4; cursor: default; }
+.quiz-historial-pagina-info {
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+    font-weight: 600;
+}
+
 /* Aviso de confirmación (p. ej. tras publicar). */
 .quiz-aviso {
     margin: 16px 0 0;

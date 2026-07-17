@@ -21,7 +21,9 @@ import './misionNarrativa.css';
 
 const LETRAS = ['A', 'B', 'C'];
 
-export function MisionNarrativa({ reto, estudianteId, onSalir, onCompletado }) {
+// `soloPrueba` (SPEC-012): vista previa del docente — se juega igual pero no
+// se otorga XP ni se guarda progreso.
+export function MisionNarrativa({ reto, estudianteId, onSalir, onCompletado, soloPrueba = false }) {
     const mision = reto?.configuracion || {};
     const desafios = mision.desafios || [];
     const total = desafios.length;
@@ -72,19 +74,22 @@ export function MisionNarrativa({ reto, estudianteId, onSalir, onCompletado }) {
         if (recompensado.current) return;
         recompensado.current = true;
 
-        const { puntos, nuevosLogros, servidor } = gamificationService.completarReto({
+        if (soloPrueba) {
+            // Puntaje simulado: la pantalla final se ve igual, nada se guarda.
+            setPuntosGanados(aciertos * PUNTOS_POR_ACIERTO);
+            setToast({ titulo: 'Modo prueba', mensaje: 'Nada se guardó: así lo verá el estudiante.' });
+            return;
+        }
+
+        const { puntos, servidor } = gamificationService.completarReto({
             estudianteId,
             reto,
-            tipo: 'mision',
-            aciertos,
-            total
+            aciertos
         });
         setPuntosGanados(puntos);
 
         if (aciertos === total) {
             setToast({ mensaje: 'Maestro de la Materia' });
-        } else if (nuevosLogros.length) {
-            setToast({ mensaje: nuevosLogros[0].titulo });
         }
 
         servidor.then((data) => {

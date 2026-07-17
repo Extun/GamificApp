@@ -196,8 +196,10 @@ const ESTADOS_RETO = ['borrador', 'publicado', 'archivado'];
 
 // PATCH /api/retos/:id — gestión desde la Biblioteca (SPEC-004): cambiar el
 // estado (archivar/restaurar/publicar un borrador) y ajustar descripción o XP.
-// La configuración del juego NO se toca aquí (eso es de los editores), así que
-// no se rompe la compatibilidad de configuracion_json ya publicado.
+// SPEC-011: sobre retos en estado BORRADOR también acepta `titulo` y
+// `configuracion` (los generadores sincronizan el trabajo en progreso). En un
+// reto publicado siguen prohibidos: no se rompe la compatibilidad de
+// configuracion_json ya publicado (editar = republicar por los editores).
 router.patch('/:id', soloDocente, async (req, res, next) => {
     try {
         const reto = await retoGestionable(req, res, Number(req.params.id));
@@ -212,6 +214,52 @@ router.patch('/:id', soloDocente, async (req, res, next) => {
             }
             cambios.push('estado = ?');
             params.push(estado);
+        }
+        // SPEC-011 — titulo/configuracion, solo mientras el reto es borrador.
+        const tocaContenido = req.body?.titulo !== undefined || req.body?.configuracion !== undefined;
+        if (tocaContenido && reto.estado !== 'borrador') {
+            return res.status(400).json({
+                error: 'titulo y configuracion solo se editan en borradores; para cambiar un reto publicado, republícalo desde su editor'
+            });
+        }
+        if (req.body?.titulo !== undefined) {
+            const titulo = String(req.body.titulo).trim().slice(0, 120);
+            if (!titulo) return res.status(400).json({ error: 'titulo no puede quedar vacío' });
+            if (titulo !== reto.titulo) {
+                // Respeta la unicidad viva por (materia, titulo) del upsert de POST.
+                const [[ocupado]] = await pool.query(
+                    'SELECT 1 AS si FROM retos WHERE materia_id = ? AND titulo = ? AND eliminado_en IS NULL AND id <> ?',
+                    [reto.materia_id, titulo, reto.id]
+                );
+                if (ocupado) {
+                    return res.status(409).json({ error: 'Ya existe otra actividad con ese título en esta materia' });
+                }
+            }
+            cambios.push('titulo = ?');
+            params.push(titulo);
+        }
+        if (req.body?.configuracion !== undefined) {
+            const config = req.body.configuracion;
+            if (config !== null && (typeof config !== 'object' || Array.isArray(config))) {
+                return res.status(400).json({ error: 'configuracion debe ser un objeto' });
+            }
+            cambios.push('configuracion_json = ?');
+            params.push(config ? JSON.stringify(config) : null);
+        }
+        // SPEC-011 — como los borradores pueden guardarse incompletos, al
+        // PUBLICAR un borrador se valida su configuración (la del body si
+        // vino, o la almacenada) con el validador de su tipo.
+        if (estado === 'publicado' && reto.estado === 'borrador') {
+            const validarConfig = VALIDADORES_CONFIG[reto.tipo];
+            if (validarConfig) {
+                const configFinal = req.body?.configuracion !== undefined
+                    ? req.body.configuracion
+                    : parsearConfig(reto.configuracion_json);
+                const errorConfig = validarConfig(configFinal);
+                if (errorConfig) {
+                    return res.status(400).json({ error: `No se puede publicar: ${errorConfig}` });
+                }
+            }
         }
         if (req.body?.descripcion !== undefined) {
             cambios.push('descripcion = ?');
@@ -247,7 +295,7 @@ router.patch('/:id', soloDocente, async (req, res, next) => {
             params.push(cursoId);
         }
         if (!cambios.length) {
-            return res.status(400).json({ error: 'Nada que actualizar (estado, descripcion, xp_recompensa, favorito, dificultad o curso_id)' });
+            return res.status(400).json({ error: 'Nada que actualizar (estado, descripcion, xp_recompensa, favorito, dificultad, curso_id, titulo o configuracion)' });
         }
 
         await pool.query(`UPDATE retos SET ${cambios.join(', ')} WHERE id = ?`, [...params, reto.id]);
@@ -414,10 +462,20 @@ router.post('/', soloDocente, async (req, res, next) => {
     if (!esIdValido(materiaId) || !titulo || typeof tipo !== 'string' || !TIPO_SLUG.test(tipo)) {
         return res.status(400).json({ error: 'Se requieren materia_id, titulo y un tipo válido (slug en minúsculas)' });
     }
-    const validarConfig = VALIDADORES_CONFIG[tipo];
-    if (validarConfig) {
-        const errorConfig = validarConfig(configuracion);
-        if (errorConfig) return res.status(400).json({ error: errorConfig });
+    // SPEC-011: los BORRADORES son trabajo en progreso y pueden guardarse
+    // incompletos (solo se exige que la configuración sea un objeto); la
+    // validación completa por tipo se aplica siempre al PUBLICAR.
+    if (estado === 'borrador') {
+        if (configuracion !== undefined && configuracion !== null &&
+            (typeof configuracion !== 'object' || Array.isArray(configuracion))) {
+            return res.status(400).json({ error: 'configuracion debe ser un objeto' });
+        }
+    } else {
+        const validarConfig = VALIDADORES_CONFIG[tipo];
+        if (validarConfig) {
+            const errorConfig = validarConfig(configuracion);
+            if (errorConfig) return res.status(400).json({ error: errorConfig });
+        }
     }
     const xp = esIdValido(xpRecompensa) ? xpRecompensa : 100;
 

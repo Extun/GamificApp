@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
@@ -6,11 +6,15 @@ import RocketLaunchRoundedIcon from '@mui/icons-material/RocketLaunchRounded';
 import CategoryRoundedIcon from '@mui/icons-material/CategoryRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
+import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import { idPorNombre } from '../../services/materiasService';
 import { generarActividadIA } from '../../services/iaService';
 import { publicarReto } from '../../services/retosService';
 import { PUNTOS_POR_ACIERTO } from '../../services/gamificationService';
-import { useHistorialActividades, nuevaEntradaHistorial, HistorialActividades } from '../juegos/HistorialActividades';
+import { useHistorialRetos, HistorialActividades } from '../juegos/HistorialActividades';
+import { PreviewJuegoModal } from '../juegos/PreviewJuegoModal';
+import { BarraAccionesEditor } from '../juegos/BarraAccionesEditor';
+import LibraryAddRoundedIcon from '@mui/icons-material/LibraryAddRounded';
 import './editorClasificador.css';
 
 // Editor no-code del juego 'Clasificador de Objetos'. El docente define el
@@ -43,38 +47,57 @@ export function EditorClasificador({ materia }) {
     // Tras publicar, el botón queda bloqueado hasta que el docente edite algo:
     // así un doble clic no crea el mismo juego dos veces.
     const [publicado, setPublicado] = useState(false);
+    // SPEC-012: vista previa como estudiante (modo prueba).
+    const [previewAbierta, setPreviewAbierta] = useState(false);
     const [aviso, setAviso] = useState('');
     const [error, setError] = useState('');
-    // Historial "Últimos juegos generados" (mismo patrón que el quiz):
-    // últimas 3 entradas por materia, en localStorage.
+    // SPEC-011 — historial respaldado en BD: el borrador vive en `retos` y la
+    // lista se lee del servidor (localStorage = caché offline).
     const [entradaId, setEntradaId] = useState(null);
-    const { historial, guardar: guardarHistorial, actualizar: actualizarHistorial, eliminar: eliminarHistorial } =
-        useHistorialActividades('edu_historialActividades_clasificador', materia);
+    // ¿La fila en BD está publicada? (los publicados no se editan en caliente).
+    const [publicadoEnBD, setPublicadoEnBD] = useState(false);
+    const creandoRef = useRef(false);
+    const { historial, crearBorrador, sincronizar, cancelarSincronizacion, eliminar: eliminarBorrador, abrirDetalle, refrescar } =
+        useHistorialRetos('clasificador', materia);
 
     const materiaId = idPorNombre(materia);
     const totalElementos = categorias.reduce((n, c) => n + c.elementos.length, 0);
 
-    // Mantiene el historial sincronizado con lo que hay en el editor. La
-    // entrada se crea sola en cuanto el docente escribe algo (borrador) y se
-    // actualiza con cada edición; al publicar cambia de estado.
+    // Forma publicable de la configuración (la misma del POST publicar); como
+    // borrador puede ir incompleta — el servidor solo la valida al publicar.
+    const configuracionActual = () => ({
+        categorias: categorias.map((c) => ({ nombre: c.nombre.trim(), elementos: c.elementos }))
+    });
+
+    // El borrador en BD se crea recién cuando hay TÍTULO (el upsert por
+    // (materia, título) exige uno y así no se acumulan filas sin nombre);
+    // desde entonces cada edición se sincroniza con PATCH (debounce). Si el
+    // reto ya está publicado, los cambios quedan en memoria hasta republicar.
     useEffect(() => {
-        const hayContenido = titulo.trim() || totalElementos > 0 || categorias.some((c) => c.nombre.trim());
+        const tituloTrim = titulo.trim();
+        if (!tituloTrim || !materiaId) return;
         if (!entradaId) {
-            if (!hayContenido) return;
-            const entrada = nuevaEntradaHistorial({ materia, titulo, categorias });
-            guardarHistorial(entrada);
-            setEntradaId(entrada.id);
+            if (creandoRef.current) return;
+            creandoRef.current = true;
+            crearBorrador({
+                materiaId,
+                titulo: tituloTrim,
+                configuracion: configuracionActual(),
+                xpRecompensa: Math.max(totalElementos, 1) * PUNTOS_POR_ACIERTO
+            })
+                .then((creado) => setEntradaId(creado?.id ?? null))
+                .catch((err) => console.warn('El borrador no se pudo guardar en el servidor:', err.message))
+                .finally(() => { creandoRef.current = false; });
             return;
         }
-        actualizarHistorial({
-            id: entradaId,
-            materia,
-            titulo,
-            categorias,
-            estado: publicado ? 'publicado' : 'borrador'
+        if (publicadoEnBD) return;
+        sincronizar(entradaId, {
+            titulo: tituloTrim,
+            configuracion: configuracionActual(),
+            xp_recompensa: Math.max(totalElementos, 1) * PUNTOS_POR_ACIERTO
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [titulo, categorias, publicado]);
+    }, [titulo, categorias]);
 
     // Regla mínima de publicación: título, 2+ categorías con nombre y al
     // menos un elemento en cada una (misma validación que aplica el backend).
@@ -130,11 +153,12 @@ export function EditorClasificador({ materia }) {
                 nombre: c.nombre,
                 elementos: c.elementos
             }));
-            // Cada generación con IA crea una entrada NUEVA en el historial
-            // (como el quiz), sin pisar el juego anterior.
-            const entrada = nuevaEntradaHistorial({ materia, titulo: data.titulo, categorias: nuevasCategorias });
-            guardarHistorial(entrada);
-            setEntradaId(entrada.id);
+            // Cada generación con IA crea una entrada NUEVA (el efecto de
+            // sincronización la registra en BD al detectar el título nuevo
+            // sin entradaId), sin pisar el juego anterior.
+            cancelarSincronizacion(entradaId);
+            setEntradaId(null);
+            setPublicadoEnBD(false);
             setTitulo(data.titulo);
             setCategorias(nuevasCategorias);
             setPublicado(false);
@@ -155,7 +179,10 @@ export function EditorClasificador({ materia }) {
         setError('');
         setAviso('');
         try {
-            await publicarReto({
+            // Un PATCH pendiente del debounce ya no hace falta: el POST que
+            // sigue escribe el estado completo.
+            cancelarSincronizacion(entradaId);
+            const data = await publicarReto({
                 materiaId,
                 titulo: titulo.trim(),
                 tipo: 'clasificador',
@@ -163,13 +190,11 @@ export function EditorClasificador({ materia }) {
                 // La recompensa se alinea con el resto de la app: cada elemento
                 // bien clasificado al primer intento vale PUNTOS_POR_ACIERTO XP.
                 xpRecompensa: totalElementos * PUNTOS_POR_ACIERTO,
-                configuracion: {
-                    categorias: categorias.map((c) => ({
-                        nombre: c.nombre.trim(),
-                        elementos: c.elementos
-                    }))
-                }
+                configuracion: configuracionActual()
             });
+            setEntradaId(data?.id ?? entradaId);
+            setPublicadoEnBD(true);
+            refrescar();
             setPublicado(true);
             setAviso('¡Juego publicado! Ya es visible para los estudiantes.');
             setTimeout(() => setAviso(''), 4000);
@@ -282,9 +307,41 @@ export function EditorClasificador({ materia }) {
                 ))}
             </div>
 
-            <button type="button" className="clasificador-btn-cat" onClick={agregarCategoria}>
-                <AddRoundedIcon sx={{ fontSize: '1.15rem' }} /> Añadir categoría
-            </button>
+            {/* Barra unificada (SPEC-012): mismas acciones en todos los editores. */}
+            <BarraAccionesEditor acciones={[
+                {
+                    id: 'manual',
+                    label: 'Añadir categoría',
+                    Icon: AddRoundedIcon,
+                    onClick: agregarCategoria,
+                    disabled: publicando,
+                    title: 'Añade otra canasta; los elementos se escriben dentro de cada categoría'
+                },
+                {
+                    id: 'banco',
+                    label: 'Añadir del banco',
+                    Icon: LibraryAddRoundedIcon,
+                    disabled: true,
+                    title: 'El clasificador no usa el banco: sus elementos dependen de las categorías de cada juego'
+                },
+                {
+                    id: 'ia',
+                    label: 'Añadir con IA',
+                    Icon: AutoAwesomeRoundedIcon,
+                    disabled: true,
+                    title: 'Usa el formulario «Generar con IA» de arriba: llena título, categorías y elementos de una vez'
+                },
+                {
+                    id: 'preview',
+                    label: 'Vista previa',
+                    Icon: VisibilityRoundedIcon,
+                    onClick: () => setPreviewAbierta(true),
+                    disabled: publicando || !totalElementos,
+                    title: totalElementos
+                        ? 'Juega el clasificador como lo verá el estudiante (sin XP ni progreso)'
+                        : 'Añade al menos un elemento para previsualizar'
+                }
+            ]} />
 
             {error && <p className="quiz-error">{error}</p>}
             {aviso && (
@@ -314,30 +371,51 @@ export function EditorClasificador({ materia }) {
                 </button>
             </div>
 
+            {previewAbierta && (
+                <PreviewJuegoModal
+                    tipo="clasificador"
+                    titulo={titulo}
+                    configuracion={configuracionActual()}
+                    onCerrar={() => setPreviewAbierta(false)}
+                />
+            )}
+
             <HistorialActividades
                 titulo="Últimos juegos generados"
                 items={historial}
                 activoId={entradaId}
-                onAbrir={(e) => {
-                    setTitulo(e.titulo || '');
-                    setCategorias(e.categorias?.length ? e.categorias : [categoriaVacia(), categoriaVacia()]);
-                    setEntradaId(e.id);
-                    setPublicado(e.estado === 'publicado');
+                onAbrir={async (e) => {
                     setAviso('');
                     setError('');
-                }}
-                onEliminar={(id) => {
-                    eliminarHistorial(id);
-                    if (entradaId === id) {
-                        setTitulo('');
-                        setCategorias([categoriaVacia(), categoriaVacia()]);
-                        setEntradaId(null);
-                        setPublicado(false);
+                    try {
+                        const detalle = await abrirDetalle(e.id);
+                        cancelarSincronizacion(entradaId);
+                        const abiertas = (detalle.configuracion?.categorias || []).map((c) => ({
+                            id: idUnico(), nombre: c.nombre || '', elementos: c.elementos || []
+                        }));
+                        while (abiertas.length < 2) abiertas.push(categoriaVacia());
+                        setEntradaId(detalle.id);
+                        setPublicadoEnBD(detalle.estado === 'publicado');
+                        setTitulo(detalle.titulo || '');
+                        setCategorias(abiertas);
+                        setPublicado(detalle.estado === 'publicado');
+                    } catch (err) {
+                        setError(`No se pudo abrir el juego: ${err.message}`);
                     }
                 }}
-                meta={(e) => {
-                    const n = (e.categorias || []).reduce((t, c) => t + (c.elementos?.length || 0), 0);
-                    return `${e.categorias?.length || 0} categorías · ${n} elementos`;
+                onEliminar={async (id) => {
+                    try {
+                        await eliminarBorrador(id);
+                        if (entradaId === id) {
+                            setTitulo('');
+                            setCategorias([categoriaVacia(), categoriaVacia()]);
+                            setEntradaId(null);
+                            setPublicadoEnBD(false);
+                            setPublicado(false);
+                        }
+                    } catch (err) {
+                        setError(`No se pudo eliminar: ${err.message}`);
+                    }
                 }}
             />
         </section>

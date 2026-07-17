@@ -6,7 +6,7 @@ Dar a cualquier desarrollador o IA el contexto completo de GamificApp en una sol
 
 # Última actualización
 
-2026-07-07 (consolidación documental)
+2026-07-14 (corrección de auditoría documental: nombre de institución y modelo de materias)
 
 # Responsable
 
@@ -14,9 +14,9 @@ Fabrizio Zurita (Extun)
 
 ## 1. Resumen del proyecto
 
-**GamificApp** es una plataforma web de gamificación educativa para niños de **6 a 9 años** (educación básica elemental), desarrollada como proyecto de tesis para la Unidad Educativa Benemérita Sociedad Filantrópica del Guayas (Guayaquil, Ecuador). Tiene **tres roles**: Administrador (gestiona docentes y estudiantes), Docente (crea contenido educativo con ayuda de IA y gestiona su aula) y Estudiante (aprende jugando y gana XP, niveles y logros).
+**GamificApp** es una plataforma web de gamificación educativa para niños de **6 a 9 años** (educación básica elemental), desarrollada como proyecto de tesis para la Unidad Educativa Fiscal Clemencia Coronel de Pincay (Guayaquil, Ecuador). Tiene **tres roles**: Administrador (gestiona docentes y estudiantes), Docente (crea contenido educativo con ayuda de IA y gestiona su aula) y Estudiante (aprende jugando y gana XP, niveles y logros).
 
-Las mecánicas de juego son tres: **Quiz** (opción múltiple A-D con justificación), **Clasificador** (drag & drop de elementos en categorías) y **Misión Narrativa** (aventura RPG por capítulos). El contenido de Quiz y Misión se genera con IA (Google Gemini, proxy en backend). Hay 5 materias fijas: Matemáticas, Lenguaje, Ciencias Naturales, Ciencias Sociales y Educación Física.
+Las mecánicas de juego base son tres: **Quiz** (opción múltiple A-D con justificación), **Clasificador** (drag & drop de elementos en categorías) y **Misión Narrativa** (aventura RPG por capítulos); desde SPEC-006 se sumaron **Memorama**, **Línea del tiempo** y **Completar espacios**, también generables con IA. El contenido se genera con IA (Google Gemini, proxy en backend). Las **materias son un catálogo dinámico en BD** (no hay lista fija en el código): el admin crea/ordena/oculta materias desde el módulo Materias (`src/services/materiasService.js`; `src/constants/materias.js` fue eliminado en SPEC-002).
 
 El login del niño es **nombre + PIN de 6 caracteres** derivado de su fecha de nacimiento, con código de emergencia impreso en el carné. Filosofía "siempre se termina ganando": equivocarse da pista y reintento; solo los aciertos al primer intento dan XP; ningún niño queda bloqueado.
 

@@ -12,7 +12,10 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import ArrowUpwardRoundedIcon from '@mui/icons-material/ArrowUpwardRounded';
 import ArrowDownwardRoundedIcon from '@mui/icons-material/ArrowDownwardRounded';
+import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import LibraryAddRoundedIcon from '@mui/icons-material/LibraryAddRounded';
+import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
+import { BarraAccionesEditor } from './BarraAccionesEditor';
 import { idPorNombre } from '../../services/materiasService';
 import { generarActividadIA } from '../../services/iaService';
 import { publicarReto } from '../../services/retosService';
@@ -21,7 +24,8 @@ import docenteService from '../../services/docenteService';
 import bancoService from '../../services/bancoService';
 import { TIPOS_ACTIVIDAD } from './registroJuegos';
 import { SelectorBanco } from './SelectorBanco';
-import { useHistorialActividades, nuevaEntradaHistorial, HistorialActividades } from './HistorialActividades';
+import { PreviewJuegoModal } from './PreviewJuegoModal';
+import { useHistorialRetos, HistorialActividades } from './HistorialActividades';
 
 export const DIFICULTADES_UI = [
     ['facil', '🙂 Fácil'],
@@ -56,6 +60,14 @@ const contarItems = (tipo, config) => {
 const CLAVE_ITEMS = { memorama: 'parejas', 'linea-tiempo': 'eventos', completar: 'frases' };
 const MAX_ITEMS = { memorama: 10, 'linea-tiempo': 8, completar: 8 };
 
+// Plantillas de ítem vacío para "Añadir manual" (SPEC-012, Fase 3): el ítem
+// aparece en la lista editable y el docente lo completa ahí mismo.
+const ITEM_VACIO = {
+    memorama: () => ({ a: '', b: '' }),
+    'linea-tiempo': () => ({ texto: '', etiqueta: '' }),
+    completar: () => ({ texto: '', opciones: ['', ''], correcta: '' })
+};
+
 export function GeneradorActividadIA({ materia, tipo }) {
     const [tema, setTema] = useState('');
     const [cantidad, setCantidad] = useState(CANTIDADES[tipo]?.[1] || 5);
@@ -71,10 +83,12 @@ export function GeneradorActividadIA({ materia, tipo }) {
     const [aviso, setAviso] = useState('');
     // SPEC-010: modal del banco para reutilizar ítems ya creados.
     const [bancoAbierto, setBancoAbierto] = useState(false);
-    // Historial "Últimas actividades generadas" (mismo patrón que el quiz):
-    // últimas 3 por materia, en localStorage bajo una clave propia del tipo.
-    const { historial, guardar: guardarHistorial, actualizar: actualizarHistorial, eliminar: eliminarHistorial } =
-        useHistorialActividades(`edu_historialActividades_${tipo}`, materia);
+    // SPEC-012: vista previa como estudiante (modo prueba).
+    const [previewAbierta, setPreviewAbierta] = useState(false);
+    // SPEC-011 — historial respaldado en BD: cada generación crea un reto
+    // 'borrador' y la lista se lee del servidor (localStorage = caché offline).
+    const { historial, crearBorrador, sincronizar, cancelarSincronizacion, eliminar: eliminarBorrador, abrirDetalle, refrescar } =
+        useHistorialRetos(tipo, materia);
 
     // Nota: el dashboard monta este componente con key={tipo}, así que al
     // cambiar de tipo se reinicia todo el estado (sin efectos de limpieza).
@@ -135,19 +149,35 @@ export function GeneradorActividadIA({ materia, tipo }) {
             const itemsConBanco = await guardarLoteEnBanco(
                 data.configuracion?.[claveItems] || [], tema.trim()
             );
-            // La actividad nace como BORRADOR y se guarda en el historial para
-            // poder retomarla/editarla aunque el docente cambie de vista.
-            const entrada = nuevaEntradaHistorial({
-                materia,
-                tema: tema.trim(),
-                dificultad,
-                cursoId,
+            // La actividad nace como BORRADOR EN LA BD (SPEC-011): sobrevive a
+            // cambios de navegador y aparece también en la Biblioteca. Si el
+            // guardado remoto falla, se sigue editando en memoria (los botones
+            // Guardar/Publicar la crean igual, vía el upsert del POST).
+            const configuracion = { ...data.configuracion, [claveItems]: itemsConBanco };
+            let retoId = null;
+            try {
+                const creado = await crearBorrador({
+                    materiaId,
+                    titulo: data.titulo,
+                    descripcion: data.descripcion,
+                    configuracion,
+                    xpRecompensa: Math.max(itemsConBanco.length, 1) * PUNTOS_POR_ACIERTO,
+                    origen: 'ia',
+                    dificultad,
+                    cursoId: cursoId ? Number(cursoId) : undefined
+                });
+                retoId = creado?.id ?? null;
+            } catch (err) {
+                console.warn('El borrador no se pudo guardar en el servidor:', err.message);
+            }
+            setActividad({
+                retoId,
                 titulo: data.titulo,
                 descripcion: data.descripcion,
-                configuracion: { ...data.configuracion, [claveItems]: itemsConBanco }
+                configuracion,
+                estado: 'borrador',
+                publicadoEnBD: false
             });
-            guardarHistorial(entrada);
-            setActividad(entrada);
             setPublicado(false);
         } catch (err) {
             setError(`No se pudo generar con la IA: ${err.message}`);
@@ -157,32 +187,59 @@ export function GeneradorActividadIA({ materia, tipo }) {
     };
 
     // Cualquier edición desbloquea el botón de publicar (candado anti doble
-    // clic) y sincroniza la entrada del historial, que vuelve a ser borrador.
+    // clic). Si la actividad sigue siendo un borrador en la BD, el cambio se
+    // sincroniza con PATCH (debounce); si ya está publicada, queda en memoria
+    // hasta que el docente vuelva a Guardar/Publicar (nunca se edita en caliente).
     const editar = (cambio) => {
         setPublicado(false);
         setActividad((prev) => {
             const actualizado = { ...prev, ...cambio, estado: 'borrador' };
-            actualizarHistorial(actualizado);
+            if (actualizado.retoId && !actualizado.publicadoEnBD) {
+                sincronizar(actualizado.retoId, {
+                    titulo: actualizado.titulo,
+                    configuracion: actualizado.configuracion,
+                    xp_recompensa: Math.max(contarItems(tipo, actualizado.configuracion), 1) * PUNTOS_POR_ACIERTO
+                });
+            }
             return actualizado;
         });
     };
     const editarConfig = (cambio) =>
         editar({ configuracion: { ...actividad.configuracion, ...cambio } });
 
-    // Reabre una entrada del historial en el editor, con sus parámetros.
-    const abrirDelHistorial = (entrada) => {
-        setActividad(entrada);
-        setTema(entrada.tema || '');
-        setDificultad(entrada.dificultad || 'media');
-        setCursoId(entrada.cursoId || '');
-        setPublicado(entrada.estado === 'publicado');
+    // Reabre una entrada del historial: trae del servidor el reto completo
+    // (la lista es ligera, sin configuración) y lo monta en el editor.
+    const abrirDelHistorial = async (entrada) => {
         setAviso('');
         setError('');
+        try {
+            const detalle = await abrirDetalle(entrada.id);
+            setActividad({
+                retoId: detalle.id,
+                titulo: detalle.titulo,
+                descripcion: detalle.descripcion,
+                configuracion: detalle.configuracion || {},
+                estado: detalle.estado,
+                publicadoEnBD: detalle.estado === 'publicado'
+            });
+            setDificultad(detalle.dificultad || 'media');
+            setCursoId(detalle.curso_id ? String(detalle.curso_id) : '');
+            setPublicado(detalle.estado === 'publicado');
+        } catch (err) {
+            setError(`No se pudo abrir la actividad: ${err.message}`);
+            setTimeout(() => setError(''), 4000);
+        }
     };
 
-    const quitarDelHistorial = (id) => {
-        eliminarHistorial(id);
-        setActividad((actual) => (actual?.id === id ? null : actual));
+    // Enviar a la Papelera (recuperable desde la Biblioteca).
+    const quitarDelHistorial = async (id) => {
+        try {
+            await eliminarBorrador(id);
+            setActividad((actual) => (actual?.retoId === id ? null : actual));
+        } catch (err) {
+            setError(`No se pudo eliminar: ${err.message}`);
+            setTimeout(() => setError(''), 4000);
+        }
     };
 
     const guardar = async (estado) => {
@@ -195,16 +252,19 @@ export function GeneradorActividadIA({ materia, tipo }) {
         setGuardando(true);
         setError('');
         try {
+            // Un PATCH pendiente del debounce ya no hace falta: el POST que
+            // sigue escribe el estado completo.
+            cancelarSincronizacion(actividad.retoId);
             // Al publicar, los ítems que aún no estén en el banco (p. ej. si el
             // guardado al generar falló) se guardan también (SPEC-010).
             let configuracion = actividad.configuracion;
             if (estado === 'publicado') {
                 const itemsConBanco = await guardarLoteEnBanco(
-                    configuracion?.[claveItems] || [], actividad.tema || tema.trim()
+                    configuracion?.[claveItems] || [], tema.trim()
                 );
                 configuracion = { ...configuracion, [claveItems]: itemsConBanco };
             }
-            await publicarReto({
+            const data = await publicarReto({
                 materiaId,
                 titulo: actividad.titulo.trim(),
                 tipo,
@@ -216,9 +276,14 @@ export function GeneradorActividadIA({ materia, tipo }) {
                 dificultad,
                 cursoId: cursoId ? Number(cursoId) : undefined
             });
-            const actualizado = { ...actividad, configuracion, estado };
-            setActividad(actualizado);
-            actualizarHistorial(actualizado);
+            setActividad({
+                ...actividad,
+                retoId: data?.id ?? actividad.retoId,
+                configuracion,
+                estado,
+                publicadoEnBD: estado === 'publicado'
+            });
+            refrescar();
             if (estado === 'publicado') {
                 setPublicado(true);
                 setAviso('¡Actividad publicada! Ya es visible para tus estudiantes.');
@@ -448,17 +513,48 @@ export function GeneradorActividadIA({ materia, tipo }) {
                         </div>
                     )}
 
-                    <button
-                        type="button"
-                        className="preview-action"
-                        disabled={guardando || items >= maxItems}
-                        title={items >= maxItems
-                            ? `Ya está el máximo de ${maxItems} ítems para esta actividad`
-                            : 'Reutiliza ítems que ya creaste antes (se insertan como copia)'}
-                        onClick={() => setBancoAbierto(true)}
-                    >
-                        <LibraryAddRoundedIcon sx={{ fontSize: '1.1rem' }} /> Añadir del banco
-                    </button>
+                    {/* Barra unificada (SPEC-012): mismas acciones en todos los editores. */}
+                    <BarraAccionesEditor acciones={[
+                        {
+                            id: 'manual',
+                            label: `Añadir ${tipo === 'memorama' ? 'pareja' : tipo === 'linea-tiempo' ? 'evento' : 'frase'} manual`,
+                            Icon: AddRoundedIcon,
+                            onClick: () => editarConfig({
+                                [claveItems]: [...(config?.[claveItems] || []), ITEM_VACIO[tipo]()]
+                            }),
+                            disabled: guardando || items >= maxItems,
+                            title: items >= maxItems
+                                ? `Ya está el máximo de ${maxItems} ítems para esta actividad`
+                                : 'Añade un ítem vacío y complétalo aquí mismo'
+                        },
+                        {
+                            id: 'banco',
+                            label: 'Añadir del banco',
+                            Icon: LibraryAddRoundedIcon,
+                            onClick: () => setBancoAbierto(true),
+                            disabled: guardando || items >= maxItems,
+                            title: items >= maxItems
+                                ? `Ya está el máximo de ${maxItems} ítems para esta actividad`
+                                : 'Reutiliza ítems que ya creaste antes (se insertan como copia)'
+                        },
+                        {
+                            id: 'ia',
+                            label: 'Añadir con IA',
+                            Icon: AutoAwesomeRoundedIcon,
+                            disabled: true,
+                            title: 'Para pedir más ítems a la IA, genera de nuevo desde el formulario de arriba (elige la cantidad ahí)'
+                        },
+                        {
+                            id: 'preview',
+                            label: 'Vista previa',
+                            Icon: VisibilityRoundedIcon,
+                            onClick: () => setPreviewAbierta(true),
+                            disabled: guardando || !items,
+                            title: items
+                                ? 'Juega la actividad como la verá el estudiante (sin XP ni progreso)'
+                                : 'Añade al menos un ítem para previsualizar'
+                        }
+                    ]} />
 
                     <div className="clasificador-publicar-barra">
                         <p className="clasificador-publicar-hint">
@@ -491,6 +587,15 @@ export function GeneradorActividadIA({ materia, tipo }) {
                 </div>
             )}
 
+            {previewAbierta && actividad && (
+                <PreviewJuegoModal
+                    tipo={tipo}
+                    titulo={actividad.titulo}
+                    configuracion={actividad.configuracion}
+                    onCerrar={() => setPreviewAbierta(false)}
+                />
+            )}
+
             {bancoAbierto && actividad && (
                 <SelectorBanco
                     tipo={tipo}
@@ -502,13 +607,9 @@ export function GeneradorActividadIA({ materia, tipo }) {
 
             <HistorialActividades
                 items={historial}
-                activoId={actividad?.id}
+                activoId={actividad?.retoId}
                 onAbrir={abrirDelHistorial}
                 onEliminar={quitarDelHistorial}
-                meta={(e) => {
-                    const n = contarItems(tipo, e.configuracion);
-                    return `${n} ${n === 1 ? 'ítem' : 'ítems'}`;
-                }}
             />
         </section>
     );

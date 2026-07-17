@@ -239,3 +239,28 @@
     color: var(--color-primary-dark);
     font-weight: 600;
 }
+
+/* ---- Editor de la misión (SPEC-012 Fase 1): lo generado por la IA se edita
+   en su lugar — textos, alternativas, añadir/quitar desafíos. ---- */
+.mision-editor { display: flex; flex-direction: column; gap: 0.85rem; }
+.mision-editor-desafios { display: flex; flex-direction: column; gap: 0.85rem; }
+.mision-editor-desafio {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.85rem;
+    background: var(--color-surface-soft, #f9fafb);
+    border: 1px solid var(--color-border, #e5e7eb);
+    border-radius: var(--radius-md, 12px);
+}
+.mision-editor-desafio-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+}
+.mision-editor-desafio-head .quiz-historial-eliminar { height: 34px; }
+.mision-editor-desafio-head .quiz-historial-eliminar:disabled { opacity: 0.4; cursor: default; }
+.mision-editor-alt > span { display: flex; align-items: center; gap: 0.35rem; }
+.mision-editor-alt input[type="radio"] { width: auto; margin: 0; }
+.mision-editor-agregar { align-self: flex-start; }

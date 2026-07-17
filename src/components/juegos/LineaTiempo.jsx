@@ -12,7 +12,7 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import { mezclar, useRecompensa, PantallaFinal, LogroToast } from './juegosComunes';
 import './juegos.css';
 
-export function LineaTiempo({ reto, estudianteId, onSalir, onCompletado }) {
+export function LineaTiempo({ reto, estudianteId, onSalir, onCompletado, soloPrueba }) {
     const eventos = reto?.configuracion?.eventos || [];
     const instruccion = reto?.configuracion?.instruccion || 'Ordena los eventos: arriba el primero, abajo el último.';
     const tituloSecuencia = reto?.configuracion?.titulo_secuencia || null;
@@ -45,7 +45,7 @@ export function LineaTiempo({ reto, estudianteId, onSalir, onCompletado }) {
     const completado = total > 0 && fijados.size === total;
 
     const { puntosGanados, toast, setToast } = useRecompensa({
-        completado, estudianteId, reto, tipo: 'linea-tiempo', aciertos, total, semilla, onCompletado
+        completado, estudianteId, reto, tipo: 'linea-tiempo', aciertos, total, semilla, onCompletado, soloPrueba
     });
 
     const mover = (posicion, delta) => {

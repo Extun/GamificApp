@@ -1,33 +1,15 @@
 import { useState } from 'react';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
-import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
-import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded';
-import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import { EditorQuiz } from '../../components/quiz/EditorQuiz';
 import { SelectorBanco } from '../../components/juegos/SelectorBanco';
+import { PreviewJuegoModal } from '../../components/juegos/PreviewJuegoModal';
+import { useHistorialRetos, HistorialActividades } from '../../components/juegos/HistorialActividades';
 import { publicarReto } from '../../services/retosService';
 import { authFetch } from '../../services/authService';
 import { idPorNombre } from '../../services/materiasService';
 import bancoService from '../../services/bancoService';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
-// Persistencia del historial: guardamos los últimos 3 quizzes POR MATERIA, en
-// un objeto { [materia]: Quiz[] }, igual que el dashboard con los archivos.
-const HISTORIAL_KEY = 'edu_historialQuizzes';
-const HISTORIAL_MAX = 3;
-
-const leerHistorialTodo = () => {
-    try {
-        const guardado = localStorage.getItem(HISTORIAL_KEY);
-        const data = guardado ? JSON.parse(guardado) : {};
-        // Si existiera un historial antiguo en formato array (global), lo
-        // descartamos para no mezclarlo con el nuevo esquema por materia.
-        return Array.isArray(data) ? {} : data;
-    } catch {
-        return {};
-    }
-};
 
 export function GeneradorQuiz({ materia = 'la materia' }) {
     const [tema, setTema] = useState('');
@@ -39,67 +21,41 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
     const [publicando, setPublicando] = useState(false);
     const [error, setError] = useState('');
     const [aviso, setAviso] = useState('');
-    const [historialTodo, setHistorialTodo] = useState(leerHistorialTodo);
     // SPEC-010: modal del banco de preguntas (tercera fuente junto a manual e IA).
     const [bancoAbierto, setBancoAbierto] = useState(false);
-    // Solo los quizzes de la materia actual (últimos 3).
-    const historial = historialTodo[materia] || [];
+    // SPEC-012: vista previa del quiz como estudiante (modo prueba).
+    const [previewAbierta, setPreviewAbierta] = useState(false);
+    // SPEC-011 — historial respaldado en BD: cada generación crea un reto
+    // 'borrador' en `retos` y la lista se lee del servidor (los borradores
+    // sobreviven a cambios de navegador; localStorage es solo caché offline).
+    const { historial, crearBorrador, sincronizar, cancelarSincronizacion, eliminar: eliminarBorrador, abrirDetalle, refrescar } =
+        useHistorialRetos('quiz', materia);
 
-    // Persiste el mapa { materia: Quiz[] } completo en localStorage.
-    const persistir = (mapa) => {
+    // Elimina un quiz del historial (Papelera, recuperable desde la
+    // Biblioteca); si está abierto en el editor, lo cierra.
+    const eliminarDelHistorial = async (id) => {
         try {
-            localStorage.setItem(HISTORIAL_KEY, JSON.stringify(mapa));
-        } catch {
-            // Ignorar errores de cuota/persistencia de localStorage.
+            await eliminarBorrador(id);
+            setQuizEdit((actual) => (actual?.retoId === id ? null : actual));
+        } catch (err) {
+            setError(`No se pudo eliminar: ${err.message}`);
+            setTimeout(() => setError(''), 4000);
         }
     };
 
-    // Añade un quiz al historial de su materia, conservando solo los últimos 3.
-    const guardarEnHistorial = (entrada) => {
-        setHistorialTodo((prev) => {
-            const previosMateria = prev[entrada.materia] || [];
-            const actualizado = {
-                ...prev,
-                [entrada.materia]: [entrada, ...previosMateria].slice(0, HISTORIAL_MAX)
-            };
-            persistir(actualizado);
-            return actualizado;
-        });
-    };
-
-    // Reemplaza un quiz existente (por id) en el historial de su materia.
-    const actualizarEnHistorial = (entrada) => {
-        setHistorialTodo((prev) => {
-            const previosMateria = prev[entrada.materia] || [];
-            const actualizado = {
-                ...prev,
-                [entrada.materia]: previosMateria.map((q) => (q.id === entrada.id ? entrada : q))
-            };
-            persistir(actualizado);
-            return actualizado;
-        });
-    };
-
-    // Elimina un quiz del historial; si está abierto en el editor, lo cierra.
-    const eliminarDelHistorial = (id) => {
-        setHistorialTodo((prev) => {
-            const actualizado = {
-                ...prev,
-                [materia]: (prev[materia] || []).filter((q) => q.id !== id)
-            };
-            persistir(actualizado);
-            return actualizado;
-        });
-        setQuizEdit((actual) => (actual?.id === id ? null : actual));
-    };
-
-    // Sincroniza los cambios del editor con el estado y el historial. Si el
-    // quiz ya estaba publicado, editar lo convierte en un borrador nuevo (al
-    // publicarlo otra vez se crea otro reto, no se modifica el anterior).
+    // Sincroniza los cambios del editor con el estado local y, si el quiz
+    // sigue siendo un borrador en la BD, con el servidor (PATCH con debounce).
+    // Si ya estaba publicado, los cambios quedan en memoria y solo llegan a la
+    // BD al volver a pulsar "Publicar" (nunca se edita un publicado en caliente).
     const actualizarPreguntas = (nuevasPreguntas) => {
-        const actualizado = { ...quizEdit, preguntas: nuevasPreguntas, cantidad: nuevasPreguntas.length, estado: 'borrador' };
+        const actualizado = { ...quizEdit, preguntas: nuevasPreguntas, estado: 'borrador' };
         setQuizEdit(actualizado);
-        actualizarEnHistorial(actualizado);
+        if (actualizado.retoId && !actualizado.publicadoEnBD) {
+            sincronizar(actualizado.retoId, {
+                configuracion: { preguntas: nuevasPreguntas },
+                xp_recompensa: Math.max(nuevasPreguntas.length, 1) * 100
+            });
+        }
     };
 
     // Guarda en el banco (siempre, sin opción de apagarlo) las preguntas que aún
@@ -126,8 +82,9 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
     };
 
     // Publica el quiz EN LA BASE DE DATOS (tabla `retos`, tipo 'quiz'): así lo
-    // ven los estudiantes desde cualquier navegador/dispositivo. El historial
-    // local queda solo como espacio de trabajo/borradores del docente.
+    // ven los estudiantes desde cualquier navegador/dispositivo. El POST es un
+    // upsert por (materia, título), así que actualiza la misma fila del
+    // borrador ya sincronizado en vez de duplicarla.
     const publicarQuiz = async () => {
         if (publicando || quizEdit?.estado === 'publicado') return;
         const materiaId = idPorNombre(materia);
@@ -138,19 +95,21 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
         setPublicando(true);
         try {
             setError('');
+            // Un PATCH pendiente del debounce ya no hace falta: el POST que
+            // sigue escribe el estado completo (y sobre publicado fallaría).
+            cancelarSincronizacion(quizEdit.retoId);
             // Las preguntas manuales (ya completas al publicar) se guardan
             // también en el banco antes de publicar.
             const preguntas = await guardarLoteEnBanco(quizEdit.preguntas, quizEdit.tema);
-            await publicarReto({
+            const data = await publicarReto({
                 materiaId,
                 titulo: quizEdit.tema,
                 tipo: 'quiz',
                 configuracion: { preguntas },
                 xpRecompensa: preguntas.length * 100
             });
-            const publicado = { ...quizEdit, preguntas, estado: 'publicado' };
-            setQuizEdit(publicado);
-            actualizarEnHistorial(publicado);
+            setQuizEdit({ ...quizEdit, retoId: data?.id ?? quizEdit.retoId, preguntas, estado: 'publicado', publicadoEnBD: true });
+            refrescar();
             setAviso('¡Quiz publicado! Ya es visible para los estudiantes.');
             setTimeout(() => setAviso(''), 4000);
         } catch (err) {
@@ -191,19 +150,24 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
         try {
             let quiz = await pedirPreguntasIA(tema.trim(), cantidad);
             quiz = await guardarLoteEnBanco(quiz, tema.trim());
-            // El quiz nace como BORRADOR: el docente lo edita y solo se publica
-            // cuando pulsa "Publicar quiz para estudiantes".
-            const entrada = {
-                id: Date.now(),
-                materia,
-                tema: tema.trim(),
-                cantidad: quiz.length,
-                preguntas: quiz,
-                estado: 'borrador',
-                fecha: new Date().toLocaleString('es-EC', { dateStyle: 'short', timeStyle: 'short' })
-            };
-            guardarEnHistorial(entrada);
-            setQuizEdit(entrada);
+            // El quiz nace como BORRADOR EN LA BD (SPEC-011): sobrevive a
+            // cambios de navegador y aparece también en la Biblioteca. Si el
+            // guardado remoto falla, se sigue editando solo en memoria (el
+            // botón Publicar lo crea igual, vía el upsert del POST).
+            let retoId = null;
+            try {
+                const creado = await crearBorrador({
+                    materiaId: idPorNombre(materia),
+                    titulo: tema.trim(),
+                    configuracion: { preguntas: quiz },
+                    xpRecompensa: quiz.length * 100,
+                    origen: 'ia'
+                });
+                retoId = creado?.id ?? null;
+            } catch (err) {
+                console.warn('El borrador no se pudo guardar en el servidor:', err.message);
+            }
+            setQuizEdit({ retoId, tema: tema.trim(), preguntas: quiz, estado: 'borrador', publicadoEnBD: false });
         } catch (err) {
             console.error('Error al generar el quiz:', err);
             const detalle = err?.message ? ` (${err.message})` : '';
@@ -240,6 +204,26 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
         setTimeout(() => setAviso(''), 4000);
     };
 
+    // Reabre una entrada del historial: trae del servidor el reto completo
+    // (la lista es ligera, sin configuración) y lo monta en el editor.
+    const abrirDelHistorial = async (entrada) => {
+        setAviso('');
+        setError('');
+        try {
+            const detalle = await abrirDetalle(entrada.id);
+            setQuizEdit({
+                retoId: detalle.id,
+                tema: detalle.titulo,
+                preguntas: detalle.configuracion?.preguntas || [],
+                estado: detalle.estado,
+                publicadoEnBD: detalle.estado === 'publicado'
+            });
+        } catch (err) {
+            setError(`No se pudo abrir la actividad: ${err.message}`);
+            setTimeout(() => setError(''), 4000);
+        }
+    };
+
     // SPEC-010: guarda una pregunta del quiz en el banco para reutilizarla en
     // futuros quizzes. Se guarda sin el metadato `_banco_id` (si viniera del
     // banco, sería crear un duplicado consciente, no re-referenciarla).
@@ -251,7 +235,8 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
             return;
         }
         try {
-            const { _banco_id, ...contenido } = pregunta;
+            const contenido = { ...pregunta };
+            delete contenido._banco_id;
             await bancoService.crearPregunta({
                 materiaId,
                 tipo: 'quiz',
@@ -315,6 +300,16 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                     publicado={quizEdit.estado === 'publicado'}
                     onAbrirBanco={() => setBancoAbierto(true)}
                     onGuardarEnBanco={guardarPreguntaEnBanco}
+                    onVistaPrevia={() => setPreviewAbierta(true)}
+                />
+            )}
+
+            {previewAbierta && quizEdit && (
+                <PreviewJuegoModal
+                    tipo="quiz"
+                    titulo={quizEdit.tema}
+                    configuracion={{ preguntas: quizEdit.preguntas }}
+                    onCerrar={() => setPreviewAbierta(false)}
                 />
             )}
 
@@ -327,46 +322,13 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                 />
             )}
 
-            {historial.length > 0 && (
-                <div className="quiz-historial">
-                    <h4>Últimos quizzes generados</h4>
-                    <ul className="quiz-historial-lista">
-                        {historial.map((q) => {
-                            const publicado = q.estado === 'publicado';
-                            return (
-                                <li key={q.id} className="quiz-historial-fila">
-                                    <button
-                                        type="button"
-                                        className={`quiz-historial-item ${quizEdit?.id === q.id ? 'is-activo' : ''}`}
-                                        onClick={() => { setQuizEdit(q); setAviso(''); }}
-                                    >
-                                        <span className="quiz-historial-tema">
-                                            {q.tema}
-                                            <span className={`quiz-estado-badge ${publicado ? 'is-publicado' : 'is-borrador'}`}>
-                                                {publicado
-                                                    ? <><CheckCircleRoundedIcon sx={{ fontSize: '0.85rem' }} /> Publicado</>
-                                                    : <><EditNoteRoundedIcon sx={{ fontSize: '0.85rem' }} /> Borrador</>}
-                                            </span>
-                                        </span>
-                                        <span className="quiz-historial-meta">
-                                            {q.cantidad} preguntas · {q.fecha}
-                                        </span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="quiz-historial-eliminar"
-                                        title="Eliminar quiz"
-                                        aria-label={`Eliminar quiz ${q.tema}`}
-                                        onClick={() => eliminarDelHistorial(q.id)}
-                                    >
-                                        <DeleteOutlineRoundedIcon sx={{ fontSize: '1.2rem' }} />
-                                    </button>
-                                </li>
-                            );
-                        })}
-                    </ul>
-                </div>
-            )}
+            <HistorialActividades
+                titulo="Últimos quizzes generados"
+                items={historial}
+                activoId={quizEdit?.retoId}
+                onAbrir={abrirDelHistorial}
+                onEliminar={eliminarDelHistorial}
+            />
         </section>
     );
 }

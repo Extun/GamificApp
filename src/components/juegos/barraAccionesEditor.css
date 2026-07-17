@@ -1,0 +1,53 @@
+/* Barra de acciones unificada de los editores de juegos (SPEC-012, Fase 3). */
+.barra-acciones-editor {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+}
+.barra-accion-wrap { position: relative; flex: 1; min-width: 170px; display: flex; }
+.barra-accion-btn {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.6rem 0.9rem;
+    border: 1px dashed var(--color-border, #d1d5db);
+    border-radius: var(--radius-md, 12px);
+    background: var(--color-surface, #fff);
+    color: var(--color-text, #111827);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+.barra-accion-btn:hover:not(:disabled) {
+    border-color: var(--color-primary, #6366f1);
+    color: var(--color-primary, #6366f1);
+}
+.barra-accion-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.barra-accion-menu {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--color-surface, #fff);
+    border: 1px solid var(--color-border, #e5e7eb);
+    border-radius: var(--radius-md, 12px);
+    box-shadow: var(--shadow-lg, 0 10px 24px rgba(0, 0, 0, 0.12));
+    padding: 0.35rem;
+    z-index: 20;
+}
+.barra-accion-opcion {
+    border: 0;
+    background: transparent;
+    text-align: left;
+    padding: 0.5rem 0.6rem;
+    border-radius: var(--radius-sm, 8px);
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+.barra-accion-opcion:hover { background: var(--color-surface-soft, #f3f4f6); }

@@ -32,10 +32,12 @@ import {
     formatearFecha
 } from '../../components/dashboard/DashboardWidgets';
 import LocalLibraryRoundedIcon from '@mui/icons-material/LocalLibraryRounded';
+import LibraryBooksRoundedIcon from '@mui/icons-material/LibraryBooksRounded';
 import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
 import AccountCircleRoundedIcon from '@mui/icons-material/AccountCircleRounded';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import { BibliotecaActividades } from '../docente/BibliotecaActividades';
+import { BancoPreguntas } from '../docente/BancoPreguntas';
 import { RankingCompleto } from '../docente/RankingCompleto';
 import { PerfilDocente } from '../docente/PerfilDocente';
 import { MisionesDocente } from '../docente/MisionesDocente';
@@ -420,6 +422,7 @@ export function Dashboard() {
                 { id: '', label: 'Inicio', Icon: HomeFilledIcon },
                 { id: 'materias', label: 'Materias', Icon: MenuBookIcon, grupo: 'Enseñanza' },
                 { id: 'biblioteca', label: 'Biblioteca', Icon: LocalLibraryRoundedIcon, grupo: 'Enseñanza' },
+                { id: 'banco', label: 'Banco de preguntas', Icon: LibraryBooksRoundedIcon, grupo: 'Enseñanza' },
                 { id: 'estudiantes', label: 'Mis Estudiantes', Icon: GroupsRoundedIcon, grupo: 'Mi aula' },
                 { id: 'ranking', label: 'Ranking', Icon: EmojiEventsRoundedIcon, grupo: 'Mi aula' },
                 { id: 'misiones', label: 'Misiones', Icon: MilitaryTechRoundedIcon, grupo: 'Mi aula' },
@@ -1004,6 +1007,28 @@ export function Dashboard() {
                             subtitulo="Todo lo que has creado, en un solo lugar: busca, duplica, edita, archiva o restaura. Nada se borra para siempre."
                         />
                         <BibliotecaActividades onAviso={setAvisoOk} onError={setErrorMaterial} />
+                        {errorMaterial && (
+                            <div className="aviso-migracion" role="alert">
+                                <p>{errorMaterial}</p>
+                                <button onClick={() => setErrorMaterial('')}>Entendido</button>
+                            </div>
+                        )}
+                        {avisoOk && (
+                            <div className="admin-aviso-ok" role="status">
+                                <p>{avisoOk}</p>
+                                <button onClick={() => setAvisoOk('')}>OK</button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {pagina === 'banco' && (
+                    <div className="home-doc">
+                        <DashboardHeader
+                            titulo="Mi Banco de Preguntas"
+                            subtitulo="Tu repositorio de preguntas reutilizables. Se alimenta solo al crear actividades; aquí lo curas: edita, duplica, archiva o elimina."
+                        />
+                        <BancoPreguntas onAviso={setAvisoOk} onError={setErrorMaterial} />
                         {errorMaterial && (
                             <div className="aviso-migracion" role="alert">
                                 <p>{errorMaterial}</p>

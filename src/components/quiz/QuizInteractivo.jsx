@@ -107,7 +107,9 @@ export function LogroToast({ titulo = '¡Logro desbloqueado!', mensaje, icono, o
 // Si recibe `estudianteId` y `reto` ({ id } o { materiaId, titulo }), además
 // persiste el resultado en la BD central vía la API y confirma el guardado
 // con un toast.
-export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteId, reto, onCompletado }) {
+// `soloPrueba` (SPEC-012): vista previa del docente — se juega igual pero no
+// se otorga XP ni se guarda progreso.
+export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteId, reto, onCompletado, soloPrueba = false }) {
     const [aciertos, setAciertos] = useState(0);
     const [respondidas, setRespondidas] = useState(0);
     const [puntosGanados, setPuntosGanados] = useState(0);
@@ -138,19 +140,22 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
         if (!completado || recompensado.current) return;
         recompensado.current = true;
 
-        const { puntos, nuevosLogros, servidor } = gamificationService.completarReto({
+        if (soloPrueba) {
+            // Puntaje simulado: la pantalla final se ve igual, nada se guarda.
+            setPuntosGanados(aciertos * 100);
+            setToast({ titulo: 'Modo prueba', mensaje: 'Nada se guardó: así lo verá el estudiante.' });
+            return;
+        }
+
+        const { puntos, servidor } = gamificationService.completarReto({
             estudianteId,
             reto,
-            tipo: 'quiz',
-            aciertos,
-            total
+            aciertos
         });
         setPuntosGanados(puntos);
 
         if (aciertos === total) {
             setToast({ mensaje: 'Maestro de la Materia' });
-        } else if (nuevosLogros.length) {
-            setToast({ mensaje: nuevosLogros[0].titulo });
         }
 
         servidor.then((data) => {
@@ -167,7 +172,7 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
                 });
             }
         });
-    }, [completado, aciertos, total, estudianteId, reto, onCompletado]);
+    }, [completado, aciertos, total, estudianteId, reto, onCompletado, soloPrueba]);
 
     return (
         <div className="quiz-interactivo" key={claveQuiz}>

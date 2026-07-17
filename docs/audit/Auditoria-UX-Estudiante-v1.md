@@ -8,6 +8,8 @@ Auditoría profunda de la experiencia del estudiante (niños de 2.º a 4.º EGB,
 
 🟢 Completo — pendiente de convertirse en RFC de rediseño.
 
+> **Nota (2026-07-14, auditoría documental):** las críticas de este documento al sistema de logros de `localStorage` (3/5 sin lógica de desbloqueo, no compartidos entre dispositivos) **ya fueron resueltas** por SPEC-007 (Sistema de Misiones, server-backed, 46 misiones semilla). Las demás recomendaciones (shell del estudiante sin sidebar, motor único de retos, login infantil, vitrina de premios) siguen vigentes y son el insumo de SPEC-001, aún no implementada — ver `docs/architecture/CURRENT_STATE.md` §3.
+
 # Última actualización
 
 2026-07-06

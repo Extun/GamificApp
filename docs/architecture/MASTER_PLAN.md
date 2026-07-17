@@ -20,7 +20,7 @@ Fabrizio Zurita (Extun)
 | 1 | Fundamentos v2 | Auditoría de navegación, inventario funcional, blueprint (en `docs/archive/fundamentos/`) | ✅ Hecho |
 | 2 | Dashboards reales | Reorganización de los 3 dashboards, componentes compartidos, cero datos ficticios | ✅ Hecho |
 | 3 | DevOS documental | Sistema documental — **cerrado y simplificado** en la consolidación 2026-07-07 (START_HERE + 4 docs vivos) | ✅ Hecho |
-| 3.5 | Centro de Administración (SPEC-002 + SPEC-003) | Materias/cursos/institución dinámicos, TablaPro, roles y permisos de admin, auditoría, papelera, sidebar agrupado | ✅ Hecho en código (2026-07-09) — **pendiente: backup Aiven + migraciones 002-004 + deploy** |
+| 3.5 | Centro de Administración (SPEC-002 + SPEC-003) | Materias/cursos/institución dinámicos, TablaPro, roles y permisos de admin, auditoría, papelera, sidebar agrupado | ✅ Hecho en código y **desplegado en Aiven** (migraciones 002-004 confirmadas en producción el 2026-07-10, ver `CURRENT_STATE.md`) |
 | 3.6 | Centro de Trabajo Docente (SPEC-006) | 3 juegos nuevos (memorama, línea del tiempo, completar), IA genérica por registro, actividad sorpresa, adaptar con IA, Biblioteca IA con papelera/favoritas/estadísticas, Libro de Calificaciones editable | ✅ Hecho en código (2026-07-09) — **pendiente: migración 008 a Aiven + deploy + prueba end-to-end con BD** |
 | 4 | **Épica 1: Experiencia del estudiante** | Rediseño completo del lado del niño en 5 specs (ver §2) | 🟡 En curso (auditoría y SPEC-001 redactadas; nada implementado) |
 | 5 | Módulos incompletos | Libro de Calificaciones, 3 logros faltantes, UI de edición de docente | ⚪ Pendiente (antes de la defensa, si hay tiempo) |
@@ -64,22 +64,26 @@ Insumos: `docs/audit/Auditoria-UX-Estudiante-v1.md`, `docs/specifications/SPEC-0
 16. Estadísticas por pregunta ("más fallada/acertada") y tiempo promedio: exigen `detalle_json` en `progreso_estudiante` + cambios en todos los reproductores.
 17. El Libro de Calificaciones consulta el progreso estudiante por estudiante (N peticiones); con aulas grandes convendría un endpoint agregado por materia.
 
-## 4. Dependencias
+### Posibles extensiones del Banco de Preguntas (SPEC-010, anotadas 2026-07-16)
+
+18. Banco para el **Clasificador**: sus elementos no son ítems autónomos (dependen de las categorías de cada actividad); exigiría guardar "elemento + categoría" o categorías completas como unidad — diseño propio antes de implementar.
+19. "Banco de misiones" para **Misión Narrativa**: reutilizar la historia COMPLETA (duplicar/adaptar), concepto distinto al banco de ítems atómicos actual.
+
+## 4. Dependencias entre items del backlog
 
 - Specs 2–5 dependen de SPEC-001 (el shell con rutas es la base).
-- Libro de Calificaciones solo necesita datos ya existentes (`progreso_estudiante`); sin backend nuevo.
-- Logro `racha-7` puede usar `actualizado_en`; `estrella-aula` requiere corte semanal (hoy no existe noción de semana en la BD — requiere spec de backend).
-- Multi-institución requiere cambios de BD → spec propia obligatoria.
+- Multi-institución requiere spec propia obligatoria (cambios de BD).
+- Detalle técnico de cada dependencia: ver la spec correspondiente en `docs/specifications/`.
 
-## 5. Riesgos
+## 5. Riesgos (prioridad de mitigación)
 
 | Riesgo | Impacto | Mitigación |
 |--------|---------|------------|
 | Archivos base64 en MySQL (LONGTEXT) crecen sin límite | Lentitud/costos de BD | Post-tesis: mover a almacenamiento de objetos |
 | Plan free de Render (cold start) | Latencia en primer uso | Keep-alive activo vía `/api/health` cada 14 min |
 | Dependencia exclusiva de Gemini | Creación de contenido cae si Google falla | Reintentos multi-modelo ya implementados; fallback de proveedor post-tesis |
-| Migración a rutas anidadas (SPEC-001) | Deep-links rotos con F5, regresión CSS cruzada, romper docente/admin | Riesgos §5 de SPEC-001: verificar rewrite SPA en Vercel, copiar clases CSS en el mismo commit, probar los 3 roles |
-| Logros del catálogo que nunca se otorgan | Promesa rota al niño | Backlog #2 |
+| Migración a rutas anidadas (SPEC-001) | Deep-links rotos, regresión CSS, romper docente/admin | Ver §5 de SPEC-001 antes de implementar |
+| Logros del catálogo que nunca se otorgan | Promesa rota al niño | Backlog §3, ítem 2 |
 
 # Pendientes
 

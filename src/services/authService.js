@@ -21,6 +21,13 @@ const guardarSesion = (data) => {
     } else {
         localStorage.removeItem('edu_estudianteId');
     }
+    // SPEC-011: claves de sistemas retirados (logros viejos y historiales
+    // locales de borradores, hoy respaldados en la BD). Limpieza única.
+    ['edu_logrosObtenidos', 'edu_actividades', 'edu_historialQuizzes',
+        'edu_historialActividades_mision', 'edu_historialActividades_clasificador',
+        'edu_historialActividades_memorama', 'edu_historialActividades_linea-tiempo',
+        'edu_historialActividades_completar'
+    ].forEach((clave) => localStorage.removeItem(clave));
     return data;
 };
 

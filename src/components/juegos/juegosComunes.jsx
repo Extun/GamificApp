@@ -7,7 +7,7 @@ import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
 import ReplayRoundedIcon from '@mui/icons-material/ReplayRounded';
 import StarRoundedIcon from '@mui/icons-material/StarRounded';
 import CloudDoneRoundedIcon from '@mui/icons-material/CloudDoneRounded';
-import gamificationService from '../../services/gamificationService';
+import gamificationService, { PUNTOS_POR_ACIERTO } from '../../services/gamificationService';
 import { LogroToast } from '../quiz/QuizInteractivo';
 
 // Mezcla no destructiva (Fisher–Yates) para que cada partida sea distinta.
@@ -24,7 +24,9 @@ export const mezclar = (arr) => {
 // persiste en la BD central. `semilla` reinicia el candado al volver a jugar.
 // `onCompletado` avisa al contenedor (el Home) cuando el servidor confirma el
 // progreso, para que refresque el XP/nivel/premios con la verdad de la BD.
-export const useRecompensa = ({ completado, estudianteId, reto, tipo, aciertos, total, semilla, onCompletado }) => {
+// `soloPrueba` (SPEC-012): modo vista previa del docente — el juego se
+// comporta igual pero NO otorga nada (ni XP local ni POST /api/progreso).
+export const useRecompensa = ({ completado, estudianteId, reto, tipo, aciertos, total, semilla, onCompletado, soloPrueba = false }) => {
     const [puntosGanados, setPuntosGanados] = useState(0);
     const [toast, setToast] = useState(null);
     const recompensado = useRef(false);
@@ -38,15 +40,20 @@ export const useRecompensa = ({ completado, estudianteId, reto, tipo, aciertos, 
         if (!completado || recompensado.current) return;
         recompensado.current = true;
 
-        const { puntos, nuevosLogros, servidor } = gamificationService.completarReto({
-            estudianteId, reto, tipo, aciertos, total
+        if (soloPrueba) {
+            // Puntaje simulado para que la pantalla final sea realista.
+            setPuntosGanados(aciertos * PUNTOS_POR_ACIERTO);
+            setToast({ titulo: 'Modo prueba', mensaje: 'Nada se guardó: así lo verá el estudiante.' });
+            return;
+        }
+
+        const { puntos, servidor } = gamificationService.completarReto({
+            estudianteId, reto, aciertos
         });
         setPuntosGanados(puntos);
 
         if (aciertos === total) {
             setToast({ mensaje: '¡Resultado perfecto! 🌟' });
-        } else if (nuevosLogros.length) {
-            setToast({ mensaje: nuevosLogros[0].titulo });
         }
         servidor.then((data) => {
             // Avisa siempre (aunque la red fallara): el Home vuelve a leer la
@@ -64,7 +71,7 @@ export const useRecompensa = ({ completado, estudianteId, reto, tipo, aciertos, 
                 });
             }
         });
-    }, [completado, aciertos, total, estudianteId, reto, tipo, onCompletado]);
+    }, [completado, aciertos, total, estudianteId, reto, tipo, onCompletado, soloPrueba]);
 
     return { puntosGanados, toast, setToast };
 };

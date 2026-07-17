@@ -25,7 +25,7 @@ const Frase = ({ texto, relleno, estado }) => {
     );
 };
 
-export function CompletarEspacios({ reto, estudianteId, onSalir, onCompletado }) {
+export function CompletarEspacios({ reto, estudianteId, onSalir, onCompletado, soloPrueba }) {
     const frases = reto?.configuracion?.frases || [];
     const instruccion = reto?.configuracion?.instruccion || 'Elige la palabra que completa cada frase.';
 
@@ -49,7 +49,7 @@ export function CompletarEspacios({ reto, estudianteId, onSalir, onCompletado })
     const esCorrecta = respondida && elegida === frase?.correcta;
 
     const { puntosGanados, toast, setToast } = useRecompensa({
-        completado, estudianteId, reto, tipo: 'completar', aciertos, total, semilla, onCompletado
+        completado, estudianteId, reto, tipo: 'completar', aciertos, total, semilla, onCompletado, soloPrueba
     });
 
     const elegir = (opcion) => {

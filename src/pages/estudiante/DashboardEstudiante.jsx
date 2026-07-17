@@ -110,8 +110,10 @@ export function DashboardEstudiante() {
     const nivelMostrado = misionesResumen ? misionesResumen.nivel : gami.nivel;
     const porcentajeNivel = Math.round(((xpMostrado % XP_POR_NIVEL) / XP_POR_NIVEL) * 100);
     const rachaActual = misionesResumen?.racha_actual || 0;
-    // Conteo de premios consistente con la página de Premios.
-    const premiosGanados = misionesResumen ? misionesResumen.completadas : gami.totalLogros;
+    // Conteo de premios consistente con la página de Premios (SPEC-011: el
+    // conteo viejo de localStorage se retiró; sin servidor se muestra 0 hasta
+    // que responda, igual que el resto de datos de misiones).
+    const premiosGanados = misionesResumen ? misionesResumen.completadas : 0;
 
     // Carga desde la BD los quizzes y juegos publicados y el material de la
     // materia abierta. Si la red falla, los servicios devuelven [] y las

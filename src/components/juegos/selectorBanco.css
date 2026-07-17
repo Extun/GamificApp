@@ -44,3 +44,11 @@
 .banco-item-cuerpo { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
 .banco-item-enunciado { font-weight: 600; overflow-wrap: anywhere; }
 .banco-item-meta { font-size: 0.8rem; color: var(--color-text-soft, #6b7280); }
+
+/* Vista previa "como estudiante" (SPEC-012): el reproductor real en un modal
+   ancho, para que el juego se vea como en la pantalla del estudiante. */
+.preview-juego-modal { width: min(760px, 94vw); max-width: 760px; }
+
+/* Edición de una pregunta en "Mi Banco de Preguntas": fila opción + radio. */
+.banco-alt-row > span { display: flex; align-items: center; gap: 0.35rem; }
+.banco-alt-row input[type="radio"] { width: auto; margin: 0; }

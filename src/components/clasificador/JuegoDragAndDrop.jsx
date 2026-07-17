@@ -37,7 +37,9 @@ const partirEmoji = (texto) => {
     return match ? { emoji: match[1], label: match[2] || '' } : { emoji: null, label: texto };
 };
 
-export function JuegoDragAndDrop({ reto, estudianteId, onSalir, onCompletado }) {
+// `soloPrueba` (SPEC-012): vista previa del docente — se juega igual pero no
+// se otorga XP ni se guarda progreso.
+export function JuegoDragAndDrop({ reto, estudianteId, onSalir, onCompletado, soloPrueba = false }) {
     const categorias = reto?.configuracion?.categorias || [];
 
     // Aplana la configuración del docente en fichas jugables y las mezcla.
@@ -96,25 +98,29 @@ export function JuegoDragAndDrop({ reto, estudianteId, onSalir, onCompletado }) 
         }
     };
 
-    // Al completar: XP local + logros + persistencia en la BD central.
+    // Al completar: XP local + persistencia en la BD central (las misiones
+    // desbloqueadas llegan en la respuesta del servidor).
     const recompensado = useRef(false);
     useEffect(() => {
         if (!completado || recompensado.current) return;
         recompensado.current = true;
 
-        const { puntos, nuevosLogros, servidor } = gamificationService.completarReto({
+        if (soloPrueba) {
+            // Puntaje simulado: la pantalla final se ve igual, nada se guarda.
+            setPuntosGanados(aciertos * 100);
+            setToast({ titulo: 'Modo prueba', mensaje: 'Nada se guardó: así lo verá el estudiante.' });
+            return;
+        }
+
+        const { puntos, servidor } = gamificationService.completarReto({
             estudianteId,
             reto,
-            tipo: 'clasificador',
-            aciertos,
-            total
+            aciertos
         });
         setPuntosGanados(puntos);
 
         if (aciertos === total) {
             setToast({ mensaje: '¡Clasificación perfecta! 🌟' });
-        } else if (nuevosLogros.length) {
-            setToast({ mensaje: nuevosLogros[0].titulo });
         }
 
         servidor.then((data) => {
@@ -131,7 +137,7 @@ export function JuegoDragAndDrop({ reto, estudianteId, onSalir, onCompletado }) 
                 });
             }
         });
-    }, [completado, aciertos, total, estudianteId, reto, onCompletado]);
+    }, [completado, aciertos, total, estudianteId, reto, onCompletado, soloPrueba]);
 
     // Permite reintentar tras reiniciar la partida.
     useEffect(() => {

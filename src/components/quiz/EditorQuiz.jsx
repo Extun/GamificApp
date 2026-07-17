@@ -8,6 +8,8 @@ import RocketLaunchRoundedIcon from '@mui/icons-material/RocketLaunchRounded';
 import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded';
 import LibraryAddRoundedIcon from '@mui/icons-material/LibraryAddRounded';
 import BookmarkAddRoundedIcon from '@mui/icons-material/BookmarkAddRounded';
+import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
+import { BarraAccionesEditor } from '../juegos/BarraAccionesEditor';
 import './editorQuiz.css';
 
 const LETRAS = ['A', 'B', 'C', 'D'];
@@ -27,13 +29,13 @@ const preguntaVacia = () => ({
 // SPEC-010: `onAbrirBanco` abre el selector del banco de preguntas (tercera
 // fuente junto a manual e IA) y `onGuardarEnBanco(pregunta)` guarda una
 // pregunta del quiz en el banco para reutilizarla después; ambas opcionales.
-export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar, publicando, publicado, onAbrirBanco, onGuardarEnBanco }) {
+// `onVistaPrevia` (SPEC-012): abre el quiz en el reproductor real, en modo
+// prueba (sin XP ni progreso), para revisarlo antes de publicar.
+export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar, publicando, publicado, onAbrirBanco, onGuardarEnBanco, onVistaPrevia }) {
     // Ninguna pregunta expandida al abrir el quiz (vista limpia de entrada).
     // Single-open: abrir una contrae automáticamente las demás.
     const [abierta, setAbierta] = useState(-1);
-    const [menuIA, setMenuIA] = useState(false);
     const [cargandoIA, setCargandoIA] = useState(false);
-    const iaRef = useRef(null);
     const abiertaRef = useRef(null);
 
     const alternar = (i) => setAbierta((prev) => (prev === i ? -1 : i));
@@ -44,14 +46,6 @@ export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar,
             abiertaRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     }, [abierta]);
-
-    // Cierra el dropdown de IA al hacer clic fuera de él.
-    useEffect(() => {
-        if (!menuIA) return;
-        const fuera = (e) => { if (iaRef.current && !iaRef.current.contains(e.target)) setMenuIA(false); };
-        document.addEventListener('mousedown', fuera);
-        return () => document.removeEventListener('mousedown', fuera);
-    }, [menuIA]);
 
     const total = preguntas.length;
     // Una pregunta está "completa" si tiene enunciado y sus 4 alternativas con texto.
@@ -80,7 +74,6 @@ export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar,
     };
 
     const añadirConIA = async (n) => {
-        setMenuIA(false);
         setCargandoIA(true);
         try {
             await onAgregarIA?.(n);
@@ -216,57 +209,45 @@ export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar,
                 })}
             </div>
 
-            {/* Acciones para agregar preguntas: manual o con IA (con selector de cantidad). */}
-            <div className="editor-agregar-barra">
-                <button
-                    type="button"
-                    className="editor-btn editor-btn-ghost editor-btn-añadir"
-                    onClick={añadirPregunta}
-                    disabled={cargandoIA}
-                >
-                    <AddRoundedIcon sx={{ fontSize: '1.2rem' }} /> Añadir pregunta manual
-                </button>
-
-                {onAbrirBanco && (
-                    <button
-                        type="button"
-                        className="editor-btn editor-btn-ghost editor-btn-añadir"
-                        onClick={onAbrirBanco}
-                        disabled={cargandoIA}
-                    >
-                        <LibraryAddRoundedIcon sx={{ fontSize: '1.15rem' }} /> Añadir del banco
-                    </button>
-                )}
-
-                <div className="editor-ia-wrap" ref={iaRef}>
-                    <button
-                        type="button"
-                        className="editor-btn editor-btn-ia"
-                        onClick={() => setMenuIA((v) => !v)}
-                        disabled={cargandoIA}
-                    >
-                        {cargandoIA
-                            ? <span className="editor-ia-spinner" aria-hidden="true" />
-                            : <AutoAwesomeRoundedIcon sx={{ fontSize: '1.1rem' }} />}
-                        {cargandoIA ? 'Generando…' : 'Añadir con IA'}
-                    </button>
-                    {menuIA && !cargandoIA && (
-                        <div className="editor-ia-menu" role="menu">
-                            <span className="editor-ia-menu-titulo">¿Cuántas añadir?</span>
-                            {OPCIONES_IA.map((n) => (
-                                <button
-                                    key={n}
-                                    type="button"
-                                    className="editor-ia-opcion"
-                                    onClick={() => añadirConIA(n)}
-                                >
-                                    {n} {n === 1 ? 'pregunta' : 'preguntas'}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
+            {/* Barra unificada (SPEC-012): mismas acciones en todos los editores. */}
+            <BarraAccionesEditor acciones={[
+                {
+                    id: 'manual',
+                    label: 'Añadir pregunta manual',
+                    Icon: AddRoundedIcon,
+                    onClick: añadirPregunta,
+                    disabled: cargandoIA
+                },
+                {
+                    id: 'banco',
+                    label: 'Añadir del banco',
+                    Icon: LibraryAddRoundedIcon,
+                    onClick: onAbrirBanco,
+                    disabled: !onAbrirBanco || cargandoIA,
+                    title: 'Reutiliza preguntas que ya creaste antes (se insertan como copia)'
+                },
+                {
+                    id: 'ia',
+                    label: cargandoIA ? 'Generando…' : 'Añadir con IA',
+                    Icon: AutoAwesomeRoundedIcon,
+                    disabled: cargandoIA || !onAgregarIA,
+                    title: '¿Cuántas preguntas nuevas pido a la IA?',
+                    opciones: OPCIONES_IA.map((n) => ({
+                        label: `${n} ${n === 1 ? 'pregunta' : 'preguntas'}`,
+                        onClick: () => añadirConIA(n)
+                    }))
+                },
+                {
+                    id: 'preview',
+                    label: 'Vista previa',
+                    Icon: VisibilityRoundedIcon,
+                    onClick: onVistaPrevia,
+                    disabled: !onVistaPrevia || !total || cargandoIA,
+                    title: total
+                        ? 'Juega el quiz como lo verá el estudiante (sin XP ni progreso)'
+                        : 'Añade al menos una pregunta para previsualizar'
+                }
+            ]} />
 
             <div className="editor-publicar-barra">
                 <p className="editor-publicar-hint">

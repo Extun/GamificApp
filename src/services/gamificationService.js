@@ -1,32 +1,22 @@
-// Servicio central de gamificación (XP y Logros).
+// Servicio central de gamificación (XP).
 //
 // La fuente de verdad del progreso es el backend (MySQL); localStorage se
 // mantiene como caché local para que la UI responda al instante y siga
 // funcionando si la red falla (se resincroniza en la próxima lectura).
+// SPEC-011 Fase 2: el sistema viejo de logros de localStorage se retiró —
+// las recompensas reales son las Misiones del servidor (SPEC-007), que
+// llegan en `nuevas_misiones` al guardar el progreso.
 
 import { authFetch } from './authService';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const KEY_XP = 'edu_xpTotal';
-const KEY_LOGROS = 'edu_logrosObtenidos';
-const KEY_ACTIVIDADES = 'edu_actividades';
 
 // Cada nivel cuesta esta cantidad de XP. El nivel se deriva del XP total.
 export const XP_POR_NIVEL = 1000;
 // XP que otorga cada respuesta correcta en un quiz.
 export const PUNTOS_POR_ACIERTO = 100;
-
-// Catálogo único de logros. Los componentes mapean el icono por `id`.
-export const CATALOGO_LOGROS = [
-    { id: 'primer-quiz', titulo: 'Primer Quiz', desc: 'Completaste tu primer quiz' },
-    { id: 'maestro-materia', titulo: 'Maestro de la Materia', desc: 'Lograste 100% en un quiz' },
-    { id: 'racha-7', titulo: 'Racha de 7 días', desc: 'Estudiaste una semana seguida' },
-    { id: 'estrella-aula', titulo: 'Estrella del aula', desc: 'Top 3 del ranking semanal' },
-    { id: 'explorador', titulo: 'Explorador', desc: 'Revisa material de 5 materias' }
-];
-
-const logroPorId = (id) => CATALOGO_LOGROS.find((l) => l.id === id);
 
 // ---- Lectura/escritura segura de localStorage ----
 const leer = (key, fallback) => {
@@ -72,55 +62,6 @@ export const getProgresoNivel = () => {
         xpNecesario: XP_POR_NIVEL,
         porcentaje: Math.round((xpActual / XP_POR_NIVEL) * 100)
     };
-};
-
-// ---- Logros ----
-export const getLogros = () => {
-    const logros = leer(KEY_LOGROS, []);
-    return Array.isArray(logros) ? logros : [];
-};
-
-export const tieneLogro = (id) => getLogros().includes(id);
-
-const otorgarLogro = (obtenidos, nuevos, id) => {
-    if (!obtenidos.includes(id) && logroPorId(id)) {
-        obtenidos.push(id);
-        nuevos.push(logroPorId(id));
-    }
-};
-
-const registrarActividad = (tipo) => {
-    const data = leer(KEY_ACTIVIDADES, {}) || {};
-    const total = (Number(data[tipo]) || 0) + 1;
-    escribir(KEY_ACTIVIDADES, { ...data, [tipo]: total });
-    return total;
-};
-
-// Evalúa qué logros desbloquea una actividad completada, los persiste y
-// devuelve SOLO los nuevos (para mostrarlos en pantalla).
-// Es genérico: funciona para CUALQUIER tipo de reto, presente o futuro.
-// actividad: { tipo: string, aciertos: number, total: number }
-export const verificarLogros = (actividad = {}) => {
-    const { tipo, aciertos, total } = actividad;
-    if (!tipo) return [];
-
-    const obtenidos = getLogros();
-    const nuevos = [];
-
-    const completadosDelTipo = registrarActividad(tipo);
-
-    // Primer quiz completado (logro histórico del catálogo).
-    if (tipo === 'quiz' && completadosDelTipo === 1) {
-        otorgarLogro(obtenidos, nuevos, 'primer-quiz');
-    }
-
-    // Un resultado perfecto acredita 'maestro-materia' en cualquier mecánica.
-    if (total > 0 && aciertos === total) {
-        otorgarLogro(obtenidos, nuevos, 'maestro-materia');
-    }
-
-    if (nuevos.length) escribir(KEY_LOGROS, obtenidos);
-    return nuevos;
 };
 
 // ---- Sincronización con el backend ----
@@ -183,21 +124,21 @@ export const obtenerProgreso = async (estudianteId) => {
 
 // Puente ÚNICO para reportar un reto completado, sea cual sea su mecánica
 // (quiz, clasificador, lectura o cualquier juego futuro). Ningún componente
-// necesita hablar con XP, logros o el backend por separado.
+// necesita hablar con XP o el backend por separado; las misiones desbloqueadas
+// llegan en `nuevas_misiones` dentro de la respuesta del servidor.
 //
-// Parámetros: { estudianteId, reto, tipo?, aciertos, total, puntosObtenidos? }
+// Parámetros: { estudianteId, reto, aciertos, total, puntosObtenidos? }
 //   · reto: objeto de la BD ({ id, tipo, xp_recompensa, ... }) o al menos
 //     { materiaId, titulo } para retos que aún no existen en la BD.
 //   · puntosObtenidos: si se omite, se calculan como aciertos * PUNTOS_POR_ACIERTO.
-// Devuelve { puntos, nuevosLogros, servidor } — `servidor` es la promesa de
-// guardarProgreso (resuelve null si no hay sesión o la red falla).
-export const completarReto = ({ estudianteId, reto, tipo, aciertos = 0, total = 0, puntosObtenidos }) => {
+// Devuelve { puntos, servidor } — `servidor` es la promesa de guardarProgreso
+// (resuelve null si no hay sesión o la red falla).
+export const completarReto = ({ estudianteId, reto, aciertos = 0, puntosObtenidos }) => {
     const puntos = Number.isFinite(puntosObtenidos)
         ? puntosObtenidos
         : aciertos * PUNTOS_POR_ACIERTO;
 
     sumarXP(puntos);
-    const nuevosLogros = verificarLogros({ tipo: tipo || reto?.tipo || 'quiz', aciertos, total });
 
     const retoIdentificable = reto && (reto.id || ((reto.materiaId || reto.materia_id) && reto.titulo));
     const servidor = estudianteId && retoIdentificable
@@ -211,7 +152,7 @@ export const completarReto = ({ estudianteId, reto, tipo, aciertos = 0, total = 
         })
         : Promise.resolve(null);
 
-    return { puntos, nuevosLogros, servidor };
+    return { puntos, servidor };
 };
 
 // GET /api/ranking — Top N de estudiantes por XP acumulado (por defecto 10).
@@ -227,24 +168,16 @@ export const obtenerRanking = async (limite = 10) => {
     }
 };
 
-// Snapshot completo para los dashboards.
-export const getResumen = () => ({
-    ...getProgresoNivel(),
-    logros: getLogros(),
-    totalLogros: getLogros().length
-});
+// Snapshot de XP/nivel para los dashboards (caché alineada con el servidor).
+export const getResumen = () => getProgresoNivel();
 
 const gamificationService = {
     XP_POR_NIVEL,
     PUNTOS_POR_ACIERTO,
-    CATALOGO_LOGROS,
     getXP,
     sumarXP,
     getNivel,
     getProgresoNivel,
-    getLogros,
-    tieneLogro,
-    verificarLogros,
     getEstudianteId,
     guardarProgreso,
     completarReto,
