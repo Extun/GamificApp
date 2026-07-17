@@ -1509,6 +1509,36 @@
     text-align: left;
 }
 
+/* SPEC-013 Fase 1 — Configuración del quiz (acordeón nativo colapsado). */
+.quiz-config {
+    margin: 16px 0 0;
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+}
+.quiz-config summary {
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--color-text);
+}
+.quiz-config-opcion {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    font-size: 0.9rem;
+    color: var(--color-text);
+    cursor: pointer;
+}
+.quiz-config-opcion input { accent-color: var(--color-primary); width: 18px; height: 18px; }
+.quiz-config-ayuda {
+    margin: 10px 0 0;
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+}
+
 /* Aviso minimalista de migración de materias (se descarta con un clic). */
 .aviso-migracion {
     display: flex;

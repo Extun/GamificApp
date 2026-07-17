@@ -2,7 +2,7 @@
 
 # Última actualización
 
-2026-07-16
+2026-07-17
 
 # Responsable
 
@@ -35,6 +35,8 @@ Fabrizio Zurita (Extun)
 
 ## Próximo sprint
 
+**SPEC-013 — Editor de actividades universal (aprobada 2026-07-17, diseño congelado).** Rediseño UX de los editores del docente: botón único "➕ Agregar" con menú por acciones (Escribir / Generarlas automáticamente / Reutilizar / Seleccionar automáticamente), lenguaje docente sin términos técnicos, toggles "Mezclar" configurables en el quiz, selección aleatoria desde preguntas guardadas, autoguardado unificado en los 6 editores y modal de generación IA único. Solo frontend, sin migraciones. Fases 1-7 por implementar en orden; detalle en `docs/specifications/SPEC-013-Editor-Actividades-Universal.md`.
+
 **Épica 1 — Rediseño de la experiencia del estudiante.** SPEC-001 (Student Shell: rutas anidadas, sin sidebar, nuevo Inicio, menú de avatar, modal de PIN) redactada y pendiente de aprobación; nada implementado. Specs 2–5 (vista de materia, motor único de retos, login infantil, vitrina de premios) por redactar, dependen de SPEC-001. Insumos: `docs/audit/Auditoria-UX-Estudiante-v1.md`, `docs/specifications/SPEC-001-Student-Shell-Plan.md`. Roadmap y backlog completo: `MASTER_PLAN.md`.
 
 ## Riesgos operativos vigentes
@@ -46,6 +48,12 @@ Fabrizio Zurita (Extun)
 ---
 
 ## Historial detallado (bitácora, no hace falta leer para trabajar — consultar solo para contexto de un cambio pasado)
+
+> **SPEC-013 Fase 2 — Botón único "➕ Agregar…" con menú por acciones (2026-07-17, solo frontend):** `BarraAccionesEditor` gana el prop `agregar` (aditivo; la API `acciones` de SPEC-012 sigue igual y la usa "Vista previa"): un botón primario "➕ Agregar preguntas/parejas/eventos/frases/categorías/desafíos" abre un menú con encabezado "¿Cómo deseas agregarlas?" y entradas ricas (emoji + título + subtítulo) según el tipo — **lo que no aplica ya NO aparece** (fin de los botones deshabilitados con tooltip de SPEC-012 §F3). Quiz: Escribir / Generarlas automáticamente (sub-paso "¿Cuántas preguntas?" 1/3/5, misma `añadirConIA`) / Reutilizar (SelectorBanco). Genéricos: Escribir / Generar de nuevo / Reutilizar (con tope MAX_ITEMS deshabilitando entradas con motivo en el subtítulo). Clasificador y Misión: solo Escribir + Generar (sin banco, SPEC-013 §3); la entrada "Generar" hace scroll suave + focus al formulario de IA superior (acción real en vez de botón muerto; la Fase 7 lo convertirá en modal). Sin ningún cambio de lógica de negocio: mismos handlers de siempre detrás del nuevo menú. CSS nuevo `.barra-agregar-*` (tokens, menú `min(320px, 86vw)` para móvil). Verificado: `npm run build` limpio; lint sin errores nuevos (solo los 2 `react-refresh` preexistentes, MASTER_PLAN §3.12). **Sin MySQL local: la revisión visual/e2e de los 6 editores (menú, sub-paso, móvil) queda para producción tras el deploy.**
+
+> **SPEC-013 Fase 1 — Toggles "Mezclar" del Quiz (2026-07-17, solo frontend):** el barajado del quiz (implementado el mismo día como comportamiento fijo) pasa a ser configurable por quiz: dos flags aditivos en `configuracion_json` (`mezclar_preguntas`, `mezclar_respuestas`), **ausentes = true** (los quizzes publicados antes de los flags siguen barajando igual — regla §6.12 intacta). `QuizInteractivo.jsx` los lee de `reto.configuracion` (cubre estudiante y vista previa); `GeneradorQuiz.jsx` gana la sección colapsada "⚙ Configuración" (`<details>` nativo) con los 2 checkboxes y el copy congelado de la SPEC-013 §4.10, persiste los flags en cada escritura (borrador nuevo, PATCH del debounce, publicar, reabrir del historial, vista previa) vía el helper `configuracionDe()`. CSS con tokens en `dashboard.css` (`.quiz-config*`). Verificado: `npm run build` limpio + prueba aislada de los 4 modos de mezcla (flags apagados = salida idéntica 100/100; cada flag actúa solo sobre lo suyo; lectura de flags correcta en 6 combinaciones; original sin mutar). **Sin MySQL local: e2e (toggle → publicar → jugar como estudiante) queda para producción tras el deploy.**
+
+> **Quiz: preguntas y alternativas barajadas por partida (2026-07-17, solo frontend):** `QuizInteractivo.jsx` ahora baraja el orden de las preguntas y, dentro de cada una, el orden de las alternativas remapeando las letras (la correcta apunta siempre a su nueva letra) en cada montaje del reproductor — mismo patrón `mezclar` (Fisher–Yates) que ya usaban memorama/línea/completar/clasificador, definido localmente para evitar un import circular con `juegosComunes.jsx`. La configuración del reto NUNCA se muta (copias nuevas); el editor del docente y `configuracion_json` conservan el orden canónico. Cubre estudiante, misiones y vista previa del docente (todos montan el mismo reproductor). Casos borde manejados: alternativas con letras faltantes o vacías se compactan a letras contiguas desde A; preguntas con <2 alternativas reales no se barajan; `correcta` en minúscula/con espacios se normaliza como ya hacía `PreguntaCard`. Verificado: `npm run build` limpio + prueba aislada de la lógica (500 corridas: sin pérdida de alternativas/justificación/`_banco_id`, correcta siempre remapeada, original sin mutar). **Sin MySQL local: e2e (jugar quiz como estudiante, repetirlo y ver otro orden) queda para producción tras el deploy.**
 
 > **SPEC-012 — Editores de juegos consistentes (2026-07-16, Fases 1-3 en código; solo frontend, sin migración):**
 > - **Fase 1 — Misión narrativa editable:** `GeneradorMision.jsx` pasó de vista de solo lectura a editor completo — título, introducción, final y, por desafío: narrativa, pregunta, alternativas A/B/C con radio de correcta y pista; añadir/quitar desafíos (respetando el mínimo de 3 del validador); selectores de **dificultad** y **curso** (como los juegos genéricos); botón **Guardar borrador**. Los borradores se sincronizan con PATCH (SPEC-011); un reto publicado no se edita en caliente. `_tema`/`_tematica` siguen como metadatos aditivos en la configuración.

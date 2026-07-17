@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import RocketLaunchRoundedIcon from '@mui/icons-material/RocketLaunchRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
-import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import { publicarReto } from '../../services/retosService';
 import { authFetch } from '../../services/authService';
@@ -14,7 +13,6 @@ import { useHistorialRetos, HistorialActividades } from '../../components/juegos
 import { PreviewJuegoModal } from '../../components/juegos/PreviewJuegoModal';
 import { BarraAccionesEditor } from '../../components/juegos/BarraAccionesEditor';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
-import LibraryAddRoundedIcon from '@mui/icons-material/LibraryAddRounded';
 import '../../components/mision/misionNarrativa.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -72,6 +70,13 @@ export function GeneradorMision({ materia = 'la materia' }) {
         useHistorialRetos('mision', materia);
     const [cargando, setCargando] = useState(false);
     const [guardando, setGuardando] = useState(false);
+    // SPEC-013 Fase 2: la entrada "Generarla automáticamente" del menú lleva
+    // al formulario de IA (hasta que la Fase 7 lo convierta en modal).
+    const temaRef = useRef(null);
+    const irAlFormularioIA = () => {
+        temaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        temaRef.current?.focus({ preventScroll: true });
+    };
     // SPEC-012: vista previa como estudiante (modo prueba).
     const [previewAbierta, setPreviewAbierta] = useState(false);
     const [error, setError] = useState('');
@@ -229,6 +234,7 @@ export function GeneradorMision({ materia = 'la materia' }) {
                     <span>Tema de la lección</span>
                     <input
                         type="text"
+                        ref={temaRef}
                         value={tema}
                         onChange={(e) => setTema(e.target.value)}
                         placeholder="Ej. Sumas hasta 100, los animales vertebrados…"
@@ -353,41 +359,44 @@ export function GeneradorMision({ materia = 'la materia' }) {
                         ))}
                     </div>
 
-                    {/* Barra unificada (SPEC-012): mismas acciones en todos los editores. */}
-                    <BarraAccionesEditor acciones={[
-                        {
-                            id: 'manual',
-                            label: 'Añadir desafío manual',
-                            Icon: AddRoundedIcon,
-                            onClick: agregarDesafio,
+                    {/* SPEC-013 Fase 2: botón único "Agregar" con menú por acciones.
+                        La misión es una historia con capítulos conectados: no usa el
+                        banco (SPEC-013 §3), esas entradas NO aparecen. */}
+                    <BarraAccionesEditor
+                        agregar={{
+                            label: 'Agregar desafíos',
+                            pregunta: '¿Cómo deseas agregarlos?',
                             disabled: guardando,
-                            title: 'Añade un capítulo vacío y escríbelo aquí mismo'
-                        },
-                        {
-                            id: 'banco',
-                            label: 'Añadir del banco',
-                            Icon: LibraryAddRoundedIcon,
-                            disabled: true,
-                            title: 'La misión es una historia completa con capítulos conectados; no usa el banco de preguntas sueltas'
-                        },
-                        {
-                            id: 'ia',
-                            label: 'Añadir con IA',
-                            Icon: AutoAwesomeRoundedIcon,
-                            disabled: true,
-                            title: 'Para otra aventura con IA, genera de nuevo desde el formulario de arriba'
-                        },
-                        {
-                            id: 'preview',
-                            label: 'Vista previa',
-                            Icon: VisibilityRoundedIcon,
-                            onClick: () => setPreviewAbierta(true),
-                            disabled: guardando || !desafios.length,
-                            title: desafios.length
-                                ? 'Juega la misión como la verá el estudiante (sin XP ni progreso)'
-                                : 'Añade al menos un desafío para previsualizar'
-                        }
-                    ]} />
+                            opciones: [
+                                {
+                                    id: 'escribir',
+                                    emoji: '📝',
+                                    titulo: 'Escribir un desafío',
+                                    detalle: 'Añade un capítulo vacío y escríbelo aquí mismo.',
+                                    onClick: agregarDesafio
+                                },
+                                {
+                                    id: 'generar',
+                                    emoji: '🤖',
+                                    titulo: 'Generar otra aventura',
+                                    detalle: 'Dale un tema y la IA crea una historia nueva completa.',
+                                    onClick: irAlFormularioIA
+                                }
+                            ]
+                        }}
+                        acciones={[
+                            {
+                                id: 'preview',
+                                label: 'Vista previa',
+                                Icon: VisibilityRoundedIcon,
+                                onClick: () => setPreviewAbierta(true),
+                                disabled: guardando || !desafios.length,
+                                title: desafios.length
+                                    ? 'Juega la misión como la verá el estudiante (sin XP ni progreso)'
+                                    : 'Añade al menos un desafío para previsualizar'
+                            }
+                        ]}
+                    />
 
                     <label className="quiz-field">
                         <span>Final (cómo se celebra el triunfo)</span>

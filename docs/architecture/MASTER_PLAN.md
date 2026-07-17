@@ -6,7 +6,7 @@ Roadmap de GamificApp: fases, backlog priorizado, dependencias y riesgos. El est
 
 # Última actualización
 
-2026-07-09 (SPEC-006 implementada: Centro de Trabajo Docente con IA)
+2026-07-17 (SPEC-013 aprobada: Editor de actividades universal — diseño congelado, implementación por fases)
 
 # Responsable
 
@@ -22,6 +22,7 @@ Fabrizio Zurita (Extun)
 | 3 | DevOS documental | Sistema documental — **cerrado y simplificado** en la consolidación 2026-07-07 (START_HERE + 4 docs vivos) | ✅ Hecho |
 | 3.5 | Centro de Administración (SPEC-002 + SPEC-003) | Materias/cursos/institución dinámicos, TablaPro, roles y permisos de admin, auditoría, papelera, sidebar agrupado | ✅ Hecho en código y **desplegado en Aiven** (migraciones 002-004 confirmadas en producción el 2026-07-10, ver `CURRENT_STATE.md`) |
 | 3.6 | Centro de Trabajo Docente (SPEC-006) | 3 juegos nuevos (memorama, línea del tiempo, completar), IA genérica por registro, actividad sorpresa, adaptar con IA, Biblioteca IA con papelera/favoritas/estadísticas, Libro de Calificaciones editable | ✅ Hecho en código (2026-07-09) — **pendiente: migración 008 a Aiven + deploy + prueba end-to-end con BD** |
+| 3.7 | Editor de actividades universal (SPEC-013) | Botón único "Agregar" con menú por acciones, lenguaje docente (sin "Banco"/"IA"/"manual"), toggles "Mezclar" del quiz, selección automática desde preguntas guardadas, autoguardado unificado, modal IA único | 🟡 Aprobada 2026-07-17 — diseño congelado, Fases 1-7 por implementar (Fase 8 shell post-tesis) |
 | 4 | **Épica 1: Experiencia del estudiante** | Rediseño completo del lado del niño en 5 specs (ver §2) | 🟡 En curso (auditoría y SPEC-001 redactadas; nada implementado) |
 | 5 | Módulos incompletos | Libro de Calificaciones, 3 logros faltantes, UI de edición de docente | ⚪ Pendiente (antes de la defensa, si hay tiempo) |
 | 6 | Post-tesis | Multi-institución, archivos fuera de la BD, fallback de IA, memoria del asistente | ⚪ Futuro |
@@ -66,8 +67,8 @@ Insumos: `docs/audit/Auditoria-UX-Estudiante-v1.md`, `docs/specifications/SPEC-0
 
 ### Posibles extensiones del Banco de Preguntas (SPEC-010, anotadas 2026-07-16)
 
-18. Banco para el **Clasificador**: sus elementos no son ítems autónomos (dependen de las categorías de cada actividad); exigiría guardar "elemento + categoría" o categorías completas como unidad — diseño propio antes de implementar.
-19. "Banco de misiones" para **Misión Narrativa**: reutilizar la historia COMPLETA (duplicar/adaptar), concepto distinto al banco de ítems atómicos actual.
+18. Banco para el **Clasificador**: analizado en SPEC-013 (2026-07-17) — la unidad viable es el **"grupo de clasificación" completo** (todas las categorías + elementos de una actividad como un solo ítem reutilizable, nunca categorías sueltas). Viable y coherente con el modelo snapshot+`_banco_id`, pero diferido a post-tesis por costo/beneficio.
+19. "Banco de misiones" para **Misión Narrativa**: analizado y **descartado conscientemente** en SPEC-013 (2026-07-17) — reutilizar desafíos sueltos rompe la narrativa (su valor pedagógico central) y adaptarla con IA al insertar es costo desproporcionado. Si se retoma, el concepto correcto es reutilizar la historia COMPLETA vía duplicar/adaptar (`/api/ia/adaptar`), no ítems atómicos.
 
 ## 4. Dependencias entre items del backlog
 

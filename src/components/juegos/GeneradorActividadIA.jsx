@@ -4,7 +4,7 @@
 // → vista previa editable → «Guardar borrador» o «Publicar».
 // El contenido SIEMPRE lo genera la IA en el servidor (POST /api/ia/generar),
 // que ya conoce materia, curso, dificultad e institución desde la BD.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import RocketLaunchRoundedIcon from '@mui/icons-material/RocketLaunchRounded';
 import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
@@ -12,8 +12,6 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import ArrowUpwardRoundedIcon from '@mui/icons-material/ArrowUpwardRounded';
 import ArrowDownwardRoundedIcon from '@mui/icons-material/ArrowDownwardRounded';
-import AddRoundedIcon from '@mui/icons-material/AddRounded';
-import LibraryAddRoundedIcon from '@mui/icons-material/LibraryAddRounded';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import { BarraAccionesEditor } from './BarraAccionesEditor';
 import { idPorNombre } from '../../services/materiasService';
@@ -60,6 +58,9 @@ const contarItems = (tipo, config) => {
 const CLAVE_ITEMS = { memorama: 'parejas', 'linea-tiempo': 'eventos', completar: 'frases' };
 const MAX_ITEMS = { memorama: 10, 'linea-tiempo': 8, completar: 8 };
 
+// Nombre del ítem en plural para el botón "Agregar…" (SPEC-013, Fase 2).
+const NOMBRE_ITEM_PLURAL = { memorama: 'parejas', 'linea-tiempo': 'eventos', completar: 'frases' };
+
 // Plantillas de ítem vacío para "Añadir manual" (SPEC-012, Fase 3): el ítem
 // aparece en la lista editable y el docente lo completa ahí mismo.
 const ITEM_VACIO = {
@@ -70,6 +71,13 @@ const ITEM_VACIO = {
 
 export function GeneradorActividadIA({ materia, tipo }) {
     const [tema, setTema] = useState('');
+    // SPEC-013 Fase 2: la entrada "Generar de nuevo" del menú lleva al
+    // formulario de IA (hasta que la Fase 7 lo convierta en modal).
+    const temaRef = useRef(null);
+    const irAlFormularioIA = () => {
+        temaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        temaRef.current?.focus({ preventScroll: true });
+    };
     const [cantidad, setCantidad] = useState(CANTIDADES[tipo]?.[1] || 5);
     const [dificultad, setDificultad] = useState('media');
     const [cursoId, setCursoId] = useState('');
@@ -348,6 +356,7 @@ export function GeneradorActividadIA({ materia, tipo }) {
                     <span>Tema</span>
                     <input
                         type="text"
+                        ref={temaRef}
                         value={tema}
                         onChange={(e) => setTema(e.target.value)}
                         placeholder="Ej. Las partes de la planta"
@@ -513,48 +522,57 @@ export function GeneradorActividadIA({ materia, tipo }) {
                         </div>
                     )}
 
-                    {/* Barra unificada (SPEC-012): mismas acciones en todos los editores. */}
-                    <BarraAccionesEditor acciones={[
-                        {
-                            id: 'manual',
-                            label: `Añadir ${tipo === 'memorama' ? 'pareja' : tipo === 'linea-tiempo' ? 'evento' : 'frase'} manual`,
-                            Icon: AddRoundedIcon,
-                            onClick: () => editarConfig({
-                                [claveItems]: [...(config?.[claveItems] || []), ITEM_VACIO[tipo]()]
-                            }),
-                            disabled: guardando || items >= maxItems,
-                            title: items >= maxItems
-                                ? `Ya está el máximo de ${maxItems} ítems para esta actividad`
-                                : 'Añade un ítem vacío y complétalo aquí mismo'
-                        },
-                        {
-                            id: 'banco',
-                            label: 'Añadir del banco',
-                            Icon: LibraryAddRoundedIcon,
-                            onClick: () => setBancoAbierto(true),
-                            disabled: guardando || items >= maxItems,
-                            title: items >= maxItems
-                                ? `Ya está el máximo de ${maxItems} ítems para esta actividad`
-                                : 'Reutiliza ítems que ya creaste antes (se insertan como copia)'
-                        },
-                        {
-                            id: 'ia',
-                            label: 'Añadir con IA',
-                            Icon: AutoAwesomeRoundedIcon,
-                            disabled: true,
-                            title: 'Para pedir más ítems a la IA, genera de nuevo desde el formulario de arriba (elige la cantidad ahí)'
-                        },
-                        {
-                            id: 'preview',
-                            label: 'Vista previa',
-                            Icon: VisibilityRoundedIcon,
-                            onClick: () => setPreviewAbierta(true),
-                            disabled: guardando || !items,
-                            title: items
-                                ? 'Juega la actividad como la verá el estudiante (sin XP ni progreso)'
-                                : 'Añade al menos un ítem para previsualizar'
-                        }
-                    ]} />
+                    {/* SPEC-013 Fase 2: botón único "Agregar" con menú por acciones. */}
+                    <BarraAccionesEditor
+                        agregar={{
+                            label: `Agregar ${NOMBRE_ITEM_PLURAL[tipo]}`,
+                            pregunta: tipo === 'linea-tiempo' ? '¿Cómo deseas agregarlos?' : '¿Cómo deseas agregarlas?',
+                            disabled: guardando,
+                            opciones: [
+                                {
+                                    id: 'escribir',
+                                    emoji: '📝',
+                                    titulo: `Escribir ${NOMBRE_ITEM_PLURAL[tipo]}`,
+                                    detalle: items >= maxItems
+                                        ? `Ya está el máximo de ${maxItems} para esta actividad.`
+                                        : 'Añade un ítem vacío y complétalo aquí mismo.',
+                                    disabled: items >= maxItems,
+                                    onClick: () => editarConfig({
+                                        [claveItems]: [...(config?.[claveItems] || []), ITEM_VACIO[tipo]()]
+                                    })
+                                },
+                                {
+                                    id: 'generar',
+                                    emoji: '🤖',
+                                    titulo: 'Generar de nuevo',
+                                    detalle: 'Dale otro tema o cantidad y la IA crea una actividad nueva.',
+                                    onClick: irAlFormularioIA
+                                },
+                                {
+                                    id: 'reutilizar',
+                                    emoji: '📚',
+                                    titulo: `Reutilizar ${NOMBRE_ITEM_PLURAL[tipo]}`,
+                                    detalle: items >= maxItems
+                                        ? `Ya está el máximo de ${maxItems} para esta actividad.`
+                                        : 'Elige entre lo que ya has usado antes.',
+                                    disabled: items >= maxItems,
+                                    onClick: () => setBancoAbierto(true)
+                                }
+                            ]
+                        }}
+                        acciones={[
+                            {
+                                id: 'preview',
+                                label: 'Vista previa',
+                                Icon: VisibilityRoundedIcon,
+                                onClick: () => setPreviewAbierta(true),
+                                disabled: guardando || !items,
+                                title: items
+                                    ? 'Juega la actividad como la verá el estudiante (sin XP ni progreso)'
+                                    : 'Añade al menos un ítem para previsualizar'
+                            }
+                        ]}
+                    />
 
                     <div className="clasificador-publicar-barra">
                         <p className="clasificador-publicar-hint">

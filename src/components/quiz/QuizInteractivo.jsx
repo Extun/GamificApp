@@ -11,6 +11,47 @@ import './quizInteractivo.css';
 
 const LETRAS = ['A', 'B', 'C', 'D'];
 
+// Mezcla no destructiva (Fisher–Yates). Local para evitar un import circular
+// con juegosComunes.jsx, que a su vez importa LogroToast desde este archivo.
+const mezclar = (arr) => {
+    const copia = [...arr];
+    for (let i = copia.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copia[i], copia[j]] = [copia[j], copia[i]];
+    }
+    return copia;
+};
+
+// Baraja el orden de las preguntas y, dentro de cada una, el orden de las
+// alternativas reasignando las letras (la correcta se remapea a su nueva letra).
+// SPEC-013 Fase 1: cada mezcla es configurable por quiz vía `configuracion_json`
+// (`mezclar_preguntas` / `mezclar_respuestas`); ausentes = true (compatibilidad
+// con quizzes publicados antes de existir los flags).
+// Nunca muta la configuración original del reto: devuelve copias nuevas.
+const barajarQuiz = (preguntas, { mezclarPreguntas = true, mezclarRespuestas = true } = {}) => {
+    if (!Array.isArray(preguntas)) return [];
+    const base = mezclarPreguntas ? mezclar(preguntas) : preguntas;
+    if (!mezclarRespuestas) return base;
+    return base.map((p) => {
+        const entradas = LETRAS
+            .map((letra) => [letra, p.alternativas?.[letra]])
+            .filter(([, texto]) => typeof texto === 'string' && texto.trim() !== '');
+        // Con menos de 2 alternativas reales no hay nada que barajar.
+        if (entradas.length < 2) return p;
+
+        const correctaOriginal = (p.correcta || '').trim().toUpperCase().charAt(0);
+        const barajadas = mezclar(entradas);
+        const alternativas = {};
+        let correcta = correctaOriginal;
+        barajadas.forEach(([letraOriginal, texto], i) => {
+            const nuevaLetra = LETRAS[i];
+            alternativas[nuevaLetra] = texto;
+            if (letraOriginal === correctaOriginal) correcta = nuevaLetra;
+        });
+        return { ...p, alternativas, correcta };
+    });
+};
+
 // Tarjeta interactiva de una pregunta: alternativas como botones clicables que
 // marcan acierto/error y revelan la justificación.
 // `onResponder(esCorrecta)` es opcional y permite a un contenedor superior (p. ej.
@@ -119,6 +160,17 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
     // Reinicia el marcador si cambia el set de preguntas (otro quiz seleccionado).
     const claveQuiz = useMemo(() => preguntas.map((p) => p.pregunta).join('|'), [preguntas]);
 
+    // Cada partida baraja preguntas y alternativas según la configuración del
+    // reto (estable mientras se juega: solo se rebaraja al cambiar de quiz o
+    // volver a montar el componente). Flags ausentes = mezclar (retrocompatible).
+    const mezclarPreguntas = reto?.configuracion?.mezclar_preguntas !== false;
+    const mezclarRespuestas = reto?.configuracion?.mezclar_respuestas !== false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const preguntasJugables = useMemo(
+        () => barajarQuiz(preguntas, { mezclarPreguntas, mezclarRespuestas }),
+        [claveQuiz, mezclarPreguntas, mezclarRespuestas]
+    );
+
     // Evita otorgar XP/logros más de una vez por quiz completado.
     const recompensado = useRef(false);
     useEffect(() => {
@@ -186,7 +238,7 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
                 </div>
             )}
 
-            {preguntas.map((p, i) => (
+            {preguntasJugables.map((p, i) => (
                 <PreguntaCard
                     key={i}
                     pregunta={p}

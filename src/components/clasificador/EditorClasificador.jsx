@@ -14,7 +14,6 @@ import { PUNTOS_POR_ACIERTO } from '../../services/gamificationService';
 import { useHistorialRetos, HistorialActividades } from '../juegos/HistorialActividades';
 import { PreviewJuegoModal } from '../juegos/PreviewJuegoModal';
 import { BarraAccionesEditor } from '../juegos/BarraAccionesEditor';
-import LibraryAddRoundedIcon from '@mui/icons-material/LibraryAddRounded';
 import './editorClasificador.css';
 
 // Editor no-code del juego 'Clasificador de Objetos'. El docente define el
@@ -43,6 +42,13 @@ export function EditorClasificador({ materia }) {
     // que memorama/línea del tiempo/completar).
     const [temaIA, setTemaIA] = useState('');
     const [generandoIA, setGenerandoIA] = useState(false);
+    // SPEC-013 Fase 2: la entrada "Generarlas automáticamente" del menú lleva
+    // al formulario de IA (hasta que la Fase 7 lo convierta en modal).
+    const temaIARef = useRef(null);
+    const irAlFormularioIA = () => {
+        temaIARef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        temaIARef.current?.focus({ preventScroll: true });
+    };
     const [publicando, setPublicando] = useState(false);
     // Tras publicar, el botón queda bloqueado hasta que el docente edite algo:
     // así un doble clic no crea el mismo juego dos veces.
@@ -223,6 +229,7 @@ export function EditorClasificador({ materia }) {
                     <span>Tema (para generar con IA)</span>
                     <input
                         type="text"
+                        ref={temaIARef}
                         value={temaIA}
                         onChange={(e) => setTemaIA(e.target.value)}
                         placeholder="Ej. Animales vertebrados e invertebrados"
@@ -307,41 +314,44 @@ export function EditorClasificador({ materia }) {
                 ))}
             </div>
 
-            {/* Barra unificada (SPEC-012): mismas acciones en todos los editores. */}
-            <BarraAccionesEditor acciones={[
-                {
-                    id: 'manual',
-                    label: 'Añadir categoría',
-                    Icon: AddRoundedIcon,
-                    onClick: agregarCategoria,
+            {/* SPEC-013 Fase 2: botón único "Agregar" con menú por acciones.
+                El clasificador no usa el banco (decisión de diseño, SPEC-013 §3):
+                esas entradas NO aparecen, en vez de mostrarse deshabilitadas. */}
+            <BarraAccionesEditor
+                agregar={{
+                    label: 'Agregar categorías',
+                    pregunta: '¿Cómo deseas agregarlas?',
                     disabled: publicando,
-                    title: 'Añade otra canasta; los elementos se escriben dentro de cada categoría'
-                },
-                {
-                    id: 'banco',
-                    label: 'Añadir del banco',
-                    Icon: LibraryAddRoundedIcon,
-                    disabled: true,
-                    title: 'El clasificador no usa el banco: sus elementos dependen de las categorías de cada juego'
-                },
-                {
-                    id: 'ia',
-                    label: 'Añadir con IA',
-                    Icon: AutoAwesomeRoundedIcon,
-                    disabled: true,
-                    title: 'Usa el formulario «Generar con IA» de arriba: llena título, categorías y elementos de una vez'
-                },
-                {
-                    id: 'preview',
-                    label: 'Vista previa',
-                    Icon: VisibilityRoundedIcon,
-                    onClick: () => setPreviewAbierta(true),
-                    disabled: publicando || !totalElementos,
-                    title: totalElementos
-                        ? 'Juega el clasificador como lo verá el estudiante (sin XP ni progreso)'
-                        : 'Añade al menos un elemento para previsualizar'
-                }
-            ]} />
+                    opciones: [
+                        {
+                            id: 'escribir',
+                            emoji: '📝',
+                            titulo: 'Escribir categorías',
+                            detalle: 'Añade una canasta y escribe sus elementos dentro.',
+                            onClick: agregarCategoria
+                        },
+                        {
+                            id: 'generar',
+                            emoji: '🤖',
+                            titulo: 'Generarlas automáticamente',
+                            detalle: 'Dale un tema y la IA crea título, canastas y elementos.',
+                            onClick: irAlFormularioIA
+                        }
+                    ]
+                }}
+                acciones={[
+                    {
+                        id: 'preview',
+                        label: 'Vista previa',
+                        Icon: VisibilityRoundedIcon,
+                        onClick: () => setPreviewAbierta(true),
+                        disabled: publicando || !totalElementos,
+                        title: totalElementos
+                            ? 'Juega el clasificador como lo verá el estudiante (sin XP ni progreso)'
+                            : 'Añade al menos un elemento para previsualizar'
+                    }
+                ]}
+            />
 
             {error && <p className="quiz-error">{error}</p>}
             {aviso && (

@@ -11,6 +11,14 @@ import bancoService from '../../services/bancoService';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
+// SPEC-013 Fase 1: la configuración completa del quiz que se persiste en
+// `configuracion_json` — preguntas + los dos flags de mezcla (default true).
+const configuracionDe = (quiz) => ({
+    preguntas: quiz.preguntas,
+    mezclar_preguntas: quiz.mezclarPreguntas !== false,
+    mezclar_respuestas: quiz.mezclarRespuestas !== false
+});
+
 export function GeneradorQuiz({ materia = 'la materia' }) {
     const [tema, setTema] = useState('');
     const [cantidad, setCantidad] = useState(3);
@@ -52,9 +60,19 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
         setQuizEdit(actualizado);
         if (actualizado.retoId && !actualizado.publicadoEnBD) {
             sincronizar(actualizado.retoId, {
-                configuracion: { preguntas: nuevasPreguntas },
+                configuracion: configuracionDe(actualizado),
                 xp_recompensa: Math.max(nuevasPreguntas.length, 1) * 100
             });
+        }
+    };
+
+    // SPEC-013 Fase 1: cambia un flag de mezcla ('mezclarPreguntas' o
+    // 'mezclarRespuestas') y lo sincroniza igual que una edición de preguntas.
+    const cambiarMezcla = (campo, valor) => {
+        const actualizado = { ...quizEdit, [campo]: valor, estado: 'borrador' };
+        setQuizEdit(actualizado);
+        if (actualizado.retoId && !actualizado.publicadoEnBD) {
+            sincronizar(actualizado.retoId, { configuracion: configuracionDe(actualizado) });
         }
     };
 
@@ -105,7 +123,7 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                 materiaId,
                 titulo: quizEdit.tema,
                 tipo: 'quiz',
-                configuracion: { preguntas },
+                configuracion: configuracionDe({ ...quizEdit, preguntas }),
                 xpRecompensa: preguntas.length * 100
             });
             setQuizEdit({ ...quizEdit, retoId: data?.id ?? quizEdit.retoId, preguntas, estado: 'publicado', publicadoEnBD: true });
@@ -159,7 +177,7 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                 const creado = await crearBorrador({
                     materiaId: idPorNombre(materia),
                     titulo: tema.trim(),
-                    configuracion: { preguntas: quiz },
+                    configuracion: { preguntas: quiz, mezclar_preguntas: true, mezclar_respuestas: true },
                     xpRecompensa: quiz.length * 100,
                     origen: 'ia'
                 });
@@ -167,7 +185,10 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
             } catch (err) {
                 console.warn('El borrador no se pudo guardar en el servidor:', err.message);
             }
-            setQuizEdit({ retoId, tema: tema.trim(), preguntas: quiz, estado: 'borrador', publicadoEnBD: false });
+            setQuizEdit({
+                retoId, tema: tema.trim(), preguntas: quiz, estado: 'borrador', publicadoEnBD: false,
+                mezclarPreguntas: true, mezclarRespuestas: true
+            });
         } catch (err) {
             console.error('Error al generar el quiz:', err);
             const detalle = err?.message ? ` (${err.message})` : '';
@@ -216,7 +237,10 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                 tema: detalle.titulo,
                 preguntas: detalle.configuracion?.preguntas || [],
                 estado: detalle.estado,
-                publicadoEnBD: detalle.estado === 'publicado'
+                publicadoEnBD: detalle.estado === 'publicado',
+                // Flags ausentes en quizzes previos a SPEC-013 = mezclar (default).
+                mezclarPreguntas: detalle.configuracion?.mezclar_preguntas !== false,
+                mezclarRespuestas: detalle.configuracion?.mezclar_respuestas !== false
             });
         } catch (err) {
             setError(`No se pudo abrir la actividad: ${err.message}`);
@@ -304,11 +328,36 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                 />
             )}
 
+            {quizEdit && (
+                <details className="quiz-config">
+                    <summary>⚙ Configuración</summary>
+                    <label className="quiz-config-opcion">
+                        <input
+                            type="checkbox"
+                            checked={quizEdit.mezclarPreguntas !== false}
+                            onChange={(e) => cambiarMezcla('mezclarPreguntas', e.target.checked)}
+                        />
+                        <span>Mezclar el orden de las preguntas en cada intento</span>
+                    </label>
+                    <label className="quiz-config-opcion">
+                        <input
+                            type="checkbox"
+                            checked={quizEdit.mezclarRespuestas !== false}
+                            onChange={(e) => cambiarMezcla('mezclarRespuestas', e.target.checked)}
+                        />
+                        <span>Mezclar el orden de las opciones en cada intento</span>
+                    </label>
+                    <p className="quiz-config-ayuda">
+                        Así cada estudiante ve un Quiz distinto, aunque sea el mismo para todos.
+                    </p>
+                </details>
+            )}
+
             {previewAbierta && quizEdit && (
                 <PreviewJuegoModal
                     tipo="quiz"
                     titulo={quizEdit.tema}
-                    configuracion={{ preguntas: quizEdit.preguntas }}
+                    configuracion={configuracionDe(quizEdit)}
                     onCerrar={() => setPreviewAbierta(false)}
                 />
             )}

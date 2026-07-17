@@ -1,12 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
-import AddRoundedIcon from '@mui/icons-material/AddRounded';
-import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import RocketLaunchRoundedIcon from '@mui/icons-material/RocketLaunchRounded';
 import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded';
-import LibraryAddRoundedIcon from '@mui/icons-material/LibraryAddRounded';
 import BookmarkAddRoundedIcon from '@mui/icons-material/BookmarkAddRounded';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import { BarraAccionesEditor } from '../juegos/BarraAccionesEditor';
@@ -209,45 +206,57 @@ export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar,
                 })}
             </div>
 
-            {/* Barra unificada (SPEC-012): mismas acciones en todos los editores. */}
-            <BarraAccionesEditor acciones={[
-                {
-                    id: 'manual',
-                    label: 'Añadir pregunta manual',
-                    Icon: AddRoundedIcon,
-                    onClick: añadirPregunta,
-                    disabled: cargandoIA
-                },
-                {
-                    id: 'banco',
-                    label: 'Añadir del banco',
-                    Icon: LibraryAddRoundedIcon,
-                    onClick: onAbrirBanco,
-                    disabled: !onAbrirBanco || cargandoIA,
-                    title: 'Reutiliza preguntas que ya creaste antes (se insertan como copia)'
-                },
-                {
-                    id: 'ia',
-                    label: cargandoIA ? 'Generando…' : 'Añadir con IA',
-                    Icon: AutoAwesomeRoundedIcon,
-                    disabled: cargandoIA || !onAgregarIA,
-                    title: '¿Cuántas preguntas nuevas pido a la IA?',
-                    opciones: OPCIONES_IA.map((n) => ({
-                        label: `${n} ${n === 1 ? 'pregunta' : 'preguntas'}`,
-                        onClick: () => añadirConIA(n)
-                    }))
-                },
-                {
-                    id: 'preview',
-                    label: 'Vista previa',
-                    Icon: VisibilityRoundedIcon,
-                    onClick: onVistaPrevia,
-                    disabled: !onVistaPrevia || !total || cargandoIA,
-                    title: total
-                        ? 'Juega el quiz como lo verá el estudiante (sin XP ni progreso)'
-                        : 'Añade al menos una pregunta para previsualizar'
-                }
-            ]} />
+            {/* SPEC-013 Fase 2: botón único "Agregar" con menú por acciones. */}
+            <BarraAccionesEditor
+                agregar={{
+                    label: cargandoIA ? 'Generando…' : 'Agregar preguntas',
+                    pregunta: '¿Cómo deseas agregarlas?',
+                    disabled: cargandoIA,
+                    opciones: [
+                        {
+                            id: 'escribir',
+                            emoji: '📝',
+                            titulo: 'Escribir preguntas',
+                            detalle: 'Redacta tú mismo cada pregunta y sus opciones.',
+                            onClick: añadirPregunta
+                        },
+                        {
+                            id: 'generar',
+                            emoji: '🤖',
+                            titulo: 'Generarlas automáticamente',
+                            detalle: 'Dale un tema y la IA las redacta por ti.',
+                            disabled: !onAgregarIA,
+                            sub: {
+                                pregunta: '¿Cuántas preguntas?',
+                                opciones: OPCIONES_IA.map((n) => ({
+                                    label: `${n} ${n === 1 ? 'pregunta' : 'preguntas'}`,
+                                    onClick: () => añadirConIA(n)
+                                }))
+                            }
+                        },
+                        {
+                            id: 'reutilizar',
+                            emoji: '📚',
+                            titulo: 'Reutilizar preguntas',
+                            detalle: 'Elige entre las preguntas que ya has usado antes.',
+                            disabled: !onAbrirBanco,
+                            onClick: onAbrirBanco
+                        }
+                    ]
+                }}
+                acciones={[
+                    {
+                        id: 'preview',
+                        label: 'Vista previa',
+                        Icon: VisibilityRoundedIcon,
+                        onClick: onVistaPrevia,
+                        disabled: !onVistaPrevia || !total || cargandoIA,
+                        title: total
+                            ? 'Juega el quiz como lo verá el estudiante (sin XP ni progreso)'
+                            : 'Añade al menos una pregunta para previsualizar'
+                    }
+                ]}
+            />
 
             <div className="editor-publicar-barra">
                 <p className="editor-publicar-hint">
