@@ -2,7 +2,7 @@
 
 # Última actualización
 
-2026-07-17
+2026-07-18
 
 # Responsable
 
@@ -48,6 +48,8 @@ Fabrizio Zurita (Extun)
 ---
 
 ## Historial detallado (bitácora, no hace falta leer para trabajar — consultar solo para contexto de un cambio pasado)
+
+> **SPEC-014 Fase 6 — Estado de acceso y regeneración en los paneles (2026-07-18):** `GET /api/docente/mis-estudiantes` ahora devuelve TODOS los estudiantes del docente — los de sus cursos asignados (`docente_curso`, incluye importados por Excel aún pendientes) **más** los registrados con sus invitaciones (unión, no sustitución: nadie desaparece si cambian las asignaciones) — con `pendiente` (derivado: `codigo_acceso_hash` presente y sin usar) y `codigo_acceso_pista`. Los chequeos de propiedad del docente (`resetear-pin`, `estudianteDelDocente`/ficha/retroalimentación) usan el mismo criterio doble. `GET /api/admin/estudiantes` añade los mismos campos (aditivo). UI docente ("Mis Estudiantes"): la lista principal pasa a llamarse **"Mis estudiantes"** y va primero; columna **"Acceso"** con badge Pendiente (con pista `ABC…`) / Activado; pendientes solo ofrecen "Regenerar código" (sin ficha/restablecer, que no aplican antes de activar); el código nuevo se muestra UNA vez en un modal; "Mis códigos emitidos" → "Códigos de invitación emitidos". UI admin: columna "Acceso" + botón regenerar (🔑) en pendientes con el mismo modal. `estudiantesService.regenerarCodigo()` consume el endpoint ya existente de F2. Los estudiantes pre-SPEC-014 (sin `codigo_acceso_hash`) aparecen como Activado. El refresco tras importar ya estaba cableado (`onImportado`). Verificado: `npm run build` limpio + `node --check` en rutas. **Sin MySQL local: e2e (importar→Pendiente, activar→Activado, regenerar invalida el código anterior) en producción tras el deploy.**
 
 > **Acordeón en los editores de Misión/Memorama/Línea/Completar (2026-07-18, solo frontend; feedback de Fabrizio — campos de edición demasiado grandes):** los 4 editores adoptan el **mismo acordeón del quiz** (clases `editor-item*` de `editorQuiz.css`, ahora compartidas): cada desafío/pareja/evento/frase se colapsa a una fila (número o ✓ de completo + resumen del texto + chevron) y **solo se expande el que se edita** (single-open, "Escribir" abre el ítem nuevo). Misión: narrativa/pregunta/opciones A-B-C con el layout `editor-alt-row` del quiz + pista + Eliminar en el cuerpo. Línea del tiempo: Subir/Bajar como botones con texto en el cuerpo (el acordeón sigue al ítem movido). Completar: frase + opciones con radio numerado estilo quiz. Sin cambios de datos ni de lógica: mismos handlers, mismo `configuracion_json`. Verificado: `npm run build` limpio. **Sin MySQL local: revisión visual/e2e de los 4 editores (incl. móvil) en producción tras el deploy.**
 

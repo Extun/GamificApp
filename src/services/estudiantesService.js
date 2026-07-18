@@ -28,4 +28,9 @@ export const confirmarImportacion = (cursoId, filas) =>
         body: JSON.stringify({ curso_id: cursoId, filas })
     });
 
-export default { analizarImportacion, confirmarImportacion };
+// Código de activación nuevo (el anterior queda invalidado en el acto).
+// La respuesta trae el código en claro UNA sola vez.
+export const regenerarCodigo = (usuarioId) =>
+    pedir(`/api/estudiantes/${usuarioId}/regenerar-codigo`, { method: 'POST' });
+
+export default { analizarImportacion, confirmarImportacion, regenerarCodigo };

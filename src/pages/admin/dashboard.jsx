@@ -29,8 +29,10 @@ import {
     EmptyState,
     SectionCard,
     DashboardHeader,
+    ModalPanel,
     formatearFecha
 } from '../../components/dashboard/DashboardWidgets';
+import estudiantesService from '../../services/estudiantesService';
 import LocalLibraryRoundedIcon from '@mui/icons-material/LocalLibraryRounded';
 import LibraryBooksRoundedIcon from '@mui/icons-material/LibraryBooksRounded';
 import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
@@ -322,6 +324,25 @@ export function Dashboard() {
     const [fichaEstudiante, setFichaEstudiante] = useState(null);
     // Asistente de importación de estudiantes por Excel (SPEC-014).
     const [importando, setImportando] = useState(false);
+    // Código de activación recién regenerado: se muestra UNA vez en un modal
+    // para que el docente lo anote y se lo entregue al estudiante.
+    const [codigoNuevo, setCodigoNuevo] = useState(null);
+    const [regenerando, setRegenerando] = useState(false);
+
+    const handleRegenerarCodigo = async (est) => {
+        if (regenerando) return;
+        try {
+            setErrorMaterial('');
+            setRegenerando(true);
+            const data = await estudiantesService.regenerarCodigo(est.usuario_id);
+            setCodigoNuevo({ nombre: est.nombre_completo, codigo: data.codigo });
+            await cargarEstudiantes();
+        } catch (err) {
+            setErrorMaterial(err.message);
+        } finally {
+            setRegenerando(false);
+        }
+    };
 
     const usuarioActual = authService.getUsuario();
     const nombreDocente = usuarioActual?.nombre_completo || usuarioActual?.username || 'docente';
@@ -881,7 +902,7 @@ export function Dashboard() {
                     <div className="home-doc">
                         <div>
                             <h1 style={{pointerEvents:"none"}}>Mis Estudiantes</h1>
-                            <p className="contenido-sub" style={{ marginBottom: 0 }}>Genera códigos de invitación para que tus estudiantes se registren, y ayúdalos si olvidan su PIN.</p>
+                            <p className="contenido-sub" style={{ marginBottom: 0 }}>Todos tus estudiantes en una sola lista: regístralos con códigos de invitación o impórtalos desde Excel, y ayúdalos si olvidan su PIN o su código.</p>
                         </div>
 
                         {avisoOk && (
@@ -897,6 +918,75 @@ export function Dashboard() {
                                 <button onClick={() => setErrorMaterial('')}>Entendido</button>
                             </div>
                         )}
+
+                        <section className="card">
+                            <div className="card-head">
+                                <h3>Mis estudiantes</h3>
+                                <div className="section-head-extra">
+                                    <span className="card-tag">{misEstudiantes.length}</span>
+                                    {cursos.length > 0 && (
+                                        <button type="button" className="section-accion" onClick={() => setImportando(true)}>
+                                            📥 Importar desde Excel
+                                        </button>
+                                    )}
+                                    <button type="button" className="section-accion" onClick={() => setPagina('ranking')}>
+                                        Ver ranking completo
+                                    </button>
+                                </div>
+                            </div>
+                            <table className="admin-tabla">
+                                <thead>
+                                    <tr><th>Nombre</th><th>Curso</th><th>XP</th><th>Acceso</th><th>Acciones</th></tr>
+                                </thead>
+                                <tbody>
+                                    {misEstudiantes.map((est) => (
+                                        <tr key={est.usuario_id}>
+                                            <td>{est.nombre_completo}</td>
+                                            <td>{est.curso}</td>
+                                            <td>{est.xp_total}</td>
+                                            <td>
+                                                {est.pendiente ? (
+                                                    <span
+                                                        className="inv-estado inv-pendiente"
+                                                        title={est.codigo_acceso_pista ? `Su código de activación empieza por ${est.codigo_acceso_pista}` : 'Aún no usa su código de activación'}
+                                                    >
+                                                        Pendiente{est.codigo_acceso_pista ? ` · ${est.codigo_acceso_pista}…` : ''}
+                                                    </span>
+                                                ) : (
+                                                    <span className="inv-estado inv-usado">Activado</span>
+                                                )}
+                                            </td>
+                                            <td className="admin-acciones">
+                                                {est.pendiente ? (
+                                                    <button
+                                                        title="Generar un código de activación nuevo (el anterior deja de servir)"
+                                                        disabled={regenerando}
+                                                        onClick={() => handleRegenerarCodigo(est)}
+                                                    >
+                                                        <VpnKeyRoundedIcon sx={{ fontSize: '1.1rem' }} /> Regenerar código
+                                                    </button>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            title="Ver ficha del estudiante"
+                                                            onClick={() => setFichaEstudiante(est)}
+                                                        >
+                                                            <VisibilityRoundedIcon sx={{ fontSize: '1.1rem' }} /> Ver ficha
+                                                        </button>
+                                                        <button title="Restablecer PIN a su fecha de nacimiento" onClick={() => handleResetPin(est)}>
+                                                            <RestartAltRoundedIcon sx={{ fontSize: '1.1rem' }} /> Restablecer
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {!misEstudiantes.length && (
+                                        <tr><td colSpan={5} className="vacio-msg">Aún no tienes estudiantes: genera códigos de invitación o importa tu lista desde Excel.</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </section>
 
                         <section className="card">
                             <div className="card-head">
@@ -938,52 +1028,7 @@ export function Dashboard() {
 
                         <section className="card">
                             <div className="card-head">
-                                <h3>Estudiantes registrados con mis códigos</h3>
-                                <div className="section-head-extra">
-                                    <span className="card-tag">{misEstudiantes.length}</span>
-                                    {cursos.length > 0 && (
-                                        <button type="button" className="section-accion" onClick={() => setImportando(true)}>
-                                            📥 Importar desde Excel
-                                        </button>
-                                    )}
-                                    <button type="button" className="section-accion" onClick={() => setPagina('ranking')}>
-                                        Ver ranking completo
-                                    </button>
-                                </div>
-                            </div>
-                            <table className="admin-tabla">
-                                <thead>
-                                    <tr><th>Nombre</th><th>Curso</th><th>XP</th><th>PIN</th></tr>
-                                </thead>
-                                <tbody>
-                                    {misEstudiantes.map((est) => (
-                                        <tr key={est.usuario_id}>
-                                            <td>{est.nombre_completo}</td>
-                                            <td>{est.curso}</td>
-                                            <td>{est.xp_total}</td>
-                                            <td className="admin-acciones">
-                                                <button
-                                                    title="Ver ficha del estudiante"
-                                                    onClick={() => setFichaEstudiante(est)}
-                                                >
-                                                    <VisibilityRoundedIcon sx={{ fontSize: '1.1rem' }} /> Ver ficha
-                                                </button>
-                                                <button title="Restablecer PIN a su fecha de nacimiento" onClick={() => handleResetPin(est)}>
-                                                    <RestartAltRoundedIcon sx={{ fontSize: '1.1rem' }} /> Restablecer
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {!misEstudiantes.length && (
-                                        <tr><td colSpan={4} className="vacio-msg">Aún no hay estudiantes registrados con tus códigos.</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </section>
-
-                        <section className="card">
-                            <div className="card-head">
-                                <h3>Mis códigos emitidos</h3>
+                                <h3>Códigos de invitación emitidos</h3>
                                 <span className="card-tag">{invitaciones.length}</span>
                             </div>
                             <table className="admin-tabla">
@@ -1133,6 +1178,30 @@ export function Dashboard() {
                     onCerrar={() => setImportando(false)}
                     onImportado={cargarEstudiantes}
                 />
+            )}
+
+            {/* Código de activación regenerado (SPEC-014): se ve UNA sola vez. */}
+            {codigoNuevo && (
+                <ModalPanel
+                    titulo="Código de activación nuevo"
+                    subtitulo={codigoNuevo.nombre}
+                    onCerrar={() => setCodigoNuevo(null)}
+                    pie={
+                        <button type="button" className="upload-mini-btn" onClick={() => setCodigoNuevo(null)}>
+                            Ya lo anoté
+                        </button>
+                    }
+                >
+                    <div style={{ textAlign: 'center', display: 'grid', gap: 12 }}>
+                        <code style={{ fontSize: '2rem', letterSpacing: '0.35em', fontWeight: 700 }}>
+                            {codigoNuevo.codigo}
+                        </code>
+                        <p className="contenido-sub" style={{ margin: 0 }}>
+                            Anótalo o entrégaselo al estudiante ahora: no se puede volver a ver,
+                            solo regenerar. El código anterior ya no sirve.
+                        </p>
+                    </div>
+                </ModalPanel>
             )}
         </SidebarLayout>
     );

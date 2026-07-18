@@ -40,9 +40,11 @@ import {
     StatCard,
     SectionCard,
     EmptyState,
+    ModalPanel,
     formatearFecha,
     TablaPro
 } from '../../components/dashboard/DashboardWidgets';
+import estudiantesService from '../../services/estudiantesService';
 
 // Selector de materias como tarjetas pastel (asistente de creación de
 // docentes y modal de edición). El catálogo viene de la BD (SPEC-002):
@@ -171,6 +173,8 @@ export function AdminDashboard() {
 
     // Asistente de importación de estudiantes por Excel (SPEC-014).
     const [importando, setImportando] = useState(false);
+    // Código de activación regenerado: se muestra una sola vez.
+    const [codigoNuevo, setCodigoNuevo] = useState(null);
 
     // Modal "Editar asignaciones" de un docente existente.
     const [docenteEditando, setDocenteEditando] = useState(null);
@@ -596,7 +600,7 @@ export function AdminDashboard() {
                                             filas={estudiantes}
                                             buscar={(e) => `${e.nombre_completo} ${e.curso}`}
                                             placeholderBusqueda="Buscar por nombre o curso…"
-                                            cabecera={<tr><th>Estudiante</th><th>Curso</th><th>XP</th><th>Cód. emergencia</th><th>Acciones</th></tr>}
+                                            cabecera={<tr><th>Estudiante</th><th>Curso</th><th>XP</th><th>Acceso</th><th>Cód. emergencia</th><th>Acciones</th></tr>}
                                             renderFila={(e) => (
                                                 <tr key={e.usuario_id}>
                                                             <td>
@@ -609,9 +613,35 @@ export function AdminDashboard() {
                                                             </td>
                                                             <td><span className="curso-chip">{e.curso}</span></td>
                                                             <td><span className="xp-valor">⭐ {e.xp_total}</span></td>
+                                                            <td>
+                                                                {e.pendiente ? (
+                                                                    <span
+                                                                        className="inv-estado inv-pendiente"
+                                                                        title={e.codigo_acceso_pista ? `Su código de activación empieza por ${e.codigo_acceso_pista}` : 'Aún no usa su código de activación'}
+                                                                    >
+                                                                        Pendiente{e.codigo_acceso_pista ? ` · ${e.codigo_acceso_pista}…` : ''}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="inv-estado inv-usado">Activado</span>
+                                                                )}
+                                                            </td>
                                                             <td><code>{e.codigo_emergencia}</code></td>
                                                             <td>
                                                                 <div className="admin-acciones">
+                                                                    {e.pendiente && (
+                                                                        <button
+                                                                            title="Regenerar código de activación (el anterior deja de servir)"
+                                                                            aria-label={`Regenerar código de activación de ${e.nombre_completo}`}
+                                                                            onClick={() => ejecutar(
+                                                                                async () => {
+                                                                                    const r = await estudiantesService.regenerarCodigo(e.usuario_id);
+                                                                                    setCodigoNuevo({ nombre: e.nombre_completo, codigo: r.codigo });
+                                                                                }
+                                                                            )}
+                                                                        >
+                                                                            <VpnKeyRoundedIcon sx={{ fontSize: '1.1rem' }} />
+                                                                        </button>
+                                                                    )}
                                                                     <button
                                                                         title="Restablecer PIN"
                                                                         aria-label={`Restablecer PIN de ${e.nombre_completo}`}
@@ -881,6 +911,30 @@ export function AdminDashboard() {
                     onCerrar={() => setImportando(false)}
                     onImportado={cargar}
                 />
+            )}
+
+            {/* Código de activación regenerado (SPEC-014): se ve UNA sola vez. */}
+            {codigoNuevo && (
+                <ModalPanel
+                    titulo="Código de activación nuevo"
+                    subtitulo={codigoNuevo.nombre}
+                    onCerrar={() => setCodigoNuevo(null)}
+                    pie={
+                        <button type="button" className="upload-mini-btn" onClick={() => setCodigoNuevo(null)}>
+                            Ya lo anoté
+                        </button>
+                    }
+                >
+                    <div style={{ textAlign: 'center', display: 'grid', gap: 12 }}>
+                        <code style={{ fontSize: '2rem', letterSpacing: '0.35em', fontWeight: 700 }}>
+                            {codigoNuevo.codigo}
+                        </code>
+                        <p className="contenido-sub" style={{ margin: 0 }}>
+                            Anótalo o entrégaselo al estudiante ahora: no se puede volver a ver,
+                            solo regenerar. El código anterior ya no sirve.
+                        </p>
+                    </div>
+                </ModalPanel>
             )}
         </SidebarLayout>
     );

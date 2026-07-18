@@ -107,21 +107,30 @@ router.get('/invitaciones', async (req, res, next) => {
     }
 });
 
-// GET /api/docente/mis-estudiantes — estudiantes registrados con SUS
-// invitaciones (el admin ve todos desde su propio panel).
+// GET /api/docente/mis-estudiantes — TODOS los estudiantes del docente
+// (SPEC-014 F6): los de sus cursos asignados (docente_curso, incluye los
+// importados por Excel aún pendientes de activar) y, además, los que se
+// registraron con sus invitaciones (aunque el curso ya no esté asignado):
+// así nadie desaparece de la lista al cambiar asignaciones.
+// `pendiente` = importado que aún no usó su código de activación.
 router.get('/mis-estudiantes', async (req, res, next) => {
     try {
         const [filas] = await pool.query(
             `SELECT u.id AS usuario_id, u.nombre_completo, u.bloqueado_hasta,
+                    u.codigo_acceso_pista,
+                    (u.codigo_acceso_hash IS NOT NULL AND u.codigo_acceso_usado_en IS NULL) AS pendiente,
                     e.id AS estudiante_id, e.curso, e.xp_total, e.fecha_nacimiento
-             FROM invitaciones_estudiante i
-             JOIN usuarios u ON u.id = i.usuario_id
+             FROM usuarios u
              JOIN estudiantes e ON e.id = u.estudiante_id
-             WHERE i.docente_id = ? AND i.estado = 'usado' AND u.eliminado_en IS NULL
+             WHERE u.rol = 'estudiante' AND u.eliminado_en IS NULL
+               AND (EXISTS (SELECT 1 FROM docente_curso dc
+                            WHERE dc.docente_id = ? AND dc.curso_id = e.curso_id)
+                 OR EXISTS (SELECT 1 FROM invitaciones_estudiante i
+                            WHERE i.docente_id = ? AND i.usuario_id = u.id AND i.estado = 'usado'))
              ORDER BY e.curso, u.nombre_completo`,
-            [req.user.id]
+            [req.user.id, req.user.id]
         );
-        res.json(filas);
+        res.json(filas.map((f) => ({ ...f, pendiente: Boolean(f.pendiente) })));
     } catch (err) {
         next(err);
     }
@@ -134,9 +143,17 @@ router.post('/estudiantes/:usuarioId/resetear-pin', async (req, res, next) => {
     try {
         const usuarioId = Number(req.params.usuarioId);
         if (req.user.rol !== 'admin') {
+            // Suyo si el curso está asignado (incluye importados, SPEC-014)
+            // o si se registró con una invitación de este docente.
             const [propio] = await pool.query(
-                "SELECT 1 FROM invitaciones_estudiante WHERE docente_id = ? AND usuario_id = ?",
-                [req.user.id, usuarioId]
+                `SELECT 1 FROM usuarios u
+                 JOIN estudiantes e ON e.id = u.estudiante_id
+                 WHERE u.id = ?
+                   AND (EXISTS (SELECT 1 FROM docente_curso dc
+                                WHERE dc.docente_id = ? AND dc.curso_id = e.curso_id)
+                     OR EXISTS (SELECT 1 FROM invitaciones_estudiante i
+                                WHERE i.docente_id = ? AND i.usuario_id = u.id))`,
+                [usuarioId, req.user.id, req.user.id]
             );
             if (!propio.length) {
                 return res.status(403).json({ error: 'Ese estudiante no pertenece a tus grupos' });
@@ -169,10 +186,13 @@ const estudianteDelDocente = async (user, usuarioId) => {
          FROM usuarios u
          JOIN estudiantes e ON e.id = u.estudiante_id
          WHERE u.id = ? AND u.rol = 'estudiante' AND u.eliminado_en IS NULL
-           ${user.rol === 'admin' ? '' : `AND EXISTS (
+           ${user.rol === 'admin' ? '' : `AND (EXISTS (
+               SELECT 1 FROM docente_curso dc
+               WHERE dc.docente_id = ? AND dc.curso_id = e.curso_id)
+             OR EXISTS (
                SELECT 1 FROM invitaciones_estudiante i
-               WHERE i.usuario_id = u.id AND i.docente_id = ?)`}`,
-        user.rol === 'admin' ? [usuarioId] : [usuarioId, user.id]
+               WHERE i.usuario_id = u.id AND i.docente_id = ?))`}`,
+        user.rol === 'admin' ? [usuarioId] : [usuarioId, user.id, user.id]
     );
     return filas[0] || null;
 };
