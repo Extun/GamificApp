@@ -1539,19 +1539,13 @@
 }
 .editor-cerrar-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
 
-/* SPEC-013 Fase 1 — Configuración del quiz (acordeón nativo colapsado). */
-.quiz-config {
-    margin: 16px 0 0;
-    padding: 12px 16px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--color-border);
-    background: var(--color-surface);
-}
-.quiz-config summary {
-    cursor: pointer;
-    font-weight: 700;
-    font-size: 0.95rem;
-    color: var(--color-text);
+/* SPEC-013 — Configuración de la actividad (popup desde el botón ⚙). */
+.config-actividad-modal { max-width: 480px; }
+.config-actividad-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 4px 2px 8px;
 }
 .quiz-config-opcion {
     display: flex;

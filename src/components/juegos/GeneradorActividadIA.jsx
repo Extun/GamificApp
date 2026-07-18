@@ -13,7 +13,9 @@ import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import ArrowUpwardRoundedIcon from '@mui/icons-material/ArrowUpwardRounded';
 import ArrowDownwardRoundedIcon from '@mui/icons-material/ArrowDownwardRounded';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
+import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import { BarraAccionesEditor } from './BarraAccionesEditor';
+import { ModalConfigActividad } from './ModalConfigActividad';
 import { idPorNombre } from '../../services/materiasService';
 import { generarActividadIA } from '../../services/iaService';
 import { publicarReto } from '../../services/retosService';
@@ -96,6 +98,8 @@ export function GeneradorActividadIA({ materia, tipo }) {
     const [bancoAbierto, setBancoAbierto] = useState(false);
     // SPEC-012: vista previa como estudiante (modo prueba).
     const [previewAbierta, setPreviewAbierta] = useState(false);
+    // SPEC-013: dificultad/curso también ajustables en popup (botón ⚙).
+    const [configAbierta, setConfigAbierta] = useState(false);
     // SPEC-011 — historial respaldado en BD: cada generación crea un reto
     // 'borrador' y la lista se lee del servidor (localStorage = caché offline).
     const { historial, crearBorrador, sincronizar, cancelarSincronizacion, eliminar: eliminarBorrador, abrirDetalle, refrescar } =
@@ -652,6 +656,14 @@ export function GeneradorActividadIA({ materia, tipo }) {
                         }}
                         acciones={[
                             {
+                                id: 'config',
+                                label: 'Configuración',
+                                Icon: SettingsRoundedIcon,
+                                onClick: () => setConfigAbierta(true),
+                                disabled: guardando,
+                                title: 'Dificultad y curso de esta actividad'
+                            },
+                            {
                                 id: 'preview',
                                 label: 'Vista previa',
                                 Icon: VisibilityRoundedIcon,
@@ -663,6 +675,29 @@ export function GeneradorActividadIA({ materia, tipo }) {
                             }
                         ]}
                     />
+
+                    {/* SPEC-013: dificultad/curso en popup (mismos valores que usa
+                        el formulario de generación; se aplican al Guardar/Publicar). */}
+                    {configAbierta && (
+                        <ModalConfigActividad onCerrar={() => setConfigAbierta(false)} subtitulo="Se aplican al guardar o publicar la actividad.">
+                            <label className="quiz-config-opcion quiz-config-select">
+                                <span>Dificultad</span>
+                                <select value={dificultad} onChange={(e) => setDificultad(e.target.value)}>
+                                    {DIFICULTADES_UI.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                                </select>
+                            </label>
+                            <label className="quiz-config-opcion quiz-config-select">
+                                <span>Curso</span>
+                                <select value={cursoId} onChange={(e) => setCursoId(e.target.value)}>
+                                    <option value="">Todos los cursos</option>
+                                    {cursos.map((c) => <option key={c.id} value={c.id}>{c.etiqueta}</option>)}
+                                </select>
+                            </label>
+                            <p className="quiz-config-ayuda">
+                                La dificultad también guía a la IA cuando generas o añades contenido.
+                            </p>
+                        </ModalConfigActividad>
+                    )}
 
                     <div className="clasificador-publicar-barra">
                         <p className="clasificador-publicar-hint">

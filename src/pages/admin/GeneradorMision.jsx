@@ -12,7 +12,9 @@ import { DIFICULTADES_UI } from '../../components/juegos/GeneradorActividadIA';
 import { useHistorialRetos, HistorialActividades } from '../../components/juegos/HistorialActividades';
 import { PreviewJuegoModal } from '../../components/juegos/PreviewJuegoModal';
 import { BarraAccionesEditor } from '../../components/juegos/BarraAccionesEditor';
+import { ModalConfigActividad } from '../../components/juegos/ModalConfigActividad';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
+import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import '../../components/mision/misionNarrativa.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -79,6 +81,8 @@ export function GeneradorMision({ materia = 'la materia' }) {
     };
     // SPEC-012: vista previa como estudiante (modo prueba).
     const [previewAbierta, setPreviewAbierta] = useState(false);
+    // SPEC-013: dificultad/curso también ajustables en popup (botón ⚙).
+    const [configAbierta, setConfigAbierta] = useState(false);
     const [error, setError] = useState('');
     const [aviso, setAviso] = useState('');
 
@@ -415,6 +419,14 @@ export function GeneradorMision({ materia = 'la materia' }) {
                         }}
                         acciones={[
                             {
+                                id: 'config',
+                                label: 'Configuración',
+                                Icon: SettingsRoundedIcon,
+                                onClick: () => setConfigAbierta(true),
+                                disabled: guardando,
+                                title: 'Dificultad y curso de esta misión'
+                            },
+                            {
                                 id: 'preview',
                                 label: 'Vista previa',
                                 Icon: VisibilityRoundedIcon,
@@ -426,6 +438,26 @@ export function GeneradorMision({ materia = 'la materia' }) {
                             }
                         ]}
                     />
+
+                    {/* SPEC-013: dificultad/curso en popup (mismos valores que usa
+                        el formulario; se aplican al Guardar/Publicar). */}
+                    {configAbierta && (
+                        <ModalConfigActividad onCerrar={() => setConfigAbierta(false)} subtitulo="Se aplican al guardar o publicar la misión.">
+                            <label className="quiz-config-opcion quiz-config-select">
+                                <span>Dificultad</span>
+                                <select value={dificultad} onChange={(e) => setDificultad(e.target.value)}>
+                                    {DIFICULTADES_UI.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                                </select>
+                            </label>
+                            <label className="quiz-config-opcion quiz-config-select">
+                                <span>Curso</span>
+                                <select value={cursoId} onChange={(e) => setCursoId(e.target.value)}>
+                                    <option value="">Todos los cursos</option>
+                                    {cursos.map((c) => <option key={c.id} value={c.id}>{c.etiqueta}</option>)}
+                                </select>
+                            </label>
+                        </ModalConfigActividad>
+                    )}
 
                     <label className="quiz-field">
                         <span>Final (cómo se celebra el triunfo)</span>

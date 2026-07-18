@@ -6,7 +6,9 @@ import RocketLaunchRoundedIcon from '@mui/icons-material/RocketLaunchRounded';
 import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded';
 import BookmarkAddRoundedIcon from '@mui/icons-material/BookmarkAddRounded';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
+import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import { BarraAccionesEditor } from '../juegos/BarraAccionesEditor';
+import { ModalConfigActividad } from '../juegos/ModalConfigActividad';
 import './editorQuiz.css';
 
 const LETRAS = ['A', 'B', 'C', 'D'];
@@ -33,6 +35,8 @@ export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar,
     // Single-open: abrir una contrae automáticamente las demás.
     const [abierta, setAbierta] = useState(-1);
     const [cargandoIA, setCargandoIA] = useState(false);
+    // SPEC-013: la configuración vive en un popup (botón ⚙ junto a Vista previa).
+    const [configAbierta, setConfigAbierta] = useState(false);
     const abiertaRef = useRef(null);
 
     const alternar = (i) => setAbierta((prev) => (prev === i ? -1 : i));
@@ -256,6 +260,14 @@ export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar,
                 }}
                 acciones={[
                     {
+                        id: 'config',
+                        label: 'Configuración',
+                        Icon: SettingsRoundedIcon,
+                        onClick: () => setConfigAbierta(true),
+                        disabled: !onCambiarMezcla || cargandoIA,
+                        title: 'Mezclas y preguntas por intento'
+                    },
+                    {
                         id: 'preview',
                         label: 'Vista previa',
                         Icon: VisibilityRoundedIcon,
@@ -268,11 +280,9 @@ export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar,
                 ]}
             />
 
-            {/* SPEC-013 Fase 1: opciones del quiz, entre el contenido y Publicar
-                (colapsadas; no estorban el flujo principal). */}
-            {onCambiarMezcla && (
-                <details className="quiz-config">
-                    <summary>⚙ Configuración</summary>
+            {/* SPEC-013: configuración del quiz en popup (botón ⚙ de la barra). */}
+            {configAbierta && onCambiarMezcla && (
+                <ModalConfigActividad onCerrar={() => setConfigAbierta(false)}>
                     <label className="quiz-config-opcion">
                         <input
                             type="checkbox"
@@ -308,7 +318,7 @@ export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar,
                         Si eliges menos preguntas de las que guardaste, cada intento muestra una
                         selección al azar del total.
                     </p>
-                </details>
+                </ModalConfigActividad>
             )}
 
             <div className="editor-publicar-barra">
