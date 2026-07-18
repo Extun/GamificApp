@@ -28,6 +28,15 @@ const mezclar = (arr) => {
 // (`mezclar_preguntas` / `mezclar_respuestas`); ausentes = true (compatibilidad
 // con quizzes publicados antes de existir los flags).
 // Nunca muta la configuración original del reto: devuelve copias nuevas.
+// Muestra aleatoria de `n` preguntas del pool, conservando el orden relativo
+// original (por si el docente desactivó "mezclar preguntas"). SPEC-013: un quiz
+// puede guardar más preguntas de las que muestra por intento (mini banco).
+const muestrear = (pool, n) => {
+    if (!(n > 0) || n >= pool.length) return pool;
+    const indices = mezclar(pool.map((_, i) => i)).slice(0, n).sort((a, b) => a - b);
+    return indices.map((i) => pool[i]);
+};
+
 const barajarQuiz = (preguntas, { mezclarPreguntas = true, mezclarRespuestas = true } = {}) => {
     if (!Array.isArray(preguntas)) return [];
     const base = mezclarPreguntas ? mezclar(preguntas) : preguntas;
@@ -155,21 +164,27 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
     const [respondidas, setRespondidas] = useState(0);
     const [puntosGanados, setPuntosGanados] = useState(0);
     const [toast, setToast] = useState(null);
-    const total = preguntas.length;
 
     // Reinicia el marcador si cambia el set de preguntas (otro quiz seleccionado).
     const claveQuiz = useMemo(() => preguntas.map((p) => p.pregunta).join('|'), [preguntas]);
 
-    // Cada partida baraja preguntas y alternativas según la configuración del
-    // reto (estable mientras se juega: solo se rebaraja al cambiar de quiz o
-    // volver a montar el componente). Flags ausentes = mezclar (retrocompatible).
+    // Cada partida toma su muestra del pool (si el quiz guarda más preguntas de
+    // las que muestra por intento) y baraja según la configuración del reto.
+    // Estable mientras se juega: solo se re-sortea al cambiar de quiz o volver
+    // a montar el componente. Flags ausentes = mezclar / mostrar todas.
     const mezclarPreguntas = reto?.configuracion?.mezclar_preguntas !== false;
     const mezclarRespuestas = reto?.configuracion?.mezclar_respuestas !== false;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const porIntento = Number(reto?.configuracion?.preguntas_por_intento) || 0;
     const preguntasJugables = useMemo(
-        () => barajarQuiz(preguntas, { mezclarPreguntas, mezclarRespuestas }),
-        [claveQuiz, mezclarPreguntas, mezclarRespuestas]
+        () => barajarQuiz(muestrear(preguntas, porIntento), { mezclarPreguntas, mezclarRespuestas }),
+        // `claveQuiz` representa a `preguntas` (así un array nuevo con el mismo
+        // contenido no re-sortea la muestra a mitad de partida).
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [claveQuiz, mezclarPreguntas, mezclarRespuestas, porIntento]
     );
+    // El marcador y el XP se calculan sobre lo que el estudiante realmente
+    // juega en este intento, no sobre todo el pool guardado.
+    const total = preguntasJugables.length;
 
     // Evita otorgar XP/logros más de una vez por quiz completado.
     const recompensado = useRef(false);

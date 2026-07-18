@@ -11,13 +11,25 @@ import bancoService from '../../services/bancoService';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-// SPEC-013 Fase 1: la configuración completa del quiz que se persiste en
-// `configuracion_json` — preguntas + los dos flags de mezcla (default true).
+// SPEC-013: la configuración completa del quiz que se persiste en
+// `configuracion_json` — preguntas (el pool completo), los dos flags de mezcla
+// (default true) y cuántas preguntas se muestran por intento (0 = todas).
 const configuracionDe = (quiz) => ({
     preguntas: quiz.preguntas,
     mezclar_preguntas: quiz.mezclarPreguntas !== false,
-    mezclar_respuestas: quiz.mezclarRespuestas !== false
+    mezclar_respuestas: quiz.mezclarRespuestas !== false,
+    preguntas_por_intento: Number(quiz.preguntasPorIntento) || 0
 });
+
+// XP del quiz según lo que un estudiante puede responder EN UN INTENTO (si el
+// quiz guarda 30 y muestra 5, la recompensa es por 5 — el servidor capa el
+// abono con este valor, así que debe reflejar lo realmente jugable).
+const xpRecompensaDe = (quiz) => {
+    const totalPool = quiz.preguntas.length;
+    const porIntento = Number(quiz.preguntasPorIntento) || 0;
+    const jugables = porIntento > 0 ? Math.min(porIntento, totalPool) : totalPool;
+    return Math.max(jugables, 1) * 100;
+};
 
 export function GeneradorQuiz({ materia = 'la materia' }) {
     const [tema, setTema] = useState('');
@@ -61,18 +73,22 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
         if (actualizado.retoId && !actualizado.publicadoEnBD) {
             sincronizar(actualizado.retoId, {
                 configuracion: configuracionDe(actualizado),
-                xp_recompensa: Math.max(nuevasPreguntas.length, 1) * 100
+                xp_recompensa: xpRecompensaDe(actualizado)
             });
         }
     };
 
-    // SPEC-013 Fase 1: cambia un flag de mezcla ('mezclarPreguntas' o
-    // 'mezclarRespuestas') y lo sincroniza igual que una edición de preguntas.
+    // SPEC-013: cambia una opción de configuración del quiz ('mezclarPreguntas',
+    // 'mezclarRespuestas' o 'preguntasPorIntento') y la sincroniza igual que una
+    // edición de preguntas. El XP acompaña al cambio (depende de por-intento).
     const cambiarMezcla = (campo, valor) => {
         const actualizado = { ...quizEdit, [campo]: valor, estado: 'borrador' };
         setQuizEdit(actualizado);
         if (actualizado.retoId && !actualizado.publicadoEnBD) {
-            sincronizar(actualizado.retoId, { configuracion: configuracionDe(actualizado) });
+            sincronizar(actualizado.retoId, {
+                configuracion: configuracionDe(actualizado),
+                xp_recompensa: xpRecompensaDe(actualizado)
+            });
         }
     };
 
@@ -124,7 +140,7 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                 titulo: quizEdit.tema,
                 tipo: 'quiz',
                 configuracion: configuracionDe({ ...quizEdit, preguntas }),
-                xpRecompensa: preguntas.length * 100
+                xpRecompensa: xpRecompensaDe({ ...quizEdit, preguntas })
             });
             setQuizEdit({ ...quizEdit, retoId: data?.id ?? quizEdit.retoId, preguntas, estado: 'publicado', publicadoEnBD: true });
             refrescar();
@@ -177,7 +193,7 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                 const creado = await crearBorrador({
                     materiaId: idPorNombre(materia),
                     titulo: tema.trim(),
-                    configuracion: { preguntas: quiz, mezclar_preguntas: true, mezclar_respuestas: true },
+                    configuracion: { preguntas: quiz, mezclar_preguntas: true, mezclar_respuestas: true, preguntas_por_intento: 0 },
                     xpRecompensa: quiz.length * 100,
                     origen: 'ia'
                 });
@@ -187,7 +203,7 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
             }
             setQuizEdit({
                 retoId, tema: tema.trim(), preguntas: quiz, estado: 'borrador', publicadoEnBD: false,
-                mezclarPreguntas: true, mezclarRespuestas: true
+                mezclarPreguntas: true, mezclarRespuestas: true, preguntasPorIntento: 0
             });
         } catch (err) {
             console.error('Error al generar el quiz:', err);
@@ -238,9 +254,11 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                 preguntas: detalle.configuracion?.preguntas || [],
                 estado: detalle.estado,
                 publicadoEnBD: detalle.estado === 'publicado',
-                // Flags ausentes en quizzes previos a SPEC-013 = mezclar (default).
+                // Flags ausentes en quizzes previos a SPEC-013 = mezclar (default)
+                // y mostrar todas las preguntas.
                 mezclarPreguntas: detalle.configuracion?.mezclar_preguntas !== false,
-                mezclarRespuestas: detalle.configuracion?.mezclar_respuestas !== false
+                mezclarRespuestas: detalle.configuracion?.mezclar_respuestas !== false,
+                preguntasPorIntento: Number(detalle.configuracion?.preguntas_por_intento) || 0
             });
         } catch (err) {
             setError(`No se pudo abrir la actividad: ${err.message}`);
@@ -328,6 +346,7 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                     onCerrar={() => setQuizEdit(null)}
                     mezclarPreguntas={quizEdit.mezclarPreguntas}
                     mezclarRespuestas={quizEdit.mezclarRespuestas}
+                    preguntasPorIntento={quizEdit.preguntasPorIntento}
                     onCambiarMezcla={cambiarMezcla}
                 />
             )}

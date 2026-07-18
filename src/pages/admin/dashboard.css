@@ -1563,6 +1563,15 @@
     cursor: pointer;
 }
 .quiz-config-opcion input { accent-color: var(--color-primary); width: 18px; height: 18px; }
+.quiz-config-select select {
+    margin-left: auto;
+    padding: 4px 8px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 0.85rem;
+}
 .quiz-config-ayuda {
     margin: 10px 0 0;
     font-size: 0.85rem;

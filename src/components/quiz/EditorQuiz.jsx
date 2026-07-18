@@ -28,7 +28,7 @@ const preguntaVacia = () => ({
 // pregunta del quiz en el banco para reutilizarla después; ambas opcionales.
 // `onVistaPrevia` (SPEC-012): abre el quiz en el reproductor real, en modo
 // prueba (sin XP ni progreso), para revisarlo antes de publicar.
-export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar, publicando, publicado, onAbrirBanco, onGuardarEnBanco, onVistaPrevia, onCerrar, mezclarPreguntas, mezclarRespuestas, onCambiarMezcla }) {
+export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar, publicando, publicado, onAbrirBanco, onGuardarEnBanco, onVistaPrevia, onCerrar, mezclarPreguntas, mezclarRespuestas, preguntasPorIntento, onCambiarMezcla }) {
     // Ninguna pregunta expandida al abrir el quiz (vista limpia de entrada).
     // Single-open: abrir una contrae automáticamente las demás.
     const [abierta, setAbierta] = useState(-1);
@@ -289,19 +289,39 @@ export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar,
                         />
                         <span>Mezclar el orden de las opciones en cada intento</span>
                     </label>
+                    <label className="quiz-config-opcion quiz-config-select">
+                        <span>Preguntas por intento</span>
+                        <select
+                            value={Number(preguntasPorIntento) || 0}
+                            onChange={(e) => onCambiarMezcla('preguntasPorIntento', Number(e.target.value))}
+                        >
+                            <option value={0}>Todas ({total})</option>
+                            {[3, 5, 10, 15, 20]
+                                .filter((n) => n < total || n === Number(preguntasPorIntento))
+                                .map((n) => (
+                                    <option key={n} value={n}>{n} al azar de {total}</option>
+                                ))}
+                        </select>
+                    </label>
                     <p className="quiz-config-ayuda">
                         Así cada estudiante ve un Quiz distinto, aunque sea el mismo para todos.
+                        Si eliges menos preguntas de las que guardaste, cada intento muestra una
+                        selección al azar del total.
                     </p>
                 </details>
             )}
 
             <div className="editor-publicar-barra">
                 <p className="editor-publicar-hint">
-                    {publicado
-                        ? 'Este quiz ya está publicado. Si lo editas, podrás publicarlo como un quiz nuevo.'
-                        : listaParaPublicar
-                            ? `Todo listo: ${total} preguntas · recompensa de ${total * 100} XP. Al publicar, el quiz será visible para los estudiantes.`
-                            : 'Completa el enunciado y las 4 alternativas de cada pregunta para poder publicar.'}
+                    {(() => {
+                        if (publicado) return 'Este quiz ya está publicado. Si lo editas, podrás publicarlo como un quiz nuevo.';
+                        if (!listaParaPublicar) return 'Completa el enunciado y las 4 alternativas de cada pregunta para poder publicar.';
+                        const porIntento = Number(preguntasPorIntento) || 0;
+                        const jugables = porIntento > 0 ? Math.min(porIntento, total) : total;
+                        return jugables < total
+                            ? `Todo listo: ${total} preguntas guardadas · cada intento muestra ${jugables} al azar · recompensa de ${jugables * 100} XP.`
+                            : `Todo listo: ${total} preguntas · recompensa de ${total * 100} XP. Al publicar, el quiz será visible para los estudiantes.`;
+                    })()}
                 </p>
                 <button
                     type="button"

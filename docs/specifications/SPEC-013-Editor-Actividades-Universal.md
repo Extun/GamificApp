@@ -75,7 +75,11 @@ Cada entrada lleva título + subtítulo de una línea. **Lo que no aplica a un t
 
 ## 6. Cambios de datos (únicos de toda la spec)
 
-Dos campos **aditivos** en `configuracion_json` del quiz: `mezclar_preguntas` y `mezclar_respuestas` (boolean, **default `true`** cuando faltan). `QuizInteractivo.jsx` los lee condicionalmente (hoy baraja siempre; los quizzes ya publicados sin flags conservan el comportamiento actual — regla §6.12 intacta). Ningún otro cambio de modelo.
+Tres campos **aditivos** en `configuracion_json` del quiz:
+- `mezclar_preguntas` y `mezclar_respuestas` (boolean, **default `true`** cuando faltan). `QuizInteractivo.jsx` los lee condicionalmente (los quizzes publicados sin flags conservan el comportamiento actual — regla §6.12 intacta).
+- `preguntas_por_intento` (número, **default `0` = todas**; ampliación aprobada 2026-07-17): el quiz guarda un pool de N preguntas y cada intento del estudiante muestra una **muestra aleatoria** de ese tamaño (mini banco por quiz — origen: recomendación externa de que al repetir un quiz no salgan siempre las mismas preguntas). Regla de XP obligatoria: `xp_recompensa` se calcula sobre las preguntas **mostradas por intento**, no sobre el pool (el servidor capa el abono con ese valor). La muestra conserva el orden relativo del pool (por si `mezclar_preguntas` está apagado) y se re-sortea en cada montaje del reproductor. El Banco de Preguntas global NO se conecta al tiempo de juego: sigue siendo herramienta de autoría que ayuda a llenar el pool.
+
+Ningún otro cambio de modelo.
 
 ## 7. Roadmap de implementación (aprobado 2026-07-17)
 
