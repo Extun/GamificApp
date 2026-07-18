@@ -13,6 +13,7 @@ import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import ArrowUpwardRoundedIcon from '@mui/icons-material/ArrowUpwardRounded';
 import ArrowDownwardRoundedIcon from '@mui/icons-material/ArrowDownwardRounded';
 import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
+import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import { BarraAccionesEditor } from './BarraAccionesEditor';
@@ -27,6 +28,8 @@ import { TIPOS_ACTIVIDAD } from './registroJuegos';
 import { SelectorBanco } from './SelectorBanco';
 import { PreviewJuegoModal } from './PreviewJuegoModal';
 import { useHistorialRetos, HistorialActividades } from './HistorialActividades';
+// Acordeón compartido con el editor del quiz (mismas clases editor-item*).
+import '../quiz/editorQuiz.css';
 
 export const DIFICULTADES_UI = [
     ['facil', '🙂 Fácil'],
@@ -106,6 +109,9 @@ export function GeneradorActividadIA({ materia, tipo }) {
     const [publicado, setPublicado] = useState(false);
     const [error, setError] = useState('');
     const [aviso, setAviso] = useState('');
+    // Acordeón de ítems (mismo patrón que el editor del quiz): todos cerrados
+    // al abrir, solo uno expandido a la vez.
+    const [itemAbierto, setItemAbierto] = useState(-1);
     // SPEC-010: modal del banco para reutilizar ítems ya creados.
     const [bancoAbierto, setBancoAbierto] = useState(false);
     // SPEC-012: vista previa como estudiante (modo prueba).
@@ -214,6 +220,7 @@ export function GeneradorActividadIA({ materia, tipo }) {
                 publicadoEnBD: false
             };
             setActividad(nueva);
+            setItemAbierto(-1);
             setPublicado(false);
             tomarSnapshot(nueva, false);
         } catch (err) {
@@ -300,6 +307,7 @@ export function GeneradorActividadIA({ materia, tipo }) {
     // "Últimos generados"); se puede reabrir desde ahí cuando se quiera.
     const cerrarEditor = () => {
         setSnapshot(null);
+        setItemAbierto(-1);
         setActividad(null);
         setPublicado(false);
         setAviso('');
@@ -342,6 +350,7 @@ export function GeneradorActividadIA({ materia, tipo }) {
                 publicadoEnBD: detalle.estado === 'publicado'
             };
             setActividad(abierta);
+            setItemAbierto(-1);
             setDificultad(detalle.dificultad || 'media');
             setCursoId(detalle.curso_id ? String(detalle.curso_id) : '');
             setPublicado(detalle.estado === 'publicado');
@@ -449,14 +458,41 @@ export function GeneradorActividadIA({ materia, tipo }) {
         const lista = config[clave].map((item, i) => (i === indice ? { ...item, ...cambio } : item));
         editarConfig({ [clave]: lista });
     };
-    const quitarDeLista = (clave, indice) =>
+    const quitarDeLista = (clave, indice) => {
         editarConfig({ [clave]: config[clave].filter((_, i) => i !== indice) });
+        setItemAbierto((prev) => (prev >= indice ? -1 : prev));
+    };
     const moverEnLista = (clave, indice, delta) => {
         const lista = [...config[clave]];
         const destino = indice + delta;
         if (destino < 0 || destino >= lista.length) return;
         [lista[indice], lista[destino]] = [lista[destino], lista[indice]];
         editarConfig({ [clave]: lista });
+        // El acordeón sigue al ítem que se movió (o al que intercambió lugar).
+        setItemAbierto((prev) => (prev === indice ? destino : prev === destino ? indice : prev));
+    };
+
+    // ¿El ítem tiene todo lo necesario? (misma regla que valida el servidor).
+    const itemCompleto = (item) => {
+        if (tipo === 'memorama') return Boolean(item.a?.trim() && item.b?.trim());
+        if (tipo === 'linea-tiempo') return Boolean(item.texto?.trim());
+        return Boolean(
+            item.texto?.trim() &&
+            (item.opciones || []).length >= 2 &&
+            (item.opciones || []).every((o) => (o || '').trim()) &&
+            (item.opciones || []).includes(item.correcta)
+        );
+    };
+
+    // Texto que resume el ítem en su fila colapsada del acordeón.
+    const resumenItem = (item, i) => {
+        if (tipo === 'memorama') {
+            return (item.a?.trim() || item.b?.trim())
+                ? `${item.a?.trim() || '…'} ↔ ${item.b?.trim() || '…'}`
+                : `Pareja ${i + 1} (sin escribir)`;
+        }
+        const base = tipo === 'linea-tiempo' ? 'Evento' : 'Frase';
+        return item.texto?.trim() || `${base} ${i + 1} (sin escribir)`;
     };
 
     return (
@@ -544,109 +580,167 @@ export function GeneradorActividadIA({ materia, tipo }) {
                         />
                     </label>
 
-                    {tipo === 'memorama' && (
-                        <div className="gen-ia-items">
-                            {config.parejas.map((p, i) => (
-                                <div key={i} className="gen-ia-item">
-                                    <input
-                                        value={p.a}
-                                        aria-label={`Pareja ${i + 1}, primera carta`}
-                                        onChange={(e) => editarLista('parejas', i, { a: e.target.value })}
-                                    />
-                                    <span className="gen-ia-item-sep" aria-hidden="true">↔</span>
-                                    <input
-                                        value={p.b}
-                                        aria-label={`Pareja ${i + 1}, segunda carta`}
-                                        onChange={(e) => editarLista('parejas', i, { b: e.target.value })}
-                                    />
+                    {tipo === 'linea-tiempo' && (
+                        <p className="contenido-sub" style={{ margin: 0 }}>
+                            Este es el orden CORRECTO: el juego lo desordenará para el estudiante.
+                        </p>
+                    )}
+
+                    {/* Acordeón de ítems (mismo patrón y clases que el editor del
+                        quiz): cada ítem colapsado en una línea; solo el que se
+                        edita está expandido. */}
+                    <div className="editor-acordeon">
+                        {(config?.[claveItems] || []).map((item, i) => {
+                            const expandido = itemAbierto === i;
+                            const completo = itemCompleto(item);
+                            return (
+                                <div key={i} className={`editor-item ${expandido ? 'is-abierta' : ''}`}>
                                     <button
                                         type="button"
-                                        title="Quitar pareja"
-                                        aria-label={`Quitar la pareja ${i + 1}`}
-                                        onClick={() => quitarDeLista('parejas', i)}
+                                        className="editor-item-head"
+                                        aria-expanded={expandido}
+                                        onClick={() => setItemAbierto(expandido ? -1 : i)}
                                     >
-                                        <DeleteOutlineRoundedIcon sx={{ fontSize: '1.1rem' }} />
+                                        <span className={`editor-item-num ${completo ? 'is-completa' : ''}`}>
+                                            {completo ? <CheckCircleRoundedIcon sx={{ fontSize: '1.1rem' }} /> : i + 1}
+                                        </span>
+                                        <span className="editor-item-titulo">{resumenItem(item, i)}</span>
+                                        <ExpandMoreRoundedIcon className="editor-item-chevron" />
                                     </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                                    {expandido && (
+                                        <div className="editor-item-body">
+                                            {tipo === 'memorama' && (
+                                                <>
+                                                    <label className="editor-campo">
+                                                        <span>Primera carta</span>
+                                                        <input
+                                                            type="text"
+                                                            className="editor-alt-input"
+                                                            value={item.a}
+                                                            placeholder="Ej. 5 + 3"
+                                                            onChange={(e) => editarLista('parejas', i, { a: e.target.value })}
+                                                        />
+                                                    </label>
+                                                    <label className="editor-campo">
+                                                        <span>Segunda carta (su pareja)</span>
+                                                        <input
+                                                            type="text"
+                                                            className="editor-alt-input"
+                                                            value={item.b}
+                                                            placeholder="Ej. 8"
+                                                            onChange={(e) => editarLista('parejas', i, { b: e.target.value })}
+                                                        />
+                                                    </label>
+                                                </>
+                                            )}
 
-                    {tipo === 'linea-tiempo' && (
-                        <div className="gen-ia-items">
-                            <p className="contenido-sub" style={{ margin: 0 }}>
-                                Este es el orden CORRECTO: el juego lo desordenará para el estudiante.
-                            </p>
-                            {config.eventos.map((ev, i) => (
-                                <div key={i} className="gen-ia-item">
-                                    <span className="gen-ia-item-num">{i + 1}</span>
-                                    <input
-                                        value={ev.texto}
-                                        aria-label={`Evento ${i + 1}`}
-                                        onChange={(e) => editarLista('eventos', i, { texto: e.target.value })}
-                                    />
-                                    <input
-                                        className="gen-ia-item-etiqueta"
-                                        value={ev.etiqueta || ''}
-                                        placeholder="Etiqueta"
-                                        aria-label={`Etiqueta del evento ${i + 1}`}
-                                        onChange={(e) => editarLista('eventos', i, { etiqueta: e.target.value })}
-                                    />
-                                    <button type="button" title="Subir" aria-label={`Subir el evento ${i + 1}`} onClick={() => moverEnLista('eventos', i, -1)}>
-                                        <ArrowUpwardRoundedIcon sx={{ fontSize: '1.05rem' }} />
-                                    </button>
-                                    <button type="button" title="Bajar" aria-label={`Bajar el evento ${i + 1}`} onClick={() => moverEnLista('eventos', i, 1)}>
-                                        <ArrowDownwardRoundedIcon sx={{ fontSize: '1.05rem' }} />
-                                    </button>
-                                    <button type="button" title="Quitar evento" aria-label={`Quitar el evento ${i + 1}`} onClick={() => quitarDeLista('eventos', i)}>
-                                        <DeleteOutlineRoundedIcon sx={{ fontSize: '1.1rem' }} />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                                            {tipo === 'linea-tiempo' && (
+                                                <>
+                                                    <label className="editor-campo">
+                                                        <span>Evento o paso</span>
+                                                        <input
+                                                            type="text"
+                                                            className="editor-alt-input"
+                                                            value={item.texto}
+                                                            placeholder="Ej. La semilla germina"
+                                                            onChange={(e) => editarLista('eventos', i, { texto: e.target.value })}
+                                                        />
+                                                    </label>
+                                                    <label className="editor-campo">
+                                                        <span>Etiqueta (opcional, ej. fecha o número)</span>
+                                                        <input
+                                                            type="text"
+                                                            className="editor-alt-input"
+                                                            value={item.etiqueta || ''}
+                                                            placeholder="Ej. Paso 1, 1492…"
+                                                            onChange={(e) => editarLista('eventos', i, { etiqueta: e.target.value })}
+                                                        />
+                                                    </label>
+                                                </>
+                                            )}
 
-                    {tipo === 'completar' && (
-                        <div className="gen-ia-items">
-                            {config.frases.map((f, i) => (
-                                <div key={i} className="gen-ia-frase">
-                                    <div className="gen-ia-item">
-                                        <input
-                                            value={f.texto}
-                                            aria-label={`Frase ${i + 1} (usa ___ para el espacio)`}
-                                            onChange={(e) => editarLista('frases', i, { texto: e.target.value })}
-                                        />
-                                        <button type="button" title="Quitar frase" aria-label={`Quitar la frase ${i + 1}`} onClick={() => quitarDeLista('frases', i)}>
-                                            <DeleteOutlineRoundedIcon sx={{ fontSize: '1.1rem' }} />
-                                        </button>
-                                    </div>
-                                    <div className="gen-ia-opciones">
-                                        {f.opciones.map((op, j) => (
-                                            <label key={j} className={`gen-ia-opcion ${op === f.correcta ? 'is-correcta' : ''}`}>
-                                                <input
-                                                    type="radio"
-                                                    name={`correcta-${i}`}
-                                                    checked={op === f.correcta}
-                                                    onChange={() => editarLista('frases', i, { correcta: op })}
-                                                />
-                                                <input
-                                                    value={op}
-                                                    aria-label={`Opción ${j + 1} de la frase ${i + 1}`}
-                                                    onChange={(e) => {
-                                                        const opciones = f.opciones.map((o, k) => (k === j ? e.target.value : o));
-                                                        editarLista('frases', i, {
-                                                            opciones,
-                                                            correcta: op === f.correcta ? e.target.value : f.correcta
-                                                        });
-                                                    }}
-                                                />
-                                            </label>
-                                        ))}
-                                    </div>
+                                            {tipo === 'completar' && (
+                                                <>
+                                                    <label className="editor-campo">
+                                                        <span>Frase (usa ___ para el espacio en blanco)</span>
+                                                        <input
+                                                            type="text"
+                                                            className="editor-alt-input"
+                                                            value={item.texto}
+                                                            placeholder="Ej. El sol sale por el ___"
+                                                            onChange={(e) => editarLista('frases', i, { texto: e.target.value })}
+                                                        />
+                                                    </label>
+                                                    <div className="editor-alternativas">
+                                                        <span className="editor-campo-label">
+                                                            Opciones · marca la respuesta correcta
+                                                        </span>
+                                                        {item.opciones.map((op, j) => (
+                                                            <div key={j} className={`editor-alt-row ${op === item.correcta ? 'is-correcta' : ''}`}>
+                                                                <label className="editor-alt-radio" title="Marcar como correcta">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name={`correcta-${i}`}
+                                                                        checked={op === item.correcta}
+                                                                        onChange={() => editarLista('frases', i, { correcta: op })}
+                                                                        aria-label={`Marcar la opción ${j + 1} como correcta en la frase ${i + 1}`}
+                                                                    />
+                                                                    <span className="editor-alt-letra">{j + 1}</span>
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    className="editor-alt-input"
+                                                                    value={op}
+                                                                    placeholder={`Opción ${j + 1}`}
+                                                                    onChange={(e) => {
+                                                                        const opciones = item.opciones.map((o, k) => (k === j ? e.target.value : o));
+                                                                        editarLista('frases', i, {
+                                                                            opciones,
+                                                                            correcta: op === item.correcta ? e.target.value : item.correcta
+                                                                        });
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </>
+                                            )}
+
+                                            <div className="editor-item-acciones gen-ia-item-acciones">
+                                                {tipo === 'linea-tiempo' && (
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            className="editor-btn editor-btn-ghost"
+                                                            disabled={i === 0}
+                                                            onClick={() => moverEnLista('eventos', i, -1)}
+                                                        >
+                                                            <ArrowUpwardRoundedIcon sx={{ fontSize: '1.05rem' }} /> Subir
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="editor-btn editor-btn-ghost"
+                                                            disabled={i === (config?.eventos?.length || 0) - 1}
+                                                            onClick={() => moverEnLista('eventos', i, 1)}
+                                                        >
+                                                            <ArrowDownwardRoundedIcon sx={{ fontSize: '1.05rem' }} /> Bajar
+                                                        </button>
+                                                    </>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    className="editor-btn editor-btn-ghost editor-btn-peligro"
+                                                    onClick={() => quitarDeLista(claveItems, i)}
+                                                >
+                                                    <DeleteOutlineRoundedIcon sx={{ fontSize: '1.1rem' }} /> Eliminar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            ))}
-                        </div>
-                    )}
+                            );
+                        })}
+                    </div>
 
                     {/* SPEC-013 Fase 2: botón único "Agregar" con menú por acciones. */}
                     <BarraAccionesEditor
@@ -663,9 +757,12 @@ export function GeneradorActividadIA({ materia, tipo }) {
                                         ? `Ya está el máximo de ${maxItems} para esta actividad.`
                                         : 'Añade un ítem vacío y complétalo aquí mismo.',
                                     disabled: items >= maxItems,
-                                    onClick: () => editarConfig({
-                                        [claveItems]: [...(config?.[claveItems] || []), ITEM_VACIO[tipo]()]
-                                    })
+                                    onClick: () => {
+                                        editarConfig({
+                                            [claveItems]: [...(config?.[claveItems] || []), ITEM_VACIO[tipo]()]
+                                        });
+                                        setItemAbierto(items); // abre el recién creado
+                                    }
                                 },
                                 {
                                     id: 'generar',

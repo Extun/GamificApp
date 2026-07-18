@@ -1145,6 +1145,14 @@
     flex: 1 1 220px;
 }
 
+/* Dentro de paneles de edición en COLUMNA (misión, memorama/línea/completar),
+   el flex-basis de 220px pensado para formularios en fila se vuelve ALTURA y
+   deja ~150px vacíos bajo cada campo: ahí el campo ocupa solo su contenido. */
+.gen-ia-preview .quiz-field,
+.mision-editor .quiz-field {
+    flex: 0 0 auto;
+}
+
 .quiz-field span {
     font-size: 0.82rem;
     font-weight: 600;
@@ -1999,6 +2007,9 @@
 }
 .gen-ia-opcion.is-correcta { border-color: var(--color-exito, #16a34a); background: #f0fdf4; }
 .gen-ia-acciones { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+/* Acciones dentro del acordeón de ítems (Subir/Bajar/Eliminar): con varios
+   botones hace falta separación y que quepan en pantallas pequeñas. */
+.gen-ia-item-acciones { gap: 0.6rem; flex-wrap: wrap; }
 
 @media (max-width: 640px) {
     .gen-ia-item { flex-wrap: wrap; }

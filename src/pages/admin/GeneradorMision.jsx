@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
+import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import RocketLaunchRoundedIcon from '@mui/icons-material/RocketLaunchRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
@@ -17,6 +18,8 @@ import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import '../../components/mision/misionNarrativa.css';
+// Acordeón compartido con el editor del quiz (mismas clases editor-item*).
+import '../../components/quiz/editorQuiz.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -83,6 +86,9 @@ export function GeneradorMision({ materia = 'la materia' }) {
         temaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         temaRef.current?.focus({ preventScroll: true });
     };
+    // Acordeón de desafíos (mismo patrón que el editor del quiz): todos
+    // cerrados al abrir, solo uno expandido a la vez.
+    const [desafioAbierto, setDesafioAbierto] = useState(-1);
     // SPEC-012: vista previa como estudiante (modo prueba).
     const [previewAbierta, setPreviewAbierta] = useState(false);
     // SPEC-013: dificultad/curso también ajustables en popup (botón ⚙).
@@ -155,11 +161,15 @@ export function GeneradorMision({ materia = 'la materia' }) {
     const editarAlternativa = (i, letra, valor) =>
         editarDesafio(i, { alternativas: { ...desafios[i].alternativas, [letra]: valor } });
 
-    const agregarDesafio = () => editarMision({ desafios: [...desafios, desafioVacio()] });
+    const agregarDesafio = () => {
+        editarMision({ desafios: [...desafios, desafioVacio()] });
+        setDesafioAbierto(desafios.length); // abre el recién creado
+    };
 
     const eliminarDesafio = (i) => {
         if (desafios.length <= MIN_DESAFIOS) return;
         editarMision({ desafios: desafios.filter((_, idx) => idx !== i) });
+        setDesafioAbierto((prev) => (prev >= i ? -1 : prev));
     };
 
     // Cierra la misión abierta; el borrador ya vive en la BD (y en "Últimos
@@ -167,6 +177,7 @@ export function GeneradorMision({ materia = 'la materia' }) {
     const cerrarEditor = () => {
         cancelarSincronizacion(entradaId);
         tomarSnapshot(null);
+        setDesafioAbierto(-1);
         setMision(null);
         setEntradaId(null);
         setPublicada(false);
@@ -187,6 +198,7 @@ export function GeneradorMision({ materia = 'la materia' }) {
         setCargando(true);
         setError('');
         setAviso('');
+        setDesafioAbierto(-1);
         setMision(null);
         setPublicada(false);
         try {
@@ -363,67 +375,105 @@ export function GeneradorMision({ materia = 'la materia' }) {
                         />
                     </label>
 
-                    <div className="mision-editor-desafios">
-                        {desafios.map((d, i) => (
-                            <div key={i} className="mision-editor-desafio">
-                                <div className="mision-editor-desafio-head">
-                                    <strong>Desafío {i + 1} {desafioCompleto(d) ? '✅' : ''}</strong>
+                    {/* Acordeón de desafíos (mismo patrón y clases que el editor
+                        del quiz): cada capítulo colapsado en una línea; solo el
+                        que se edita está expandido. */}
+                    <div className="editor-acordeon">
+                        {desafios.map((d, i) => {
+                            const expandido = desafioAbierto === i;
+                            const completo = desafioCompleto(d);
+                            return (
+                                <div key={i} className={`editor-item ${expandido ? 'is-abierta' : ''}`}>
                                     <button
                                         type="button"
-                                        className="quiz-historial-eliminar"
-                                        title={desafios.length <= MIN_DESAFIOS
-                                            ? `Una misión necesita al menos ${MIN_DESAFIOS} desafíos`
-                                            : 'Quitar este desafío'}
-                                        aria-label={`Quitar el desafío ${i + 1}`}
-                                        disabled={desafios.length <= MIN_DESAFIOS}
-                                        onClick={() => eliminarDesafio(i)}
+                                        className="editor-item-head"
+                                        aria-expanded={expandido}
+                                        onClick={() => setDesafioAbierto(expandido ? -1 : i)}
                                     >
-                                        <DeleteOutlineRoundedIcon sx={{ fontSize: '1.1rem' }} />
-                                    </button>
-                                </div>
-                                <label className="quiz-field">
-                                    <span>Narrativa (lo que pasa en la historia)</span>
-                                    <textarea
-                                        rows={2}
-                                        value={d.narrativa || ''}
-                                        onChange={(e) => editarDesafio(i, { narrativa: e.target.value })}
-                                    />
-                                </label>
-                                <label className="quiz-field">
-                                    <span>Pregunta</span>
-                                    <input
-                                        value={d.pregunta || ''}
-                                        onChange={(e) => editarDesafio(i, { pregunta: e.target.value })}
-                                    />
-                                </label>
-                                {LETRAS.map((letra) => (
-                                    <label key={letra} className="quiz-field mision-editor-alt">
-                                        <span>
-                                            <input
-                                                type="radio"
-                                                name={`mision-correcta-${i}`}
-                                                checked={String(d.correcta || '').trim().toUpperCase() === letra}
-                                                onChange={() => editarDesafio(i, { correcta: letra })}
-                                                aria-label={`Marcar ${letra} como correcta en el desafío ${i + 1}`}
-                                            />{' '}
-                                            Opción {letra} {String(d.correcta || '').trim().toUpperCase() === letra ? '✔' : ''}
+                                        <span className={`editor-item-num ${completo ? 'is-completa' : ''}`}>
+                                            {completo ? <CheckCircleRoundedIcon sx={{ fontSize: '1.1rem' }} /> : i + 1}
                                         </span>
-                                        <input
-                                            value={d.alternativas?.[letra] || ''}
-                                            onChange={(e) => editarAlternativa(i, letra, e.target.value)}
-                                            placeholder={`Alternativa ${letra}`}
-                                        />
-                                    </label>
-                                ))}
-                                <label className="quiz-field">
-                                    <span>Pista si se equivoca (opcional)</span>
-                                    <input
-                                        value={d.pista || ''}
-                                        onChange={(e) => editarDesafio(i, { pista: e.target.value })}
-                                    />
-                                </label>
-                            </div>
-                        ))}
+                                        <span className="editor-item-titulo">
+                                            {d.pregunta?.trim() || d.narrativa?.trim() || `Desafío ${i + 1} (sin escribir)`}
+                                        </span>
+                                        <ExpandMoreRoundedIcon className="editor-item-chevron" />
+                                    </button>
+                                    {expandido && (
+                                        <div className="editor-item-body">
+                                            <label className="editor-campo">
+                                                <span>Narrativa (lo que pasa en la historia)</span>
+                                                <textarea
+                                                    rows={3}
+                                                    value={d.narrativa || ''}
+                                                    onChange={(e) => editarDesafio(i, { narrativa: e.target.value })}
+                                                    placeholder="Cuenta este capítulo de la aventura…"
+                                                />
+                                            </label>
+                                            <label className="editor-campo">
+                                                <span>Pregunta</span>
+                                                <textarea
+                                                    rows={2}
+                                                    value={d.pregunta || ''}
+                                                    onChange={(e) => editarDesafio(i, { pregunta: e.target.value })}
+                                                    placeholder={`Escribe la pregunta del desafío ${i + 1}…`}
+                                                />
+                                            </label>
+                                            <div className="editor-alternativas">
+                                                <span className="editor-campo-label">
+                                                    Opciones · marca la respuesta correcta
+                                                </span>
+                                                {LETRAS.map((letra) => (
+                                                    <div
+                                                        key={letra}
+                                                        className={`editor-alt-row ${String(d.correcta || '').trim().toUpperCase() === letra ? 'is-correcta' : ''}`}
+                                                    >
+                                                        <label className="editor-alt-radio" title="Marcar como correcta">
+                                                            <input
+                                                                type="radio"
+                                                                name={`mision-correcta-${i}`}
+                                                                checked={String(d.correcta || '').trim().toUpperCase() === letra}
+                                                                onChange={() => editarDesafio(i, { correcta: letra })}
+                                                                aria-label={`Marcar ${letra} como correcta en el desafío ${i + 1}`}
+                                                            />
+                                                            <span className="editor-alt-letra">{letra}</span>
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            className="editor-alt-input"
+                                                            value={d.alternativas?.[letra] || ''}
+                                                            onChange={(e) => editarAlternativa(i, letra, e.target.value)}
+                                                            placeholder={`Opción ${letra}`}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <label className="editor-campo">
+                                                <span>Pista si se equivoca (opcional)</span>
+                                                <input
+                                                    className="editor-alt-input"
+                                                    value={d.pista || ''}
+                                                    onChange={(e) => editarDesafio(i, { pista: e.target.value })}
+                                                    placeholder="Una ayudita para intentarlo de nuevo…"
+                                                />
+                                            </label>
+                                            <div className="editor-item-acciones">
+                                                <button
+                                                    type="button"
+                                                    className="editor-btn editor-btn-ghost editor-btn-peligro"
+                                                    title={desafios.length <= MIN_DESAFIOS
+                                                        ? `Una misión necesita al menos ${MIN_DESAFIOS} desafíos`
+                                                        : 'Quitar este desafío'}
+                                                    disabled={desafios.length <= MIN_DESAFIOS}
+                                                    onClick={() => eliminarDesafio(i)}
+                                                >
+                                                    <DeleteOutlineRoundedIcon sx={{ fontSize: '1.1rem' }} /> Eliminar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
 
                     {/* SPEC-013 Fase 2: botón único "Agregar" con menú por acciones.
@@ -565,6 +615,7 @@ export function GeneradorMision({ materia = 'la materia' }) {
                     try {
                         const detalle = await abrirDetalle(e.id);
                         cancelarSincronizacion(entradaId);
+                        setDesafioAbierto(-1);
                         setMision(detalle.configuracion || null);
                         tomarSnapshot(detalle.configuracion || null, detalle.estado === 'publicado');
                         setTema(detalle.configuracion?._tema || '');
