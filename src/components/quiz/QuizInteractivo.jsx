@@ -6,7 +6,7 @@ import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import CloudDoneRoundedIcon from '@mui/icons-material/CloudDoneRounded';
 import gamificationService from '../../services/gamificationService';
-import { ResultadoActividad } from '../juegos/ResultadoActividad';
+import { ResultadoOverlay } from '../juegos/ResultadoActividad';
 import './quizInteractivo.css';
 
 const LETRAS = ['A', 'B', 'C', 'D'];
@@ -159,11 +159,17 @@ export function LogroToast({ titulo = '¡Logro desbloqueado!', mensaje, icono, o
 // con un toast.
 // `soloPrueba` (SPEC-012): vista previa del docente — se juega igual pero no
 // se otorga XP ni se guarda progreso.
-export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteId, reto, onCompletado, soloPrueba = false }) {
+// `onSalir` (opcional): navegación de "Otros quizzes" en el overlay de
+// resultado; sin él (vista previa, quiz embebido) la acción no se muestra.
+export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteId, reto, onCompletado, soloPrueba = false, onSalir }) {
     const [aciertos, setAciertos] = useState(0);
     const [respondidas, setRespondidas] = useState(0);
     const [puntosGanados, setPuntosGanados] = useState(0);
     const [toast, setToast] = useState(null);
+    // Overlay de resultado: visible al completar salvo que el estudiante lo
+    // haya cerrado para revisar ESTE quiz (se guarda la clave del quiz cerrado,
+    // así el estado se deriva sin setState en efectos y otro quiz lo reabre).
+    const [resultadoCerradoDe, setResultadoCerradoDe] = useState(null);
 
     // Reinicia el marcador si cambia el set de preguntas (otro quiz seleccionado).
     const claveQuiz = useMemo(() => preguntas.map((p) => p.pregunta).join('|'), [preguntas]);
@@ -245,14 +251,24 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
         <div className="quiz-interactivo" key={claveQuiz}>
             {/* Calificación /100 sobre las preguntas realmente presentadas en
                 este intento (con banco aleatorio, la muestra — nunca el pool),
-                retroalimentación por rango y XP como recompensa separada. */}
-            {completado && (
-                <ResultadoActividad
+                retroalimentación por rango y XP como recompensa separada.
+                Overlay de cierre: "Revisar respuestas" lo cierra dejando el
+                detalle actual de aciertos/errores/justificaciones intacto. */}
+            {completado && resultadoCerradoDe !== claveQuiz && (
+                <ResultadoOverlay
                     aciertos={aciertos}
                     total={total}
                     puntosGanados={puntosGanados}
                     detalle={`${aciertos} de ${total} correctas`}
+                    onRevisar={() => setResultadoCerradoDe(claveQuiz)}
+                    onContinuar={onSalir}
+                    etiquetaContinuar="Otros quizzes"
                 />
+            )}
+            {completado && resultadoCerradoDe === claveQuiz && (
+                <button type="button" className="resultado-reabrir" onClick={() => setResultadoCerradoDe(null)}>
+                    🏅 Ver mi resultado
+                </button>
             )}
 
             {preguntasJugables.map((p, i) => (

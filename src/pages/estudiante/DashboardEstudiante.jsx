@@ -449,6 +449,7 @@ export function DashboardEstudiante() {
                                         estudianteId={estudianteId}
                                         reto={quizActivo}
                                         onCompletado={refrescarProgreso}
+                                        onSalir={() => setQuizActivo(null)}
                                     />
                                 </section>
                             )}
