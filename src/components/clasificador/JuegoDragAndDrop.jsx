@@ -6,6 +6,7 @@ import CloudDoneRoundedIcon from '@mui/icons-material/CloudDoneRounded';
 import TouchAppRoundedIcon from '@mui/icons-material/TouchAppRounded';
 import gamificationService from '../../services/gamificationService';
 import { LogroToast } from '../quiz/QuizInteractivo';
+import { ResultadoActividad } from '../juegos/ResultadoActividad';
 import { COLORES_CATEGORIA } from './EditorClasificador';
 import './juegoDragAndDrop.css';
 
@@ -239,9 +240,8 @@ export function JuegoDragAndDrop({ reto, estudianteId, onSalir, onCompletado, so
                         ))}
                     </div>
                     <strong>¡Lo lograste!</strong>
-                    <p>
-                        {aciertos} de {total} al primer intento · +{puntosGanados} XP
-                    </p>
+                    {/* Calificación /100 + retroalimentación + XP separado. */}
+                    <ResultadoActividad aciertos={aciertos} total={total} puntosGanados={puntosGanados} />
                     <div className="juego-dnd-final-acciones">
                         <button type="button" className="juego-dnd-btn" onClick={reiniciar}>
                             <ReplayRoundedIcon sx={{ fontSize: '1.1rem' }} /> Jugar otra vez

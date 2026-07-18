@@ -12,6 +12,7 @@ import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
 import { authFetch } from '../../services/authService';
 import { misEstudiantes } from '../../services/docenteService';
 import { EmptyState, ModalPanel, TablaPro, formatearFecha } from './DashboardWidgets';
+import { retroalimentacionDe } from '../juegos/calificacion';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -136,6 +137,7 @@ export function LibroCalificaciones({ materia }) {
                                 <th>Estudiante</th>
                                 <th>Actividad</th>
                                 <th>Estado</th>
+                                <th>Calificación</th>
                                 <th>XP obtenida</th>
                                 <th>Revisión</th>
                                 <th>Fecha</th>
@@ -149,7 +151,13 @@ export function LibroCalificaciones({ materia }) {
                                     {f.reto}
                                     {f.observacion && <span title={f.observacion}> 💬</span>}
                                 </td>
-                                <td>{f.completado ? 'Completado' : `En progreso (${f.porcentaje}%)`}</td>
+                                <td>{f.completado ? 'Completado' : 'En progreso'}</td>
+                                {/* Calificación académica (mejor resultado persistido):
+                                    `porcentaje` equivale a aciertos/total en los flujos
+                                    actuales — se presenta como nota /100, no como XP. */}
+                                <td title="Mejor resultado del estudiante en esta actividad">
+                                    {retroalimentacionDe(f.porcentaje).emoji} <strong>{f.porcentaje} / 100</strong>
+                                </td>
                                 <td>{f.xp_obtenido} / {f.xp_recompensa} XP</td>
                                 <td>
                                     <span className={`bib-estado ${f.revisado ? 'bib-estado-publicado' : 'bib-estado-borrador'}`}>
@@ -183,7 +191,7 @@ export function LibroCalificaciones({ materia }) {
             {detalle && (
                 <ModalPanel
                     titulo={detalle.estudiante}
-                    subtitulo={`${detalle.reto} · ${detalle.completado ? 'Completado' : `En progreso (${detalle.porcentaje}%)`} · ${detalle.xp_obtenido} XP`}
+                    subtitulo={`${detalle.reto} · Calificación ${detalle.porcentaje}/100 (mejor resultado) · ${detalle.xp_obtenido} XP`}
                     onCerrar={() => !guardando && setDetalle(null)}
                     pie={
                         <>

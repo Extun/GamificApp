@@ -7,6 +7,7 @@ import ReplayRoundedIcon from '@mui/icons-material/ReplayRounded';
 import CloudDoneRoundedIcon from '@mui/icons-material/CloudDoneRounded';
 import gamificationService, { PUNTOS_POR_ACIERTO } from '../../services/gamificationService';
 import { LogroToast } from '../quiz/QuizInteractivo';
+import { ResultadoActividad } from '../juegos/ResultadoActividad';
 import './misionNarrativa.css';
 
 // Reproductor de Misiones Narrativas (estilo aventura gráfica / RPG por
@@ -205,13 +206,14 @@ export function MisionNarrativa({ reto, estudianteId, onSalir, onCompletado, sol
                     <EmojiEventsRoundedIcon className="mision-portada-icono mision-icono-oro" />
                     <h2>¡Misión cumplida!</h2>
                     <p className="mision-texto">{mision.final}</p>
-                    <div className="quiz-puntaje mision-marcador">
-                        <EmojiEventsRoundedIcon className="quiz-puntaje-icono" />
-                        <div>
-                            <strong>{aciertos} de {total} desafíos al primer intento</strong>
-                            <p>+{puntosGanados} XP · {PUNTOS_POR_ACIERTO} XP por desafío perfecto</p>
-                        </div>
-                    </div>
+                    {/* Calificación /100 (desafíos al primer intento) +
+                        retroalimentación por rango + XP separado. */}
+                    <ResultadoActividad
+                        aciertos={aciertos}
+                        total={total}
+                        puntosGanados={puntosGanados}
+                        detalle={`${aciertos} de ${total} desafíos al primer intento`}
+                    />
                     <div className="mision-final-acciones">
                         <button className="mision-btn mision-btn-secundario" onClick={reiniciar}>
                             <ReplayRoundedIcon sx={{ fontSize: '1.1rem' }} /> Jugar de nuevo

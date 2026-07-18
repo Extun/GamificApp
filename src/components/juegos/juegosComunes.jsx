@@ -9,6 +9,7 @@ import StarRoundedIcon from '@mui/icons-material/StarRounded';
 import CloudDoneRoundedIcon from '@mui/icons-material/CloudDoneRounded';
 import gamificationService, { PUNTOS_POR_ACIERTO } from '../../services/gamificationService';
 import { LogroToast } from '../quiz/QuizInteractivo';
+import { ResultadoActividad } from './ResultadoActividad';
 
 // Mezcla no destructiva (Fisher–Yates) para que cada partida sea distinta.
 export const mezclar = (arr) => {
@@ -89,7 +90,9 @@ export function PantallaFinal({ aciertos, total, puntosGanados, onReiniciar, onS
                 ))}
             </div>
             <strong>¡Lo lograste!</strong>
-            <p>{aciertos} de {total} al primer intento · +{puntosGanados} XP</p>
+            {/* Calificación /100 + retroalimentación por rango + XP separado.
+                La nota sale de aciertos/total del intento, nunca del XP. */}
+            <ResultadoActividad aciertos={aciertos} total={total} puntosGanados={puntosGanados} />
             <div className="juego-dnd-final-acciones">
                 <button type="button" className="juego-dnd-btn" onClick={onReiniciar}>
                     <ReplayRoundedIcon sx={{ fontSize: '1.1rem' }} /> Jugar otra vez

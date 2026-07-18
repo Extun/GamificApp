@@ -14,7 +14,8 @@ Fabrizio Zurita (Extun)
 |--------|--------|
 | Autenticación (login nombre+PIN, registro, emergencia, rate limiting) | ✅ |
 | Gestión de docentes (admin) | ✅ |
-| Gestión de estudiantes e invitaciones | ✅ |
+| Gestión de estudiantes (alta manual + carga masiva Excel + activación por código) | ✅ SPEC-014 completa, e2e confirmado en producción |
+| Invitaciones de estudiante | ⚪ Legacy — códigos existentes siguen funcionando; ya no se generan nuevos desde la UI |
 | Asignación de cursos a docentes (SPEC-009) | ✅ |
 | Material de estudio (base64 en MySQL, preview PDF/docx) | ✅ |
 | Quiz / Clasificador / Misión Narrativa | ✅ (crear con/sin IA y jugar) |
@@ -23,7 +24,8 @@ Fabrizio Zurita (Extun)
 | XP / niveles / ranking | ✅ (transaccional, idempotente) |
 | Misiones (reemplaza logros de `localStorage`) | ✅ Fases 1 y 2 (SPEC-007), e2e confirmado en producción |
 | Dashboards de los 3 roles con datos 100% reales | ✅ |
-| Libro de Calificaciones | ✅ |
+| Libro de Calificaciones | ✅ (muestra calificación /100 — mejor resultado) |
+| Calificación académica /100 + retroalimentación por rangos (los 6 juegos) | ✅ en código — revisión visual e2e en producción tras deploy |
 | Sistema RESET (SPEC-008) | ✅ (activo, protegido por `RESET_HABILITADO`) |
 | Permisos / Auditoría / Papelera (SPEC-003) | ✅ |
 | Asistente IA | ⚪ Retirado del menú — endpoint sigue existiendo sin entrada en la UI |
@@ -31,7 +33,9 @@ Fabrizio Zurita (Extun)
 
 ## Último sprint
 
-**Fix barra de XP del estudiante + SPEC-009 (Asignación de cursos a docentes) — 2026-07-10.** Home del estudiante ahora lee XP/nivel/racha/premios desde el servidor (`GET /api/misiones`) en vez de caché `localStorage`, y se refresca al entrar al Home y al completar cualquier actividad. El admin ahora asigna qué curso(s) gestiona cada docente (tabla `docente_curso`); el docente solo invita a sus cursos asignados (migración 010). Detalle completo en el historial más abajo.
+**Calificación académica /100 + retroalimentación por rangos (2026-07-18, requisito nº 4 del revisor de tesis; solo frontend, sin migración).** Toda actividad muestra al terminar una **calificación sobre 100** separada del XP: `calificacion = round(aciertos / total_evaluado × 100)`, calculada SIEMPRE desde los aciertos y el total realmente jugado en el intento (en el quiz con banco, la muestra presentada — nunca el pool), jamás desde el XP. Retroalimentación estándar por rango (0–40 🌱 motivación / 41–70 💪 esfuerzo / 71–100 🏆 felicitación, lenguaje neutral para niños) que depende SOLO de la nota. Nuevo `src/components/juegos/calificacion.js` (`calificacionDe`, `retroalimentacionDe`, puro) + componente compartido `ResultadoActividad.jsx` (+ css) integrado en las 4 pantallas finales que cubren los 6 juegos (PantallaFinal de juegosComunes → memorama/línea/completar; QuizInteractivo; JuegoDragAndDrop; MisionNarrativa): "Tu calificación X/100" con jerarquía principal, mensaje del rango y "+XX XP" como chip separado. **XP, progreso, ranking, niveles y misiones intactos** (§10 sin tocar; cero cambios de backend/BD). Libro de Calificaciones: nueva columna "Calificación" que presenta el `porcentaje` persistido como **nota X/100 con emoji del rango y tooltip "Mejor resultado"** (el upsert usa GREATEST: lo guardado es el mejor intento); verificado que los flujos actuales publican `xp_recompensa = total_items × 100` (quiz con banco: muestra × 100), por lo que `porcentaje` equivale a aciertos/total sin migración. Convención a mantener: si un flujo futuro publica `xp_recompensa` distinto de total×100, `porcentaje` dejaría de ser la nota (habría que persistir `calificacion` propia). Verificado: build limpio + prueba aislada de nota/rangos (16 casos borde). **Sin MySQL local: revisión visual e2e (pantallas finales de los 6 juegos, incl. móvil, y Libro) en producción tras el deploy.**
+
+**SPEC-014 — Carga masiva de estudiantes: COMPLETADA (2026-07-18, e2e validado en producción por Fabrizio).** Requisito nº 3 del revisor de tesis cerrado. Modelo único de alta: el docente registra (➕ Añadir estudiante o 📥 Importar desde Excel — ambos por la misma lógica de servidor) y el estudiante activa su acceso (Curso → Nombre → Código individual de un solo uso), y desde entonces entra con Nombre + PIN. Incluye estado de acceso Pendiente/Activado en los paneles, regeneración de código, edición de nombres/apellidos y fecha de nacimiento, homónimos resueltos por `nombre_norm`, criterio único de aula del docente (`docente_curso` OR invitación legacy) y las invitaciones antiguas en modo legacy. Detalle completo en el historial más abajo. **Cerrado: no se hacen más cambios en este módulo salvo bugs; las mejoras no indispensables sobre estudiantes quedan fuera de alcance hasta terminar el resto de puntos del revisor.**
 
 ## Próximo sprint
 

@@ -2,11 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import CancelRoundedIcon from '@mui/icons-material/CancelRounded';
 import LightbulbRoundedIcon from '@mui/icons-material/LightbulbRounded';
-import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import CloudDoneRoundedIcon from '@mui/icons-material/CloudDoneRounded';
 import gamificationService from '../../services/gamificationService';
+import { ResultadoActividad } from '../juegos/ResultadoActividad';
 import './quizInteractivo.css';
 
 const LETRAS = ['A', 'B', 'C', 'D'];
@@ -243,14 +243,16 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
 
     return (
         <div className="quiz-interactivo" key={claveQuiz}>
+            {/* Calificación /100 sobre las preguntas realmente presentadas en
+                este intento (con banco aleatorio, la muestra — nunca el pool),
+                retroalimentación por rango y XP como recompensa separada. */}
             {completado && (
-                <div className="quiz-puntaje">
-                    <EmojiEventsRoundedIcon className="quiz-puntaje-icono" />
-                    <div>
-                        <strong>{aciertos} de {total} correctas</strong>
-                        <p>{Math.round((aciertos / total) * 100)}% de aciertos · +{puntosGanados} XP</p>
-                    </div>
-                </div>
+                <ResultadoActividad
+                    aciertos={aciertos}
+                    total={total}
+                    puntosGanados={puntosGanados}
+                    detalle={`${aciertos} de ${total} correctas`}
+                />
             )}
 
             {preguntasJugables.map((p, i) => (

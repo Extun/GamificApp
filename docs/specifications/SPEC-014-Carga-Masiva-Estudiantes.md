@@ -1,6 +1,12 @@
 # SPEC-014 — Carga masiva de estudiantes por Excel + activación por código individual
 
-> Estado: **Aprobada, pendiente de implementación** (2026-07-18).
+> Estado: **COMPLETADA** — implementada y validada end-to-end en producción
+> (2026-07-18). Fases 1–7 cerradas. Ampliaciones acordadas sobre la spec
+> original: alta manual individual (`POST /api/estudiantes`, misma lógica que
+> la importación), edición de nombres/apellidos y fecha de nacimiento,
+> criterio único de aula del docente (`docente_curso` OR invitación legacy) y
+> retirada de la generación de invitaciones de la UI (backend y datos
+> intactos). Cambio de curso de un estudiante: fuera de alcance.
 > Autor: requerimiento nº 3 del revisor de tesis; diseño acordado con Fabrizio.
 > Toca áreas restringidas (§10 de CLAUDE.md): añade rutas públicas a `auth.js`
 > y modifica la consulta de localización del login de estudiante. Todo lo demás
@@ -297,19 +303,20 @@ generar plantilla/credenciales). No es librería de estilos.
 
 ## 14. Fases de implementación (cada una compila y deja la app funcional)
 
-1. **F1 — BD**: migración `012` + reversa; `initDb.js`.
-2. **F2 — Backend importación**: `server/lib/importacionEstudiantes.js`
+Todas completadas y validadas en producción (2026-07-18).
+
+1. ✅ **F1 — BD**: migración `012` + reversa; `initDb.js`.
+2. ✅ **F2 — Backend importación**: `server/lib/importacionEstudiantes.js`
    (validador puro, testeable sin BD) + `server/routes/estudiantesImport.js`.
-3. **F3 — UI importación**: `ImportarEstudiantes.jsx`, plantilla y export de
+3. ✅ **F3 — UI importación**: `ImportarEstudiantes.jsx`, plantilla y export de
    credenciales; integración en ambos paneles.
-4. **F4 — Activación**: endpoints públicos + protecciones + nueva vía en
+4. ✅ **F4 — Activación**: endpoints públicos + protecciones + nueva vía en
    `RegistroEstudiante.jsx`.
-5. **F5 — Homónimos**: `nombre_norm` en login/registro/cambiar-pin +
+5. ✅ **F5 — Homónimos**: `nombre_norm` en login/registro/cambiar-pin +
    limitador por nombre.
-6. **F6 — Estado y regeneración** en paneles admin/docente +
-   `mis-estudiantes` por `docente_curso`.
-7. **F7 — Verificación en producción** (Aiven/Render) + actualizar
-   `CURRENT_STATE.md`.
+6. ✅ **F6 — Estado y regeneración** en paneles admin/docente +
+   `mis-estudiantes` por aula del docente.
+7. ✅ **F7 — Verificación en producción** (Aiven/Render) + `CURRENT_STATE.md`.
 
 Verificación por fase: `npm run build` + `node --check` en los archivos de
 servidor tocados + prueba en navegador (incluido móvil) de lo visible.
