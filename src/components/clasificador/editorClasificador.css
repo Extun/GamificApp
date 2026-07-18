@@ -158,19 +158,25 @@
 
 .clasificador-publicar-barra {
     margin-top: 20px;
-    padding-top: 16px;
-    border-top: 1px solid var(--color-border);
+    padding: 16px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
     flex-wrap: wrap;
+    /* Fondo tintado + borde de acento para que la barra no se pierda contra
+       el fondo blanco del editor (feedback 2026-07-17). */
+    background: var(--color-primary-soft);
+    border: 1px solid var(--color-primary-light);
+    border-left: 4px solid var(--color-primary);
+    border-radius: var(--radius-md);
 }
 
 .clasificador-publicar-hint {
     margin: 0;
     font-size: 0.86rem;
-    color: var(--color-text-muted);
+    font-weight: 600;
+    color: var(--color-primary-dark);
     flex: 1;
     min-width: 220px;
 }
