@@ -429,13 +429,16 @@ router.get('/cursos-pendientes', async (_req, res, next) => {
 // ---- GET /api/auth/curso/:cursoId/estudiantes-pendientes ----
 router.get('/curso/:cursoId/estudiantes-pendientes', async (req, res, next) => {
     try {
+        // El JOIN con cursos activos evita enumerar nombres de cursos
+        // desactivados o en papelera (que el selector público nunca ofrece).
         const [filas] = await pool.query(
             `SELECT u.estudiante_id, u.nombre_completo AS nombre
              FROM usuarios u
              JOIN estudiantes e ON e.id = u.estudiante_id
+             JOIN cursos c ON c.id = e.curso_id AND c.activo = TRUE AND c.eliminado_en IS NULL
              WHERE e.curso_id = ? AND ${FILTRO_PENDIENTE}
              ORDER BY u.nombre_completo`,
-            [Number(req.params.cursoId)]
+            [Number(req.params.cursoId) || 0]
         );
         res.json(filas);
     } catch (err) {

@@ -49,13 +49,15 @@ const crearEstudiantePendiente = async (conn, datos) => {
     const pinInicial = pinDesdeFechaISO(fechaISO);
     const codigoActivacion = generarCodigo(6);
     const codigoEmergencia = generarCodigo(8);
+    // bcrypt asíncrono a propósito: la versión sync de 2 hashes × 60 filas
+    // congelaría el event loop (y con él TODA la app) varios segundos.
     const [cuenta] = await conn.query(
         `INSERT INTO usuarios (username, nombre_completo, nombre_norm, password_hash,
             pin_hash, codigo_emergencia, codigo_acceso_hash, codigo_acceso_pista,
             rol, estudiante_id)
          VALUES (?, ?, ?, '', ?, ?, ?, ?, 'estudiante', ?)`,
-        [username, nombreVisible, nombreNorm, bcrypt.hashSync(pinInicial, 10),
-         codigoEmergencia, bcrypt.hashSync(codigoActivacion, 10),
+        [username, nombreVisible, nombreNorm, await bcrypt.hash(pinInicial, 10),
+         codigoEmergencia, await bcrypt.hash(codigoActivacion, 10),
          codigoActivacion.slice(0, 3), ficha.insertId]
     );
 
@@ -347,11 +349,15 @@ router.post('/:usuarioId/regenerar-codigo', async (req, res, next) => {
         if (!cuenta) return res.status(status).json({ error });
 
         const codigo = generarCodigo(6);
+        // Se limpian también los contadores de bloqueo: el caso típico es un
+        // niño que agotó los 5 intentos con un código perdido — con el código
+        // nuevo en la mano no debe seguir esperando los 15 minutos.
         await pool.query(
             `UPDATE usuarios SET codigo_acceso_hash = ?, codigo_acceso_pista = ?,
-                codigo_acceso_usado_en = NULL
+                codigo_acceso_usado_en = NULL,
+                intentos_fallidos = 0, bloqueado_hasta = NULL
              WHERE id = ?`,
-            [bcrypt.hashSync(codigo, 10), codigo.slice(0, 3), usuarioId]
+            [await bcrypt.hash(codigo, 10), codigo.slice(0, 3), usuarioId]
         );
         registrarAuditoria({
             usuario: req.user, accion: 'regenero-codigo',
@@ -455,7 +461,7 @@ router.put('/:usuarioId', async (req, res, next) => {
                     ${pinNuevo ? ', pin_hash = ?' : ''}
                  WHERE id = ?`,
                 pinNuevo
-                    ? [nombreVisible, nombreNorm, bcrypt.hashSync(pinNuevo, 10), usuarioId]
+                    ? [nombreVisible, nombreNorm, await bcrypt.hash(pinNuevo, 10), usuarioId]
                     : [nombreVisible, nombreNorm, usuarioId]
             );
             await conn.commit();

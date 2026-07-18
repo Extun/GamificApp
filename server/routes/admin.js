@@ -520,6 +520,26 @@ router.post('/cursos', conPermiso('cursos'), async (req, res, next) => {
     }
 });
 
+// ¿Cuántos estudiantes del curso siguen pendientes de activar su cuenta?
+// (SPEC-014 §13) Un curso desactivado o en papelera desaparece del selector
+// de activación: si tuviera pendientes, esos niños no podrían entrar nunca.
+const pendientesDeActivacion = async (cursoId) => {
+    try {
+        const [[fila]] = await pool.query(
+            `SELECT COUNT(*) AS n FROM usuarios u
+             JOIN estudiantes e ON e.id = u.estudiante_id
+             WHERE e.curso_id = ? AND u.rol = 'estudiante' AND u.eliminado_en IS NULL
+               AND u.codigo_acceso_hash IS NOT NULL AND u.codigo_acceso_usado_en IS NULL`,
+            [cursoId]
+        );
+        return fila.n;
+    } catch (err) {
+        // Migración 012 aún no aplicada: no puede haber pendientes.
+        if (err.code === 'ER_BAD_FIELD_ERROR') return 0;
+        throw err;
+    }
+};
+
 // PUT /api/admin/cursos/:id — edita datos y/o activa/desactiva.
 router.put('/cursos/:id', conPermiso('cursos'), async (req, res, next) => {
     try {
@@ -527,6 +547,14 @@ router.put('/cursos/:id', conPermiso('cursos'), async (req, res, next) => {
         const datos = validarCurso(req.body);
         if (datos.error) return res.status(400).json({ error: datos.error });
         const activo = req.body?.activo === undefined ? true : Boolean(req.body.activo);
+        if (!activo) {
+            const pendientes = await pendientesDeActivacion(id);
+            if (pendientes) {
+                return res.status(409).json({
+                    error: `No se puede desactivar: ${pendientes} estudiante${pendientes === 1 ? '' : 's'} de este curso aún no ${pendientes === 1 ? 'ha' : 'han'} activado su cuenta y dejaría${pendientes === 1 ? '' : 'n'} de poder entrar. Actívalos o elimínalos primero.`
+                });
+            }
+        }
         // Transacción: el catálogo y los VARCHAR `curso` denormalizados
         // (SPEC-002 §1.2) se actualizan juntos o no se actualiza nada.
         const conn = await pool.getConnection();
@@ -577,6 +605,14 @@ router.delete('/cursos/:id', conPermiso('cursos'), async (req, res, next) => {
             [id]
         );
         if (!curso) return res.status(404).json({ error: 'Curso no encontrado' });
+        // SPEC-014 §13: con pendientes de activación, el curso no puede irse
+        // a la papelera (desaparecería del selector y quedarían sin entrar).
+        const pendientes = await pendientesDeActivacion(id);
+        if (pendientes) {
+            return res.status(409).json({
+                error: `No se puede eliminar: ${pendientes} estudiante${pendientes === 1 ? '' : 's'} de este curso aún no ${pendientes === 1 ? 'ha' : 'han'} activado su cuenta. Actívalos o elimínalos primero.`
+            });
+        }
         await pool.query(
             'UPDATE cursos SET eliminado_en = NOW(), eliminado_por = ? WHERE id = ?',
             [req.user.username, id]
