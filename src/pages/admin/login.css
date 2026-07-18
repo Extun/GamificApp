@@ -448,3 +448,101 @@
     .login-role-card:hover,
     .login-submit:hover { transform: none; transition: none; }
 }
+
+/* ---- SPEC-014: primera entrada por lista de clase (activación) ---- */
+
+/* Conmutador de camino: lista de clase vs código de invitación. */
+.registro-modos {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+.registro-modo {
+    padding: 10px 8px;
+    font-family: var(--font-body);
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--color-text);
+    background: var(--color-surface-alt);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+.registro-modo.is-activo {
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary);
+    color: var(--color-primary-dark);
+}
+
+/* El selector de curso hereda el look de los inputs del login. */
+.login-field select {
+    width: 100%;
+    padding: 12px 14px;
+    font-family: var(--font-body);
+    font-size: 1.05rem;
+    color: var(--color-text);
+    background: var(--color-surface-alt);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    outline: none;
+}
+.login-field select:focus {
+    background: #fff;
+    border-color: var(--color-primary-light);
+    box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.15);
+}
+
+.act-buscador {
+    margin-bottom: 8px;
+}
+
+/* Nombres del curso como botones grandes, fáciles de tocar. */
+.act-nombres {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 260px;
+    overflow-y: auto;
+    padding: 4px;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-alt);
+}
+.act-nombre {
+    padding: 12px 14px;
+    text-align: left;
+    font-family: var(--font-body);
+    font-size: 1.02rem;
+    font-weight: 600;
+    color: var(--color-text);
+    background: #fff;
+    border: 2px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.act-nombre:hover, .act-nombre:focus-visible {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
+}
+.act-vacio {
+    margin: 8px;
+    font-size: 0.92rem;
+    color: var(--color-text-muted);
+    text-align: center;
+}
+
+/* "Hola, Ana 👋 / No soy yo" */
+.act-elegido {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    background: var(--color-primary-soft);
+    border-radius: var(--radius-sm);
+    font-size: 1.02rem;
+}

@@ -16,6 +16,7 @@ import crypto from 'crypto';
 import pool from '../db.js';
 import { firmarToken, autenticar, permisosEfectivos } from '../middleware/auth.js';
 import { registrarAuditoria } from '../lib/auditoria.js';
+import { elegirPorPin, pinColisionaConHomonimos, crearLimitadorNombres } from '../lib/homonimos.js';
 
 const router = Router();
 
@@ -42,6 +43,34 @@ const PIN_VALIDO = /^[a-zA-Z0-9]{6}$/;
 const ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 export const generarCodigo = (largo) =>
     Array.from(crypto.randomBytes(largo), (b) => ALFABETO[b % ALFABETO.length]).join('');
+
+// Limitador POR NOMBRE para logins con varias homónimas (SPEC-014 Fase 5):
+// los fallos no tocan intentos_fallidos de ninguna cuenta — ninguna niña
+// hereda un bloqueo persistente por culpa de su homónima.
+const limitadorNombres = crearLimitadorNombres({ maxFallos: 5, minutosBloqueo: 15 });
+
+// Localiza cuentas de estudiante por nombre: nombre_norm (Fase 5) con
+// respaldo en username para cuentas previas a la migración 012 (ahí el
+// username ES el nombre normalizado). Si la columna aún no existe (deploy a
+// medias), cae a la consulta clásica por username.
+const buscarEstudiantesPorNombre = async (nombreNorm) => {
+    try {
+        const [filas] = await pool.query(
+            `SELECT * FROM usuarios
+             WHERE rol = 'estudiante'
+               AND (nombre_norm = ? OR (nombre_norm IS NULL AND username = ?))`,
+            [nombreNorm, nombreNorm]
+        );
+        return filas;
+    } catch (err) {
+        if (err.code !== 'ER_BAD_FIELD_ERROR') throw err;
+        const [filas] = await pool.query(
+            "SELECT * FROM usuarios WHERE username = ? AND rol = 'estudiante'",
+            [nombreNorm]
+        );
+        return filas;
+    }
+};
 
 // ---- Rate limiting por cuenta ----
 const estaBloqueado = (usuario) =>
@@ -90,43 +119,70 @@ router.post('/login', async (req, res, next) => {
             return res.status(400).json({ error: 'Faltan credenciales' });
         }
 
-        const [filas] = esEstudiante
-            ? await pool.query(
-                "SELECT * FROM usuarios WHERE username = ? AND rol = 'estudiante'",
-                [normalizarNombre(nombre)]
-            )
-            : await pool.query(
+        const ERROR_429 = { error: `Demasiados intentos. Espera ${MINUTOS_BLOQUEO} minutos e inténtalo de nuevo.` };
+
+        // "Nombre localiza, PIN decide" (SPEC-014 Fase 5). El nombre puede
+        // corresponder a VARIAS estudiantes homónimas (nombre_norm no es
+        // único); con una sola candidata el comportamiento es el clásico.
+        let usuario;
+        let esMulti = false;
+        let nombreNorm = null;
+        if (esEstudiante) {
+            nombreNorm = normalizarNombre(nombre);
+            // Cuentas en la Papelera (SPEC-003): se tratan como inexistentes.
+            // El chequeo es en JS (SELECT *) para tolerar la columna ausente
+            // en un deploy a medias.
+            const candidatas = (await buscarEstudiantesPorNombre(nombreNorm))
+                .filter((f) => !f.eliminado_en);
+            esMulti = candidatas.length > 1;
+            if (!esMulti) {
+                usuario = candidatas[0];
+            } else {
+                // Varias homónimas: limitador POR NOMBRE (en memoria), sin
+                // tocar los contadores persistentes de ninguna cuenta.
+                if (limitadorNombres.bloqueado(nombreNorm)) {
+                    return res.status(429).json(ERROR_429);
+                }
+                // El PIN decide: solo una puede coincidir (la colisión de
+                // PINs entre homónimas está vetada por construcción).
+                usuario = await elegirPorPin(candidatas, pin);
+            }
+        } else {
+            const [filas] = await pool.query(
                 "SELECT * FROM usuarios WHERE username = ? AND rol IN ('docente','admin')",
                 [String(username).trim().toLowerCase()]
             );
-        // Cuentas en la Papelera (SPEC-003): se tratan como inexistentes.
-        // El chequeo es en JS (SELECT *) para tolerar la columna ausente
-        // en un deploy a medias.
-        const usuario = filas[0]?.eliminado_en ? undefined : filas[0];
-
-        if (usuario && estaBloqueado(usuario)) {
-            return res.status(429).json({
-                error: `Demasiados intentos. Espera ${MINUTOS_BLOQUEO} minutos e inténtalo de nuevo.`
-            });
+            usuario = filas[0]?.eliminado_en ? undefined : filas[0];
         }
 
+        if (usuario && estaBloqueado(usuario)) {
+            return res.status(429).json(ERROR_429);
+        }
+
+        // Con homónimas, elegirPorPin ya verificó el PIN; en el resto de
+        // casos la verificación bcrypt es la clásica.
         const hash = esEstudiante ? usuario?.pin_hash : usuario?.password_hash;
-        const valido = usuario && hash && await bcrypt.compare(String(esEstudiante ? pin : password), hash);
+        const valido = esMulti
+            ? Boolean(usuario)
+            : Boolean(usuario && hash && await bcrypt.compare(String(esEstudiante ? pin : password), hash));
 
         if (!valido) {
             // Mismo mensaje exista o no la cuenta: no revelar cuál falló.
-            if (usuario) {
+            if (esMulti) {
+                if (limitadorNombres.fallo(nombreNorm)) {
+                    return res.status(429).json(ERROR_429);
+                }
+            } else if (usuario) {
                 const bloqueado = await registrarFallo(usuario.id, usuario.intentos_fallidos);
                 if (bloqueado) {
-                    return res.status(429).json({
-                        error: `Demasiados intentos. Espera ${MINUTOS_BLOQUEO} minutos e inténtalo de nuevo.`
-                    });
+                    return res.status(429).json(ERROR_429);
                 }
             }
             return res.status(401).json({
                 error: esEstudiante ? 'Nombre o PIN incorrectos' : 'Usuario o contraseña incorrectos'
             });
         }
+        if (esMulti) limitadorNombres.exito(nombreNorm);
 
         // Cuenta desactivada por un Administrador Principal: credenciales
         // correctas pero sin acceso (usuario.activo puede no existir si la
@@ -215,11 +271,23 @@ router.post('/registro-estudiante', async (req, res, next) => {
 
         const pinInicial = pinDesdeFecha(fecha_nacimiento);
         const codigoEmergencia = generarCodigo(8);
-        const [cuenta] = await conn.query(
-            `INSERT INTO usuarios (username, nombre_completo, password_hash, pin_hash, codigo_emergencia, rol, estudiante_id)
-             VALUES (?, ?, '', ?, ?, 'estudiante', ?)`,
-            [nombreNorm, nombreVisible, bcrypt.hashSync(pinInicial, 10), codigoEmergencia, fichaEst.insertId]
-        );
+        // nombre_norm (Fase 5): el login localiza por esta columna. Si la
+        // migración 012 aún no corrió, se degrada al INSERT clásico.
+        let cuenta;
+        try {
+            [cuenta] = await conn.query(
+                `INSERT INTO usuarios (username, nombre_completo, nombre_norm, password_hash, pin_hash, codigo_emergencia, rol, estudiante_id)
+                 VALUES (?, ?, ?, '', ?, ?, 'estudiante', ?)`,
+                [nombreNorm, nombreVisible, nombreNorm, bcrypt.hashSync(pinInicial, 10), codigoEmergencia, fichaEst.insertId]
+            );
+        } catch (err) {
+            if (err.code !== 'ER_BAD_FIELD_ERROR') throw err;
+            [cuenta] = await conn.query(
+                `INSERT INTO usuarios (username, nombre_completo, password_hash, pin_hash, codigo_emergencia, rol, estudiante_id)
+                 VALUES (?, ?, '', ?, ?, 'estudiante', ?)`,
+                [nombreNorm, nombreVisible, bcrypt.hashSync(pinInicial, 10), codigoEmergencia, fichaEst.insertId]
+            );
+        }
 
         await conn.query(
             "UPDATE invitaciones_estudiante SET estado = 'usado', usuario_id = ? WHERE id = ?",
@@ -264,12 +332,31 @@ router.post('/emergencia', async (req, res, next) => {
             return res.status(400).json({ error: 'Se requieren nombre y código de emergencia' });
         }
 
-        const [filas] = await pool.query(
-            `SELECT u.*, e.fecha_nacimiento FROM usuarios u
-             LEFT JOIN estudiantes e ON e.id = u.estudiante_id
-             WHERE u.username = ? AND u.codigo_emergencia = ? AND u.rol = 'estudiante'`,
-            [normalizarNombre(nombre), String(codigo_emergencia).trim().toUpperCase()]
-        );
+        // Localiza por nombre_norm (Fase 5): las homónimas con username
+        // interno "~2" también escriben su nombre tal cual. El código de
+        // emergencia es único global, así que desambigua solo. El respaldo
+        // por username cubre cuentas previas a la migración 012 (y una BD
+        // sin migrar: la subconsulta se degrada en el catch).
+        const nombreNorm = normalizarNombre(nombre);
+        const codigoNorm = String(codigo_emergencia).trim().toUpperCase();
+        let filas;
+        try {
+            [filas] = await pool.query(
+                `SELECT u.*, e.fecha_nacimiento FROM usuarios u
+                 LEFT JOIN estudiantes e ON e.id = u.estudiante_id
+                 WHERE (u.nombre_norm = ? OR (u.nombre_norm IS NULL AND u.username = ?))
+                   AND u.codigo_emergencia = ? AND u.rol = 'estudiante'`,
+                [nombreNorm, nombreNorm, codigoNorm]
+            );
+        } catch (err) {
+            if (err.code !== 'ER_BAD_FIELD_ERROR') throw err;
+            [filas] = await pool.query(
+                `SELECT u.*, e.fecha_nacimiento FROM usuarios u
+                 LEFT JOIN estudiantes e ON e.id = u.estudiante_id
+                 WHERE u.username = ? AND u.codigo_emergencia = ? AND u.rol = 'estudiante'`,
+                [nombreNorm, codigoNorm]
+            );
+        }
         // Cuentas en la Papelera se tratan como inexistentes (SPEC-003).
         const usuario = filas[0]?.eliminado_en ? undefined : filas[0];
         if (!usuario) {
@@ -305,6 +392,124 @@ router.post('/emergencia', async (req, res, next) => {
     }
 });
 
+// ---------------------------------------------------------------------------
+// SPEC-014 — Activación de estudiantes importados por Excel.
+// Flujo público: Curso → Nombre → Código individual. La lista expone lo
+// MÍNIMO (id + nombre de pendientes, nunca XP/fechas/pistas) y el código se
+// valida SIEMPRE contra la fila del estudiante seleccionado: el código de
+// otro niño jamás abre esta cuenta.
+
+// Estado "pendiente" (derivado, sin columna extra): tiene código vigente y
+// nunca lo ha usado. Las cuentas por invitación tienen el hash NULL.
+const FILTRO_PENDIENTE =
+    "u.rol = 'estudiante' AND u.eliminado_en IS NULL AND u.codigo_acceso_hash IS NOT NULL AND u.codigo_acceso_usado_en IS NULL";
+
+// ---- GET /api/auth/cursos-pendientes ----
+// Solo los cursos activos que TIENEN estudiantes por activar: el selector
+// del niño no muestra cursos donde no hay nada que hacer.
+router.get('/cursos-pendientes', async (_req, res, next) => {
+    try {
+        const [cursos] = await pool.query(
+            `SELECT c.id, CONCAT(c.nombre, ' ', c.paralelo) AS etiqueta
+             FROM cursos c
+             WHERE c.activo = TRUE AND c.eliminado_en IS NULL
+               AND EXISTS (SELECT 1 FROM estudiantes e
+                           JOIN usuarios u ON u.estudiante_id = e.id
+                           WHERE e.curso_id = c.id AND ${FILTRO_PENDIENTE})
+             ORDER BY c.nombre, c.paralelo`
+        );
+        res.json(cursos);
+    } catch (err) {
+        // BD sin la migración 012: no hay nada pendiente, lista vacía.
+        if (err.code === 'ER_BAD_FIELD_ERROR') return res.json([]);
+        next(err);
+    }
+});
+
+// ---- GET /api/auth/curso/:cursoId/estudiantes-pendientes ----
+router.get('/curso/:cursoId/estudiantes-pendientes', async (req, res, next) => {
+    try {
+        const [filas] = await pool.query(
+            `SELECT u.estudiante_id, u.nombre_completo AS nombre
+             FROM usuarios u
+             JOIN estudiantes e ON e.id = u.estudiante_id
+             WHERE e.curso_id = ? AND ${FILTRO_PENDIENTE}
+             ORDER BY u.nombre_completo`,
+            [Number(req.params.cursoId)]
+        );
+        res.json(filas);
+    } catch (err) {
+        if (err.code === 'ER_BAD_FIELD_ERROR') return res.json([]);
+        next(err);
+    }
+});
+
+// ---- POST /api/auth/activar ----
+// Body: { estudiante_id, codigo }. La cuenta se localiza POR el estudiante
+// seleccionado (nunca por el código); bcrypt decide. Un solo uso: al activar,
+// el hash se anula y usado_en queda marcado. Mismo rate limiting por cuenta
+// que el login (5 fallos → 15 min) + el limitador global por IP de /api/auth.
+router.post('/activar', async (req, res, next) => {
+    try {
+        const estudianteId = Number(req.body?.estudiante_id);
+        const codigo = String(req.body?.codigo || '').trim().toUpperCase();
+        if (!estudianteId || !codigo) {
+            return res.status(400).json({ error: 'Elige tu nombre y escribe tu código' });
+        }
+
+        const [[usuario]] = await pool.query(
+            `SELECT u.*, e.fecha_nacimiento FROM usuarios u
+             JOIN estudiantes e ON e.id = u.estudiante_id
+             WHERE u.estudiante_id = ? AND ${FILTRO_PENDIENTE}`,
+            [estudianteId]
+        );
+        // Mensaje idéntico exista o no la cuenta pendiente: no revelar nada.
+        const ERROR_GENERICO = 'Ese código no es correcto. Revisa que sea el tuyo y vuelve a intentarlo.';
+        if (!usuario) return res.status(401).json({ error: ERROR_GENERICO });
+
+        if (estaBloqueado(usuario)) {
+            return res.status(429).json({
+                error: `Demasiados intentos. Espera ${MINUTOS_BLOQUEO} minutos e inténtalo de nuevo.`
+            });
+        }
+
+        if (!await bcrypt.compare(codigo, usuario.codigo_acceso_hash)) {
+            const bloqueado = await registrarFallo(usuario.id, usuario.intentos_fallidos);
+            if (bloqueado) {
+                return res.status(429).json({
+                    error: `Demasiados intentos. Espera ${MINUTOS_BLOQUEO} minutos e inténtalo de nuevo.`
+                });
+            }
+            return res.status(401).json({ error: ERROR_GENERICO });
+        }
+
+        // Un solo uso, a prueba de doble clic: el WHERE exige que siga
+        // pendiente; si otra petición ganó, affectedRows = 0.
+        const [consumo] = await pool.query(
+            `UPDATE usuarios SET codigo_acceso_hash = NULL, codigo_acceso_usado_en = NOW(),
+                intentos_fallidos = 0, bloqueado_hasta = NULL
+             WHERE id = ? AND codigo_acceso_usado_en IS NULL AND codigo_acceso_hash IS NOT NULL`,
+            [usuario.id]
+        );
+        if (!consumo.affectedRows) return res.status(401).json({ error: ERROR_GENERICO });
+
+        const pinInicial = usuario.fecha_nacimiento
+            ? pinDesdeFecha(usuario.fecha_nacimiento.toISOString?.() || usuario.fecha_nacimiento)
+            : null;
+        registrarAuditoria({
+            usuario, accion: 'activo-cuenta',
+            descripcion: 'Entró por primera vez con su código individual'
+        });
+        return respuestaSesion(res, usuario, {
+            pin: pinInicial,
+            codigo_emergencia: usuario.codigo_emergencia,
+            mensaje: 'Tu PIN es tu fecha de nacimiento (día-mes-año). Anota tu código de emergencia.'
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
 // ---- PUT /api/auth/cambiar-pin (estudiante autenticado) ----
 router.put('/cambiar-pin', autenticar, async (req, res, next) => {
     try {
@@ -319,6 +524,20 @@ router.put('/cambiar-pin', autenticar, async (req, res, next) => {
         const [[usuario]] = await pool.query('SELECT * FROM usuarios WHERE id = ?', [req.user.id]);
         if (!usuario?.pin_hash || !await bcrypt.compare(String(pin_actual || ''), usuario.pin_hash)) {
             return res.status(401).json({ error: 'El PIN actual no es correcto' });
+        }
+
+        // SPEC-014 Fase 5: dos homónimas no pueden converger al mismo PIN
+        // (el login no podría distinguirlas). Mensaje neutro a propósito: no
+        // revela que existe una homónima ni por qué ese PIN no sirve.
+        if (usuario.nombre_norm) {
+            const [homonimos] = await pool.query(
+                `SELECT pin_hash FROM usuarios
+                 WHERE nombre_norm = ? AND id <> ? AND rol = 'estudiante' AND eliminado_en IS NULL`,
+                [usuario.nombre_norm, usuario.id]
+            );
+            if (await pinColisionaConHomonimos(String(pin_nuevo), homonimos)) {
+                return res.status(400).json({ error: 'Ese PIN no está disponible, elige otro.' });
+            }
         }
 
         await pool.query('UPDATE usuarios SET pin_hash = ? WHERE id = ?',

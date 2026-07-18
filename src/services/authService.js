@@ -42,6 +42,13 @@ const postPublico = async (ruta, body) => {
     return data;
 };
 
+const getPublico = async (ruta) => {
+    const res = await fetch(`${API_URL}${ruta}`);
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+    return data;
+};
+
 // Login de docente/admin: usuario + contraseña. El rol lo decide el servidor.
 export const login = async (username, password) => {
     const data = await postPublico('/api/auth/login', { username, password });
@@ -60,6 +67,25 @@ export const registrarEstudiante = async ({ nombre, fechaNacimiento, codigo }) =
     const data = await postPublico('/api/auth/registro-estudiante', {
         nombre,
         fecha_nacimiento: fechaNacimiento,
+        codigo
+    });
+    guardarSesion(data);
+    return data;
+};
+
+// ---- SPEC-014: primera entrada de estudiantes importados por Excel ----
+// Cursos con estudiantes por activar (público, solo id + etiqueta).
+export const cursosPendientes = () => getPublico('/api/auth/cursos-pendientes');
+
+// Estudiantes pendientes de UN curso (público, solo id + nombre).
+export const estudiantesPendientes = (cursoId) =>
+    getPublico(`/api/auth/curso/${cursoId}/estudiantes-pendientes`);
+
+// Activa la cuenta: el backend valida estudiante seleccionado + SU código.
+// Devuelve sesión iniciada + PIN inicial y código de emergencia para anotar.
+export const activarEstudiante = async (estudianteId, codigo) => {
+    const data = await postPublico('/api/auth/activar', {
+        estudiante_id: estudianteId,
         codigo
     });
     guardarSesion(data);
@@ -144,6 +170,9 @@ const authService = {
     login,
     loginEstudiante,
     registrarEstudiante,
+    cursosPendientes,
+    estudiantesPendientes,
+    activarEstudiante,
     loginEmergencia,
     cambiarPin,
     logout,
