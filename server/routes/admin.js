@@ -190,7 +190,8 @@ router.get('/estudiantes', conPermiso('estudiantes'), async (_req, res, next) =>
             `SELECT u.id AS usuario_id, u.nombre_completo, u.codigo_emergencia,
                     u.intentos_fallidos, u.bloqueado_hasta, u.codigo_acceso_pista,
                     (u.codigo_acceso_hash IS NOT NULL AND u.codigo_acceso_usado_en IS NULL) AS pendiente,
-                    e.id AS estudiante_id, e.curso, e.xp_total, e.fecha_nacimiento, e.creado_en
+                    e.id AS estudiante_id, e.curso, e.xp_total, e.fecha_nacimiento, e.creado_en,
+                    e.nombres, e.apellidos
              FROM usuarios u
              JOIN estudiantes e ON e.id = u.estudiante_id
              WHERE u.rol = 'estudiante' AND u.eliminado_en IS NULL

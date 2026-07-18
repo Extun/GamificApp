@@ -18,7 +18,8 @@
 
 .imp-campo { display: flex; flex-direction: column; gap: 6px; }
 .imp-campo > span { font-weight: 600; font-size: 0.92rem; }
-.imp-campo select {
+.imp-campo select,
+.imp-campo input[type="text"] {
     padding: 10px 12px;
     border: 1px solid var(--color-border, #e2e8f0);
     border-radius: var(--radius-md, 12px);

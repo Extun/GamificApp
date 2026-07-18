@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import pool from '../db.js';
 import { soloDocente } from '../middleware/auth.js';
 import { generarCodigo } from './auth.js';
-import { resetearPinADefault } from '../lib/estudiantes.js';
+import { resetearPinADefault, sqlAulaDocente } from '../lib/estudiantes.js';
 import { registrarAuditoria } from '../lib/auditoria.js';
 
 const router = Router();
@@ -119,14 +119,12 @@ router.get('/mis-estudiantes', async (req, res, next) => {
             `SELECT u.id AS usuario_id, u.nombre_completo, u.bloqueado_hasta,
                     u.codigo_acceso_pista,
                     (u.codigo_acceso_hash IS NOT NULL AND u.codigo_acceso_usado_en IS NULL) AS pendiente,
-                    e.id AS estudiante_id, e.curso, e.xp_total, e.fecha_nacimiento
+                    e.id AS estudiante_id, e.curso, e.xp_total, e.fecha_nacimiento,
+                    e.nombres, e.apellidos
              FROM usuarios u
              JOIN estudiantes e ON e.id = u.estudiante_id
              WHERE u.rol = 'estudiante' AND u.eliminado_en IS NULL
-               AND (EXISTS (SELECT 1 FROM docente_curso dc
-                            WHERE dc.docente_id = ? AND dc.curso_id = e.curso_id)
-                 OR EXISTS (SELECT 1 FROM invitaciones_estudiante i
-                            WHERE i.docente_id = ? AND i.usuario_id = u.id AND i.estado = 'usado'))
+               AND ${sqlAulaDocente('e.id')}
              ORDER BY e.curso, u.nombre_completo`,
             [req.user.id, req.user.id]
         );
@@ -143,16 +141,11 @@ router.post('/estudiantes/:usuarioId/resetear-pin', async (req, res, next) => {
     try {
         const usuarioId = Number(req.params.usuarioId);
         if (req.user.rol !== 'admin') {
-            // Suyo si el curso está asignado (incluye importados, SPEC-014)
-            // o si se registró con una invitación de este docente.
+            // Suyo si está en su aula (curso asignado o invitación legacy).
             const [propio] = await pool.query(
                 `SELECT 1 FROM usuarios u
                  JOIN estudiantes e ON e.id = u.estudiante_id
-                 WHERE u.id = ?
-                   AND (EXISTS (SELECT 1 FROM docente_curso dc
-                                WHERE dc.docente_id = ? AND dc.curso_id = e.curso_id)
-                     OR EXISTS (SELECT 1 FROM invitaciones_estudiante i
-                                WHERE i.docente_id = ? AND i.usuario_id = u.id))`,
+                 WHERE u.id = ? AND ${sqlAulaDocente('e.id')}`,
                 [usuarioId, req.user.id, req.user.id]
             );
             if (!propio.length) {
@@ -186,12 +179,7 @@ const estudianteDelDocente = async (user, usuarioId) => {
          FROM usuarios u
          JOIN estudiantes e ON e.id = u.estudiante_id
          WHERE u.id = ? AND u.rol = 'estudiante' AND u.eliminado_en IS NULL
-           ${user.rol === 'admin' ? '' : `AND (EXISTS (
-               SELECT 1 FROM docente_curso dc
-               WHERE dc.docente_id = ? AND dc.curso_id = e.curso_id)
-             OR EXISTS (
-               SELECT 1 FROM invitaciones_estudiante i
-               WHERE i.usuario_id = u.id AND i.docente_id = ?))`}`,
+           ${user.rol === 'admin' ? '' : `AND ${sqlAulaDocente('e.id')}`}`,
         user.rol === 'admin' ? [usuarioId] : [usuarioId, user.id, user.id]
     );
     return filas[0] || null;
@@ -230,15 +218,13 @@ router.get('/resumen', async (req, res, next) => {
             [materiaIds]
         );
 
-        // Su aula: estudiantes que se registraron con SUS códigos (el admin
-        // ve el total institucional).
+        // Su aula: criterio único de SPEC-014 (curso asignado o invitación
+        // legacy). El admin ve el total institucional.
         const filtroAula = req.user.rol === 'admin'
             ? { sql: '', params: [] }
             : {
-                sql: `AND e.id IN (SELECT u.estudiante_id FROM invitaciones_estudiante i
-                       JOIN usuarios u ON u.id = i.usuario_id
-                       WHERE i.docente_id = ? AND i.estado = 'usado')`,
-                params: [req.user.id]
+                sql: `AND ${sqlAulaDocente('e.id')}`,
+                params: [req.user.id, req.user.id]
             };
         const [[aula]] = await pool.query(
             `SELECT COUNT(DISTINCT e.id) AS estudiantes,
@@ -268,10 +254,11 @@ router.get('/resumen', async (req, res, next) => {
                 : `SELECT id, rol, nombre, accion, descripcion, materia, creado_en
                    FROM auditoria
                    WHERE usuario_id = ? OR usuario_id IN (
-                       SELECT usuario_id FROM invitaciones_estudiante
-                       WHERE docente_id = ? AND estado = 'usado')
+                       SELECT ua.id FROM usuarios ua
+                       WHERE ua.rol = 'estudiante' AND ua.estudiante_id IS NOT NULL
+                         AND ${sqlAulaDocente('ua.estudiante_id')})
                    ORDER BY creado_en DESC, id DESC LIMIT 15`,
-            req.user.rol === 'admin' ? [] : [req.user.id, req.user.id]
+            req.user.rol === 'admin' ? [] : [req.user.id, req.user.id, req.user.id]
         ).catch((err) => {
             // Tabla auditoria ausente (deploy a medias): Home sin cronología.
             if (err.code === 'ER_NO_SUCH_TABLE') return [[]];
@@ -306,27 +293,23 @@ router.get('/resumen', async (req, res, next) => {
 // docente observa, nunca modifica. El admin ve el total institucional.
 router.get('/misiones', async (req, res, next) => {
     try {
-        // Estudiantes en el ámbito (los que se registraron con SUS códigos; el
+        // Estudiantes en el ámbito (criterio único de aula, SPEC-014; el
         // admin, todos). Se filtra por el estudiante de mision_estudiante.
         const filtro = req.user.rol === 'admin'
             ? { sql: '', params: [] }
             : {
-                sql: `AND me.estudiante_id IN (
-                        SELECT u.estudiante_id FROM invitaciones_estudiante i
-                        JOIN usuarios u ON u.id = i.usuario_id
-                        WHERE i.docente_id = ? AND i.estado = 'usado')`,
-                params: [req.user.id]
+                sql: `AND ${sqlAulaDocente('me.estudiante_id')}`,
+                params: [req.user.id, req.user.id]
             };
 
         // Nº de estudiantes del ámbito (denominador de los promedios).
         const [[aula]] = req.user.rol === 'admin'
             ? await pool.query('SELECT COUNT(*) AS n FROM estudiantes')
             : await pool.query(
-                `SELECT COUNT(DISTINCT u.estudiante_id) AS n
-                 FROM invitaciones_estudiante i
-                 JOIN usuarios u ON u.id = i.usuario_id
-                 WHERE i.docente_id = ? AND i.estado = 'usado' AND u.estudiante_id IS NOT NULL`,
-                [req.user.id]
+                `SELECT COUNT(*) AS n FROM estudiantes e
+                 JOIN usuarios u ON u.estudiante_id = e.id AND u.rol = 'estudiante'
+                 WHERE u.eliminado_en IS NULL AND ${sqlAulaDocente('e.id')}`,
+                [req.user.id, req.user.id]
             );
 
         // Misiones activas por categoría (base para el % de avance).

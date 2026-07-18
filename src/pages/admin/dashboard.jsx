@@ -46,6 +46,9 @@ import { MisionesDocente } from '../docente/MisionesDocente';
 import MilitaryTechRoundedIcon from '@mui/icons-material/MilitaryTechRounded';
 import { FichaEstudiante } from '../docente/FichaEstudiante';
 import ImportarEstudiantes from '../../components/ImportarEstudiantes';
+import AgregarEstudiante from '../../components/AgregarEstudiante';
+import EditarEstudiante from '../../components/EditarEstudiante';
+import EditRoundedIcon from '@mui/icons-material/EditRounded';
 
 const TIPO_RETO_LABEL = { quiz: 'Quiz', clasificador: 'Juego', mision: 'Misión' };
 
@@ -210,11 +213,9 @@ export function Dashboard() {
     }, [pagina]);
 
     const [misEstudiantes, setMisEstudiantes] = useState([]);
+    // Invitaciones legacy: solo para mostrar los códigos aún sin usar.
     const [invitaciones, setInvitaciones] = useState([]);
-    const [codigosNuevos, setCodigosNuevos] = useState([]);
     const [cursos, setCursos] = useState([]);
-    const [invCursoId, setInvCursoId] = useState('');
-    const [invCantidad, setInvCantidad] = useState(10);
     const [avisoOk, setAvisoOk] = useState('');
 
     const cargarEstudiantes = async () => {
@@ -275,23 +276,6 @@ export function Dashboard() {
         setTabMateria(tab);
     };
 
-    const handleGenerarInvitaciones = async (e) => {
-        e.preventDefault();
-        try {
-            setErrorMaterial('');
-            if (!invCursoId) {
-                setErrorMaterial('Elige el curso de la lista antes de generar códigos.');
-                return;
-            }
-            const data = await docenteService.generarInvitaciones(invCantidad, Number(invCursoId));
-            setCodigosNuevos(data.codigos);
-            setAvisoOk(`${data.codigos.length} códigos generados para ${data.curso} (válidos ${data.dias_vigencia} días).`);
-            await cargarEstudiantes();
-        } catch (err) {
-            setErrorMaterial(err.message);
-        }
-    };
-
     const handleResetPin = async (est) => {
         try {
             setErrorMaterial('');
@@ -328,6 +312,10 @@ export function Dashboard() {
     // para que el docente lo anote y se lo entregue al estudiante.
     const [codigoNuevo, setCodigoNuevo] = useState(null);
     const [regenerando, setRegenerando] = useState(false);
+    // Modal "Editar estudiante" (corregir nombres/apellidos, SPEC-014).
+    const [editandoEstudiante, setEditandoEstudiante] = useState(null);
+    // Modal "Añadir estudiante": alta manual (misma lógica que el Excel).
+    const [agregando, setAgregando] = useState(false);
 
     const handleRegenerarCodigo = async (est) => {
         if (regenerando) return;
@@ -902,7 +890,7 @@ export function Dashboard() {
                     <div className="home-doc">
                         <div>
                             <h1 style={{pointerEvents:"none"}}>Mis Estudiantes</h1>
-                            <p className="contenido-sub" style={{ marginBottom: 0 }}>Todos tus estudiantes en una sola lista: regístralos con códigos de invitación o impórtalos desde Excel, y ayúdalos si olvidan su PIN o su código.</p>
+                            <p className="contenido-sub" style={{ marginBottom: 0 }}>Todos tus estudiantes en una sola lista: añádelos uno a uno o importa el curso completo desde Excel, y ayúdalos si olvidan su PIN o su código.</p>
                         </div>
 
                         {avisoOk && (
@@ -925,9 +913,14 @@ export function Dashboard() {
                                 <div className="section-head-extra">
                                     <span className="card-tag">{misEstudiantes.length}</span>
                                     {cursos.length > 0 && (
-                                        <button type="button" className="section-accion" onClick={() => setImportando(true)}>
-                                            📥 Importar desde Excel
-                                        </button>
+                                        <>
+                                            <button type="button" className="section-accion" onClick={() => setAgregando(true)}>
+                                                ➕ Añadir estudiante
+                                            </button>
+                                            <button type="button" className="section-accion" onClick={() => setImportando(true)}>
+                                                📥 Importar desde Excel
+                                            </button>
+                                        </>
                                     )}
                                     <button type="button" className="section-accion" onClick={() => setPagina('ranking')}>
                                         Ver ranking completo
@@ -957,6 +950,12 @@ export function Dashboard() {
                                                 )}
                                             </td>
                                             <td className="admin-acciones">
+                                                <button
+                                                    title="Corregir nombres o apellidos"
+                                                    onClick={() => setEditandoEstudiante(est)}
+                                                >
+                                                    <EditRoundedIcon sx={{ fontSize: '1.1rem' }} /> Editar
+                                                </button>
                                                 {est.pendiente ? (
                                                     <button
                                                         title="Generar un código de activación nuevo (el anterior deja de servir)"
@@ -982,74 +981,47 @@ export function Dashboard() {
                                         </tr>
                                     ))}
                                     {!misEstudiantes.length && (
-                                        <tr><td colSpan={5} className="vacio-msg">Aún no tienes estudiantes: genera códigos de invitación o importa tu lista desde Excel.</td></tr>
+                                        <tr><td colSpan={5} className="vacio-msg">
+                                            {cursos.length === 0
+                                                ? 'Todavía no tienes cursos asignados. Pídele al administrador que te asigne uno para poder registrar estudiantes.'
+                                                : 'Aún no tienes estudiantes: añádelos con «Añadir estudiante» o importa tu lista desde Excel.'}
+                                        </td></tr>
                                     )}
                                 </tbody>
                             </table>
                         </section>
 
-                        <section className="card">
-                            <div className="card-head">
-                                <h3><VpnKeyRoundedIcon sx={{ fontSize: '1.1rem', verticalAlign: 'middle' }} /> Generar invitaciones</h3>
-                            </div>
-                            {cursos.length === 0 ? (
-                                <p className="contenido-sub" style={{ margin: 0 }}>
-                                    Todavía no tienes cursos asignados. Pídele al administrador que te
-                                    asigne uno para poder generar códigos de invitación.
-                                </p>
-                            ) : (
-                                <form className="admin-form" onSubmit={handleGenerarInvitaciones}>
-                                    <select
-                                        value={invCursoId}
-                                        onChange={(e) => setInvCursoId(e.target.value)}
-                                        aria-label="Curso de los estudiantes"
-                                    >
-                                        <option value="">Elige el curso…</option>
-                                        {cursos.map((c) => (
-                                            <option key={c.id} value={c.id}>{c.etiqueta}</option>
-                                        ))}
-                                    </select>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        max="40"
-                                        value={invCantidad}
-                                        onChange={(e) => setInvCantidad(Number(e.target.value))}
-                                    />
-                                    <button type="submit" className="upload-mini-btn">Generar códigos</button>
-                                </form>
-                            )}
-                            {codigosNuevos.length > 0 && (
-                                <div className="inv-codigos-nuevos">
-                                    {codigosNuevos.map((c) => <code key={c}>{c}</code>)}
+                        {/* Sistema anterior de invitaciones (legacy): ya no se
+                            generan códigos nuevos desde aquí. La sección solo
+                            aparece mientras queden códigos SIN USAR vigentes,
+                            y desaparece sola cuando se consuman o expiren. */}
+                        {invitaciones.some((i) => i.estado === 'pendiente') && (
+                            <section className="card">
+                                <div className="card-head">
+                                    <h3><VpnKeyRoundedIcon sx={{ fontSize: '1.1rem', verticalAlign: 'middle' }} /> Códigos de invitación sin usar</h3>
+                                    <span className="card-tag">{invitaciones.filter((i) => i.estado === 'pendiente').length}</span>
                                 </div>
-                            )}
-                        </section>
-
-                        <section className="card">
-                            <div className="card-head">
-                                <h3>Códigos de invitación emitidos</h3>
-                                <span className="card-tag">{invitaciones.length}</span>
-                            </div>
-                            <table className="admin-tabla">
-                                <thead>
-                                    <tr><th>Código</th><th>Curso</th><th>Estado</th><th>Usado por</th></tr>
-                                </thead>
-                                <tbody>
-                                    {invitaciones.map((i) => (
-                                        <tr key={i.id}>
-                                            <td><code>{i.codigo}</code></td>
-                                            <td>{i.curso}</td>
-                                            <td><span className={`inv-estado inv-${i.estado}`}>{i.estado}</span></td>
-                                            <td>{i.usado_por || '—'}</td>
-                                        </tr>
-                                    ))}
-                                    {!invitaciones.length && (
-                                        <tr><td colSpan={4} className="vacio-msg">Aún no has generado códigos.</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </section>
+                                <p className="contenido-sub" style={{ marginTop: 0 }}>
+                                    Códigos del sistema anterior que todavía sirven para registrarse.
+                                    Cuando se usen o expiren, esta sección desaparecerá; los nuevos
+                                    estudiantes se registran con «Añadir estudiante» o «Importar desde Excel».
+                                </p>
+                                <table className="admin-tabla">
+                                    <thead>
+                                        <tr><th>Código</th><th>Curso</th><th>Expira</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        {invitaciones.filter((i) => i.estado === 'pendiente').map((i) => (
+                                            <tr key={i.id}>
+                                                <td><code>{i.codigo}</code></td>
+                                                <td>{i.curso}</td>
+                                                <td>{formatearFecha(i.expira_en)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </section>
+                        )}
                     </div>
                 )}
 
@@ -1177,6 +1149,25 @@ export function Dashboard() {
                     cursos={cursos}
                     onCerrar={() => setImportando(false)}
                     onImportado={cargarEstudiantes}
+                />
+            )}
+
+            {/* Alta manual de un estudiante (SPEC-014): mismo resultado que
+                el Excel — queda pendiente con su código de activación. */}
+            {agregando && (
+                <AgregarEstudiante
+                    cursos={cursos}
+                    onCerrar={() => setAgregando(false)}
+                    onCreado={cargarEstudiantes}
+                />
+            )}
+
+            {/* Corrección de nombres/apellidos (SPEC-014). */}
+            {editandoEstudiante && (
+                <EditarEstudiante
+                    estudiante={editandoEstudiante}
+                    onCerrar={() => setEditandoEstudiante(null)}
+                    onGuardado={(mensaje) => { setAvisoOk(mensaje); cargarEstudiantes(); }}
                 />
             )}
 

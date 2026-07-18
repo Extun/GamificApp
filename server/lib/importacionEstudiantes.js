@@ -62,7 +62,7 @@ export const parsearFecha = (valor) => {
     return iso && esFechaReal(iso) ? iso : null;
 };
 
-const edadEnAnios = (iso, hoy = new Date()) => {
+export const edadEnAnios = (iso, hoy = new Date()) => {
     const nacimiento = new Date(`${iso}T00:00:00Z`);
     let edad = hoy.getUTCFullYear() - nacimiento.getUTCFullYear();
     const cumpleEsteAnio = new Date(Date.UTC(hoy.getUTCFullYear(), nacimiento.getUTCMonth(), nacimiento.getUTCDate()));
@@ -70,7 +70,7 @@ const edadEnAnios = (iso, hoy = new Date()) => {
     return edad;
 };
 
-const validarNombrePropio = (valor, etiqueta) => {
+export const validarNombrePropio = (valor, etiqueta) => {
     const texto = String(valor || '').trim().replace(/\s+/g, ' ');
     if (texto.length < 2) return { error: `${etiqueta} vacío o demasiado corto` };
     if (texto.length > 80) return { error: `${etiqueta} demasiado largo (máximo 80 caracteres)` };

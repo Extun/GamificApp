@@ -28,9 +28,25 @@ export const confirmarImportacion = (cursoId, filas) =>
         body: JSON.stringify({ curso_id: cursoId, filas })
     });
 
+// Alta manual: la versión de un solo estudiante de la importación. Devuelve
+// el código de activación en claro UNA sola vez (igual que el Excel).
+export const crearEstudiante = (cursoId, datos) =>
+    pedir('/api/estudiantes', {
+        method: 'POST',
+        body: JSON.stringify({ curso_id: cursoId, ...datos })
+    });
+
 // Código de activación nuevo (el anterior queda invalidado en el acto).
 // La respuesta trae el código en claro UNA sola vez.
 export const regenerarCodigo = (usuarioId) =>
     pedir(`/api/estudiantes/${usuarioId}/regenerar-codigo`, { method: 'POST' });
 
-export default { analizarImportacion, confirmarImportacion, regenerarCodigo };
+// Corrige nombres/apellidos (ficha + nombre de login); PIN, XP, progreso y
+// código de activación quedan intactos.
+export const editarEstudiante = (usuarioId, datos) =>
+    pedir(`/api/estudiantes/${usuarioId}`, { method: 'PUT', body: JSON.stringify(datos) });
+
+export default {
+    analizarImportacion, confirmarImportacion, crearEstudiante,
+    regenerarCodigo, editarEstudiante
+};

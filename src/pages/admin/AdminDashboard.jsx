@@ -35,6 +35,8 @@ import ModuloAdministradores from './modulos/ModuloAdministradores';
 import ModuloAuditoria from './modulos/ModuloAuditoria';
 import ModuloPapelera from './modulos/ModuloPapelera';
 import ImportarEstudiantes from '../../components/ImportarEstudiantes';
+import AgregarEstudiante from '../../components/AgregarEstudiante';
+import EditarEstudiante from '../../components/EditarEstudiante';
 import {
     DashboardHeader,
     StatCard,
@@ -175,6 +177,10 @@ export function AdminDashboard() {
     const [importando, setImportando] = useState(false);
     // Código de activación regenerado: se muestra una sola vez.
     const [codigoNuevo, setCodigoNuevo] = useState(null);
+    // Modal "Añadir estudiante": alta manual (misma lógica que el Excel).
+    const [agregando, setAgregando] = useState(false);
+    // Modal "Editar estudiante" (corregir nombres/apellidos, SPEC-014).
+    const [editandoEstudiante, setEditandoEstudiante] = useState(null);
 
     // Modal "Editar asignaciones" de un docente existente.
     const [docenteEditando, setDocenteEditando] = useState(null);
@@ -593,7 +599,10 @@ export function AdminDashboard() {
                                     titulo="Estudiantes registrados"
                                     Icon={GroupsRoundedIcon}
                                     tag={estudiantes.length ? `${estudiantes.length}` : undefined}
-                                    accion={{ label: '📥 Importar desde Excel', onClick: () => setImportando(true) }}
+                                    accion={[
+                                        { label: '➕ Añadir estudiante', onClick: () => setAgregando(true) },
+                                        { label: '📥 Importar desde Excel', onClick: () => setImportando(true) }
+                                    ]}
                                 >
                                     {estudiantes.length ? (
                                         <TablaPro
@@ -628,6 +637,13 @@ export function AdminDashboard() {
                                                             <td><code>{e.codigo_emergencia}</code></td>
                                                             <td>
                                                                 <div className="admin-acciones">
+                                                                    <button
+                                                                        title="Corregir nombres o apellidos"
+                                                                        aria-label={`Editar a ${e.nombre_completo}`}
+                                                                        onClick={() => setEditandoEstudiante(e)}
+                                                                    >
+                                                                        <EditRoundedIcon sx={{ fontSize: '1.1rem' }} />
+                                                                    </button>
                                                                     {e.pendiente && (
                                                                         <button
                                                                             title="Regenerar código de activación (el anterior deja de servir)"
@@ -673,8 +689,8 @@ export function AdminDashboard() {
                                         <EmptyState
                                             Icon={GroupsRoundedIcon}
                                             titulo="Aún no hay estudiantes"
-                                            mensaje="Los estudiantes aparecerán aquí cuando se registren con un código de invitación de su docente."
-                                            accion={{ label: 'Ver invitaciones', onClick: () => setPagina('invitaciones') }}
+                                            mensaje="Registra estudiantes uno a uno con «Añadir estudiante» o carga la lista completa del curso desde Excel."
+                                            accion={{ label: '➕ Añadir estudiante', onClick: () => setAgregando(true) }}
                                         />
                                     )}
                                 </SectionCard>
@@ -910,6 +926,24 @@ export function AdminDashboard() {
                     cursos={cursos.filter((c) => c.activo).map((c) => ({ id: c.id, etiqueta: c.etiqueta }))}
                     onCerrar={() => setImportando(false)}
                     onImportado={cargar}
+                />
+            )}
+
+            {/* Alta manual de un estudiante (SPEC-014). */}
+            {agregando && (
+                <AgregarEstudiante
+                    cursos={cursos.filter((c) => c.activo).map((c) => ({ id: c.id, etiqueta: c.etiqueta }))}
+                    onCerrar={() => setAgregando(false)}
+                    onCreado={cargar}
+                />
+            )}
+
+            {/* Corrección de nombres/apellidos (SPEC-014). */}
+            {editandoEstudiante && (
+                <EditarEstudiante
+                    estudiante={editandoEstudiante}
+                    onCerrar={() => setEditandoEstudiante(null)}
+                    onGuardado={(mensaje) => { setAvisoOk(mensaje); cargar(); }}
                 />
             )}
 

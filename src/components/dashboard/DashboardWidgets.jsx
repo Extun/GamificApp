@@ -54,11 +54,12 @@ export function SectionCard({ titulo, Icon, tag, accion, children }) {
                 </h3>
                 <div className="section-head-extra">
                     {tag && <span className="card-tag">{tag}</span>}
-                    {accion && (
-                        <button type="button" className="section-accion" onClick={accion.onClick}>
-                            {accion.label}
+                    {/* `accion` admite una o varias acciones (array). */}
+                    {accion && [].concat(accion).map((a) => (
+                        <button key={a.label} type="button" className="section-accion" onClick={a.onClick}>
+                            {a.label}
                         </button>
-                    )}
+                    ))}
                 </div>
             </div>
             {children}

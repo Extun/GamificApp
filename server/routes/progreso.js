@@ -2,6 +2,7 @@ import { Router } from 'express';
 import pool from '../db.js';
 import { registrarAuditoria } from '../lib/auditoria.js';
 import { actualizarRacha, evaluarMisiones } from '../lib/misiones.js';
+import { esDelAulaDocente } from '../lib/estudiantes.js';
 
 const router = Router();
 
@@ -88,18 +89,11 @@ router.post('/', async (req, res, next) => {
     if (req.user.rol === 'estudiante' && req.user.estudiante_id !== estudianteId) {
         return res.status(403).json({ error: 'Solo puedes registrar tu propio progreso' });
     }
-    // Un docente solo puede registrar progreso de estudiantes que él invitó
-    // (misma regla que resetear PIN); el admin no tiene restricción.
-    if (req.user.rol === 'docente') {
-        const [propio] = await pool.query(
-            `SELECT 1 FROM invitaciones_estudiante i
-             JOIN usuarios u ON u.id = i.usuario_id
-             WHERE i.docente_id = ? AND u.estudiante_id = ?`,
-            [req.user.id, estudianteId]
-        );
-        if (!propio.length) {
-            return res.status(403).json({ error: 'Ese estudiante no pertenece a tus grupos' });
-        }
+    // Un docente solo puede registrar progreso de estudiantes de SU aula
+    // (curso asignado o invitación legacy — mismo criterio que el resto del
+    // panel, SPEC-014); el admin no tiene restricción.
+    if (req.user.rol === 'docente' && !(await esDelAulaDocente(req.user.id, estudianteId))) {
+        return res.status(403).json({ error: 'Ese estudiante no pertenece a tus grupos' });
     }
 
     const conn = await pool.getConnection();
@@ -254,16 +248,9 @@ router.patch('/:estudiante_id/:reto_id', async (req, res, next) => {
     if (req.user.rol === 'estudiante') {
         return res.status(403).json({ error: 'Solo el docente puede editar el libro de calificaciones' });
     }
-    if (req.user.rol === 'docente') {
-        const [propio] = await pool.query(
-            `SELECT 1 FROM invitaciones_estudiante i
-             JOIN usuarios u ON u.id = i.usuario_id
-             WHERE i.docente_id = ? AND u.estudiante_id = ?`,
-            [req.user.id, estudianteId]
-        );
-        if (!propio.length) {
-            return res.status(403).json({ error: 'Ese estudiante no pertenece a tus grupos' });
-        }
+    // Mismo criterio de aula que registrar progreso (SPEC-014).
+    if (req.user.rol === 'docente' && !(await esDelAulaDocente(req.user.id, estudianteId))) {
+        return res.status(403).json({ error: 'Ese estudiante no pertenece a tus grupos' });
     }
 
     const cambios = [];
