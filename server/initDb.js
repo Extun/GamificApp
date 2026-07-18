@@ -48,6 +48,7 @@ export const inicializarEsquema = async () => {
         await migrarDocenteCurso(conn);
         await migrarBancoPreguntas(conn);
         await migrarBackfillBanco(conn);
+        await migrarCargaMasiva(conn);
         console.log('✅ Esquema verificado/creado en la base de datos.');
         await asegurarAdmin(conn);
         await asegurarAdminPrincipal(conn);
@@ -538,6 +539,53 @@ const migrarBackfillBanco = async (conn) => {
         [filas]
     );
     console.log(`✅ Migración: ${filas.length} ítems de actividades existentes copiados al banco (backfill).`);
+};
+
+// Migración 012 (SPEC-014) — Carga masiva de estudiantes + activación por
+// código individual. 1) Código de activación (solo hash bcrypt + pista de 3
+// caracteres + fecha de uso). 2) nombre_norm para localizar homónimos en el
+// login ("nombre localiza, PIN decide"); username sigue UNIQUE con sufijo
+// interno invisible. 3) registrado_por: quién importó la ficha. 4) Unicidad
+// (curso_id, nombres, apellidos): homónimos exactos prohibidos en el MISMO
+// curso, permitidos entre cursos distintos.
+const migrarCargaMasiva = async (conn) => {
+    if (await faltaColumna(conn, 'usuarios', 'codigo_acceso_hash')) {
+        await conn.query(`ALTER TABLE usuarios
+            ADD COLUMN codigo_acceso_hash     VARCHAR(100) NULL,
+            ADD COLUMN codigo_acceso_pista    VARCHAR(3)   NULL,
+            ADD COLUMN codigo_acceso_usado_en DATETIME     NULL`);
+        console.log('✅ Migración: código de activación agregado a usuarios.');
+    }
+    if (await faltaColumna(conn, 'usuarios', 'nombre_norm')) {
+        await conn.query(`ALTER TABLE usuarios
+            ADD COLUMN nombre_norm VARCHAR(120) NULL,
+            ADD INDEX idx_usuarios_nombre_norm (nombre_norm)`);
+        console.log('✅ Migración: nombre_norm agregado a usuarios.');
+    }
+    // Backfill idempotente: en las cuentas de estudiante existentes el
+    // username ES el nombre normalizado (así las crea /registro-estudiante).
+    await conn.query(
+        "UPDATE usuarios SET nombre_norm = username WHERE rol = 'estudiante' AND nombre_norm IS NULL"
+    );
+    if (await faltaColumna(conn, 'estudiantes', 'registrado_por')) {
+        await conn.query('ALTER TABLE estudiantes ADD COLUMN registrado_por INT UNSIGNED NULL');
+        console.log('✅ Migración: registrado_por agregado a estudiantes.');
+    }
+    if (await faltaIndice(conn, 'estudiantes', 'uq_est_curso_nombre')) {
+        try {
+            await conn.query(
+                'CREATE UNIQUE INDEX uq_est_curso_nombre ON estudiantes (curso_id, nombres, apellidos)'
+            );
+            console.log('✅ Migración: unicidad (curso, nombres, apellidos) en estudiantes.');
+        } catch (err) {
+            // Datos existentes con duplicados exactos en el mismo curso: no
+            // tumbar el arranque; se avisa para resolverlo a mano y el índice
+            // se creará en el siguiente arranque tras limpiar.
+            if (err.code !== 'ER_DUP_ENTRY') throw err;
+            console.warn('⚠️  Migración 012: hay estudiantes duplicados (mismo curso, nombres y apellidos).');
+            console.warn('   El índice uq_est_curso_nombre NO se creó; depura los duplicados y reinicia.');
+        }
+    }
 };
 
 // Invariante del sistema: SIEMPRE existe al menos un Administrador Principal
