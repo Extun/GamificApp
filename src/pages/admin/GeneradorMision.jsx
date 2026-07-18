@@ -79,6 +79,9 @@ export function GeneradorMision({ materia = 'la materia' }) {
         useHistorialRetos('mision', materia);
     const [cargando, setCargando] = useState(false);
     const [guardando, setGuardando] = useState(false);
+    // "Añadir con IA" incremental: la IA continúa la historia con desafíos
+    // nuevos, sin tocar los capítulos que ya existen.
+    const [agregandoIA, setAgregandoIA] = useState(false);
     // SPEC-013 Fase 2: la entrada "Generarla automáticamente" del menú lleva
     // al formulario de IA (hasta que la Fase 7 lo convierta en modal).
     const temaRef = useRef(null);
@@ -170,6 +173,46 @@ export function GeneradorMision({ materia = 'la materia' }) {
         if (desafios.length <= MIN_DESAFIOS) return;
         editarMision({ desafios: desafios.filter((_, idx) => idx !== i) });
         setDesafioAbierto((prev) => (prev >= i ? -1 : prev));
+    };
+
+    // "Añadir con IA": el servidor recibe la misión ACTUAL y devuelve solo los
+    // desafíos nuevos que continúan la historia (sin repetir capítulos).
+    const continuarConIA = async (n) => {
+        if (agregandoIA || !mision) return;
+        const temaBase = tema.trim() || mision.titulo || '';
+        if (!temaBase) {
+            setError('Escribe el tema de la lección (arriba) para pedirle más capítulos a la IA.');
+            setTimeout(() => setError(''), 5000);
+            return;
+        }
+        setAgregandoIA(true);
+        setError('');
+        setAviso('');
+        try {
+            const res = await authFetch(`${API_URL}/api/ia/mision`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    materia,
+                    tema: temaBase,
+                    tematica: TEMATICAS.find((t) => t.id === tematica)?.label.replace(/^\S+\s/, '') || tematica,
+                    cantidad: n,
+                    mision_actual: mision
+                })
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+            const nuevos = data?.desafios || [];
+            if (!nuevos.length) throw new Error('la IA no devolvió desafíos nuevos');
+            editarMision({ desafios: [...desafios, ...nuevos] });
+            setAviso(`La historia continúa: ${nuevos.length} ${nuevos.length === 1 ? 'desafío nuevo' : 'desafíos nuevos'}, sin tocar los anteriores.`);
+            setTimeout(() => setAviso(''), 5000);
+        } catch (err) {
+            setError(`No se pudo continuar la aventura: ${err.message}`);
+            setTimeout(() => setError(''), 5000);
+        } finally {
+            setAgregandoIA(false);
+        }
     };
 
     // Cierra la misión abierta; el borrador ya vive en la BD (y en "Últimos
@@ -481,9 +524,9 @@ export function GeneradorMision({ materia = 'la materia' }) {
                         banco (SPEC-013 §3), esas entradas NO aparecen. */}
                     <BarraAccionesEditor
                         agregar={{
-                            label: 'Agregar desafíos',
+                            label: agregandoIA ? 'Generando…' : 'Agregar desafíos',
                             pregunta: '¿Cómo deseas agregarlos?',
-                            disabled: guardando,
+                            disabled: guardando || agregandoIA,
                             opciones: [
                                 {
                                     id: 'escribir',
@@ -493,8 +536,18 @@ export function GeneradorMision({ materia = 'la materia' }) {
                                     onClick: agregarDesafio
                                 },
                                 {
-                                    id: 'generar',
+                                    id: 'continuar',
                                     emoji: '🤖',
+                                    titulo: 'Añadir con IA',
+                                    detalle: 'La IA continúa ESTA historia con capítulos nuevos, sin borrar los que tienes.',
+                                    sub: {
+                                        pregunta: '¿Cuántos desafíos más?',
+                                        opciones: [1, 2, 3].map((n) => ({ label: String(n), onClick: () => continuarConIA(n) }))
+                                    }
+                                },
+                                {
+                                    id: 'generar',
+                                    emoji: '✨',
                                     titulo: 'Generar otra aventura',
                                     detalle: 'Dale un tema y la IA crea una historia nueva completa.',
                                     onClick: irAlFormularioIA

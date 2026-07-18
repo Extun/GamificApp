@@ -271,15 +271,22 @@ export function GeneradorActividadIA({ materia, tipo }) {
             // se descartan y se anexan hasta `n` (o hasta llenar el máximo).
             const rango = CANTIDADES[tipo] || [3, 5, 8];
             const pedir = Math.min(Math.max(n + 2, rango[0]), rango[rango.length - 1]);
+            const actuales = actividad.configuracion?.[claveItems] || [];
             const data = await generarActividadIA({
                 tipo,
                 materiaId,
                 tema: temaBase,
                 cantidad: pedir,
                 dificultad,
-                cursoId: cursoId ? Number(cursoId) : undefined
+                cursoId: cursoId ? Number(cursoId) : undefined,
+                // El contenido actual viaja como contexto: la IA complementa la
+                // actividad en vez de generar otra desde cero (y no se repite).
+                existentes: actuales
+                    .map((it) => (tipo === 'memorama'
+                        ? `${(it.a || '').trim()} ↔ ${(it.b || '').trim()}`
+                        : (it.texto || '').trim()))
+                    .filter((t) => t && t.replace('↔', '').trim())
             });
-            const actuales = actividad.configuracion?.[claveItems] || [];
             const firmas = new Set(actuales.map((it) => firmaItem(tipo, it)));
             const nuevos = (data.configuracion?.[claveItems] || [])
                 .filter((it) => !firmas.has(firmaItem(tipo, it)))

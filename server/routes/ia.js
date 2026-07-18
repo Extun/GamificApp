@@ -20,7 +20,8 @@ import {
     ACTIVIDADES_IA,
     DIFICULTADES,
     construirContexto,
-    generarActividad
+    generarActividad,
+    continuarMision
 } from '../lib/actividadesIA.js';
 
 const router = Router();
@@ -345,6 +346,9 @@ router.post('/quiz', soloDocente, async (req, res) => {
 
 // ---- Compatibilidad: POST /api/ia/mision ----
 // Body: { materia (nombre), tema, tematica, cantidad } → { mision }
+// Con `mision_actual` (la configuración ya en el editor) + `cantidad`, en vez
+// de crear una aventura nueva CONTINÚA esa historia y devuelve solo los
+// desafíos nuevos → { desafios }.
 router.post('/mision', soloDocente, async (req, res) => {
     const materiaNombre = String(req.body?.materia || '').trim().slice(0, 60);
     const tema = String(req.body?.tema || '').trim().slice(0, 200);
@@ -361,6 +365,12 @@ router.post('/mision', soloDocente, async (req, res) => {
         const ctx = materia
             ? await construirContexto({ materiaId: materia.id, tema, tematica, cantidad })
             : { materia: { nombre: materiaNombre }, curso: null, institucion: null, tema, tematica, dificultad: 'media', cantidad };
+        const misionActual = req.body?.mision_actual;
+        if (misionActual && Array.isArray(misionActual.desafios) && misionActual.desafios.length) {
+            const desafios = await continuarMision(generarJSON, ctx, misionActual, req.body?.cantidad);
+            if (!desafios.length) throw new Error('La IA no devolvió desafíos nuevos');
+            return res.json({ desafios });
+        }
         const resultado = await generarActividad(generarJSON, 'mision', ctx);
         res.json({ mision: resultado.configuracion });
     } catch (err) {

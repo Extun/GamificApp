@@ -229,7 +229,12 @@ export function EditorClasificador({ materia }) {
         setError('');
         setAviso('');
         try {
-            const data = await generarActividadIA({ tipo: 'clasificador', materiaId, tema: temaBase });
+            // Las categorías/elementos actuales viajan como contexto: la IA
+            // complementa el juego en vez de crear otro desde cero.
+            const existentes = categorias
+                .filter((c) => c.nombre.trim() || c.elementos.length)
+                .map((c) => `Categoría "${c.nombre.trim() || 'sin nombre'}": ${c.elementos.join(', ') || '(vacía)'}`);
+            const data = await generarActividadIA({ tipo: 'clasificador', materiaId, tema: temaBase, existentes });
             const generadas = data.configuracion?.categorias || [];
             const norm = (s) => (s || '').trim().toLowerCase();
             const fusion = categorias.map((c) => ({ ...c, elementos: [...c.elementos] }));

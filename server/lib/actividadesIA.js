@@ -68,6 +68,18 @@ const bloqueContexto = (ctx) => {
     return `CONTEXTO REAL DEL AULA (educación básica, niños de 6 a 9 años):\n- ${partes.join('\n- ')}`;
 };
 
+// Cuando el docente AMPLÍA una actividad existente, ctx.existentes trae el
+// contenido actual como textos. Se anexa a CUALQUIER prompt del registro para
+// que la IA complemente lo que ya hay en vez de generar desde cero.
+const bloqueExistentes = (ctx) => {
+    if (!ctx?.existentes?.length) return '';
+    return `\n\nCONTENIDO QUE LA ACTIVIDAD YA TIENE (el docente está AMPLIANDO una actividad existente):\n` +
+        ctx.existentes.map((t, i) => `${i + 1}. ${t}`).join('\n') +
+        `\nGenera contenido NUEVO y COMPLEMENTARIO sobre el mismo tema: NO repitas, reformules ni ` +
+        `parafrasees nada de lo anterior; cubre aspectos del tema que aún no estén tratados y ` +
+        `mantén el mismo estilo y nivel del contenido existente.`;
+};
+
 const REGLAS_COMUNES =
     `REGLAS ESTRICTAS:\n` +
     `1. Veracidad: usa únicamente información verificada y factual; si no tienes certeza de un dato, no lo inventes.\n` +
@@ -225,11 +237,7 @@ export const ACTIVIDADES_IA = {
             `sobre el tema '${ctx.tema}' con EXACTAMENTE ${ctx.cantidad} preguntas. Cada pregunta debe tener ` +
             `4 alternativas (A–D), indicar la letra de la respuesta correcta y una justificación. ` +
             `Devuelve EXACTAMENTE ${ctx.cantidad} preguntas, ni más ni menos.\n\n` +
-            `${bloqueContexto(ctx)}\n\n${REGLAS_COMUNES}` +
-            (ctx.existentes?.length
-                ? `\n\nPreguntas que YA existen (NO las repitas ni reformules):\n` +
-                  ctx.existentes.map((q, i) => `${i + 1}. ${q}`).join('\n')
-                : ''),
+            `${bloqueContexto(ctx)}\n\n${REGLAS_COMUNES}`,
         normalizar: (data, ctx) => {
             const preguntas = Array.isArray(data) ? data : data?.preguntas;
             return {
@@ -369,6 +377,35 @@ export const ACTIVIDADES_IA = {
     }
 };
 
+// Continúa una misión narrativa existente: genera `cantidad` desafíos NUEVOS
+// que siguen la historia después del último capítulo (sin repetir preguntas ni
+// escenas). Devuelve el arreglo de desafíos listos para anexar.
+export const continuarMision = async (generarJSON, ctx, misionActual, cantidad) => {
+    const n = Math.min(Math.max(Number(cantidad) || 1, 1), 3);
+    const resumen = {
+        titulo: misionActual?.titulo,
+        introduccion: misionActual?.introduccion,
+        desafios: (misionActual?.desafios || []).map((d) => ({
+            narrativa: d?.narrativa, pregunta: d?.pregunta, exito: d?.exito
+        })),
+        final: misionActual?.final
+    };
+    const data = await generarJSON({
+        prompt:
+            `Eres un escritor de cuentos infantiles y docente experto en ${ctx.materia.nombre} para niños de 6 a 9 años. ` +
+            `CONTINÚA la misión narrativa existente que verás abajo: escribe EXACTAMENTE ${n} desafíos NUEVOS ` +
+            `sobre '${ctx.tema}'${ctx.tematica ? ` con la temática "${ctx.tematica}"` : ''} que sigan la historia ` +
+            `justo después del último desafío y antes del final.\n\n` +
+            `MISIÓN ACTUAL (JSON):\n${JSON.stringify(resumen)}\n\n` +
+            `${bloqueContexto(ctx)}\n\n${REGLAS_COMUNES}\n` +
+            `5. Continuidad: los desafíos nuevos retoman la escena donde quedó el último 'exito' y mantienen a los mismos personajes y mundo.\n` +
+            `6. NO repitas ni reformules preguntas, escenas o contenidos que ya aparecen en la misión actual.\n` +
+            `7. Devuelve la misión con SOLO los ${n} desafíos nuevos en 'desafios' (conserva titulo, introduccion y final tal cual).`,
+        schema: MISION_SCHEMA
+    });
+    return (Array.isArray(data?.desafios) ? data.desafios : []).slice(0, n);
+};
+
 // Genera y valida la configuración de un tipo. Devuelve
 // { titulo, descripcion, configuracion, items } o lanza con mensaje claro.
 export const generarActividad = async (generarJSON, tipo, ctx) => {
@@ -378,7 +415,7 @@ export const generarActividad = async (generarJSON, tipo, ctx) => {
     const [min, max] = def.rango;
     ctx.cantidad = Math.min(Math.max(Number(ctx.cantidad) || min, min), max);
 
-    const data = await generarJSON({ prompt: def.construirPrompt(ctx), schema: def.schema });
+    const data = await generarJSON({ prompt: def.construirPrompt(ctx) + bloqueExistentes(ctx), schema: def.schema });
     const resultado = def.normalizar(data, ctx);
 
     const validar = VALIDADORES_CONFIG[tipo];
