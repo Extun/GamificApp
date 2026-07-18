@@ -7,6 +7,7 @@ import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded';
 import BookmarkAddRoundedIcon from '@mui/icons-material/BookmarkAddRounded';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
+import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import { BarraAccionesEditor } from '../juegos/BarraAccionesEditor';
 import { ModalConfigActividad } from '../juegos/ModalConfigActividad';
 import './editorQuiz.css';
@@ -30,7 +31,7 @@ const preguntaVacia = () => ({
 // pregunta del quiz en el banco para reutilizarla después; ambas opcionales.
 // `onVistaPrevia` (SPEC-012): abre el quiz en el reproductor real, en modo
 // prueba (sin XP ni progreso), para revisarlo antes de publicar.
-export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar, publicando, publicado, onAbrirBanco, onGuardarEnBanco, onVistaPrevia, onCerrar, mezclarPreguntas, mezclarRespuestas, preguntasPorIntento, onCambiarMezcla }) {
+export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar, publicando, publicado, onAbrirBanco, onGuardarEnBanco, onVistaPrevia, onCerrar, onDeshacer, hayCambios, mezclarPreguntas, mezclarRespuestas, preguntasPorIntento, onCambiarMezcla }) {
     // Ninguna pregunta expandida al abrir el quiz (vista limpia de entrada).
     // Single-open: abrir una contrae automáticamente las demás.
     const [abierta, setAbierta] = useState(-1);
@@ -259,6 +260,16 @@ export function EditorQuiz({ tema, preguntas, onChange, onAgregarIA, onPublicar,
                     ]
                 }}
                 acciones={[
+                    {
+                        id: 'deshacer',
+                        label: 'Deshacer cambios',
+                        Icon: UndoRoundedIcon,
+                        onClick: onDeshacer,
+                        disabled: !onDeshacer || !hayCambios || cargandoIA,
+                        title: hayCambios
+                            ? 'Vuelve el quiz a como estaba al abrirlo o generarlo'
+                            : 'No hay cambios sin guardar que deshacer'
+                    },
                     {
                         id: 'config',
                         label: 'Configuración',

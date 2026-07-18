@@ -3,6 +3,7 @@ import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import RocketLaunchRoundedIcon from '@mui/icons-material/RocketLaunchRounded';
+import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import CategoryRoundedIcon from '@mui/icons-material/CategoryRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
@@ -23,6 +24,9 @@ import './editorClasificador.css';
 // "imagen" en la vista del estudiante sin necesidad de subir archivos.
 
 const idUnico = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
+
+// Copia profunda simple (el estado del editor es JSON puro).
+const clon = (v) => JSON.parse(JSON.stringify(v));
 
 const categoriaVacia = (nombre = '') => ({ id: idUnico(), nombre, elementos: [] });
 
@@ -70,6 +74,29 @@ export function EditorClasificador({ materia }) {
 
     const materiaId = idPorNombre(materia);
     const totalElementos = categorias.reduce((n, c) => n + c.elementos.length, 0);
+
+    // "Deshacer cambios": foto de {titulo, categorias} tal como quedó al abrir,
+    // generar o publicar. Restaurarla revierte las ediciones de la sesión (el
+    // efecto de sincronización re-escribe también el borrador en BD).
+    // `null` = la base es el editor en blanco (sin efecto de montaje: se
+    // compara semánticamente contra "todo vacío").
+    const [snapshot, setSnapshot] = useState(null);
+    const tomarSnapshot = (foto = { titulo, categorias }) => setSnapshot(clon(foto));
+    const hayCambios = snapshot
+        ? JSON.stringify({ titulo, categorias }) !== JSON.stringify(snapshot)
+        : Boolean(
+            titulo.trim() || categorias.length !== 2 ||
+            categorias.some((c) => c.nombre.trim() || c.elementos.length)
+        );
+    const deshacerCambios = () => {
+        if (!hayCambios) return;
+        const s = snapshot ? clon(snapshot) : { titulo: '', categorias: [categoriaVacia(), categoriaVacia()] };
+        setTitulo(s.titulo);
+        setCategorias(s.categorias);
+        setPublicado(false);
+        setAviso('Cambios deshechos: el juego volvió a como estaba al abrirlo.');
+        setTimeout(() => setAviso(''), 4000);
+    };
 
     // Forma publicable de la configuración (la misma del POST publicar); como
     // borrador puede ir incompleta — el servidor solo la valida al publicar.
@@ -178,6 +205,7 @@ export function EditorClasificador({ materia }) {
             setTitulo(data.titulo);
             setCategorias(nuevasCategorias);
             setPublicado(false);
+            tomarSnapshot({ titulo: data.titulo, categorias: nuevasCategorias });
         } catch (err) {
             setError(`No se pudo generar con la IA: ${err.message}`);
         } finally {
@@ -247,7 +275,9 @@ export function EditorClasificador({ materia }) {
         setEntradaId(null);
         setPublicadoEnBD(false);
         setTitulo('');
-        setCategorias([categoriaVacia(), categoriaVacia()]);
+        const vacias = [categoriaVacia(), categoriaVacia()];
+        setCategorias(vacias);
+        tomarSnapshot({ titulo: '', categorias: vacias });
         setTemaIA('');
         setNuevoElemento({});
         setPublicado(false);
@@ -282,6 +312,8 @@ export function EditorClasificador({ materia }) {
             setPublicadoEnBD(true);
             refrescar();
             setPublicado(true);
+            // Lo publicado es la nueva base de "Deshacer".
+            tomarSnapshot();
             setAviso('¡Juego publicado! Ya es visible para los estudiantes.');
             setTimeout(() => setAviso(''), 4000);
         } catch (err) {
@@ -435,6 +467,16 @@ export function EditorClasificador({ materia }) {
                 }}
                 acciones={[
                     {
+                        id: 'deshacer',
+                        label: 'Deshacer cambios',
+                        Icon: UndoRoundedIcon,
+                        onClick: deshacerCambios,
+                        disabled: publicando || agregandoIA || !hayCambios,
+                        title: hayCambios
+                            ? 'Vuelve el juego a como estaba al abrirlo o generarlo'
+                            : 'No hay cambios sin guardar que deshacer'
+                    },
+                    {
                         id: 'preview',
                         label: 'Vista previa',
                         Icon: VisibilityRoundedIcon,
@@ -488,6 +530,7 @@ export function EditorClasificador({ materia }) {
                 titulo="Últimos juegos generados"
                 items={historial}
                 activoId={entradaId}
+                onCerrar={cerrarEditor}
                 onAbrir={async (e) => {
                     setAviso('');
                     setError('');
@@ -503,6 +546,7 @@ export function EditorClasificador({ materia }) {
                         setTitulo(detalle.titulo || '');
                         setCategorias(abiertas);
                         setPublicado(detalle.estado === 'publicado');
+                        tomarSnapshot({ titulo: detalle.titulo || '', categorias: abiertas });
                     } catch (err) {
                         setError(`No se pudo abrir el juego: ${err.message}`);
                     }

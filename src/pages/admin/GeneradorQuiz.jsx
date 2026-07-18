@@ -11,6 +11,9 @@ import bancoService from '../../services/bancoService';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
+// Copia profunda simple (los estados de los editores son JSON puro).
+const clon = (v) => JSON.parse(JSON.stringify(v));
+
 // SPEC-013: la configuración completa del quiz que se persiste en
 // `configuracion_json` — preguntas (el pool completo), los dos flags de mezcla
 // (default true) y cuántas preguntas se muestran por intento (0 = todas).
@@ -50,6 +53,29 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
     // sobreviven a cambios de navegador; localStorage es solo caché offline).
     const { historial, crearBorrador, sincronizar, cancelarSincronizacion, eliminar: eliminarBorrador, abrirDetalle, refrescar } =
         useHistorialRetos('quiz', materia);
+
+    // "Deshacer cambios": foto del quiz tal como se abrió/generó/publicó por
+    // última vez. Restaurarla revierte TODAS las ediciones de la sesión actual
+    // (también en la BD, re-sincronizando el borrador).
+    const [snapshot, setSnapshot] = useState(null);
+    const tomarSnapshot = (quiz) => setSnapshot(clon(quiz));
+    const hayCambios = Boolean(
+        quizEdit && snapshot &&
+        JSON.stringify(configuracionDe(quizEdit)) !== JSON.stringify(configuracionDe(snapshot))
+    );
+    const deshacerCambios = () => {
+        if (!hayCambios) return;
+        const restaurado = clon(snapshot);
+        setQuizEdit(restaurado);
+        if (restaurado.retoId && !restaurado.publicadoEnBD) {
+            sincronizar(restaurado.retoId, {
+                configuracion: configuracionDe(restaurado),
+                xp_recompensa: xpRecompensaDe(restaurado)
+            });
+        }
+        setAviso('Cambios deshechos: el quiz volvió a como estaba al abrirlo.');
+        setTimeout(() => setAviso(''), 4000);
+    };
 
     // Elimina un quiz del historial (Papelera, recuperable desde la
     // Biblioteca); si está abierto en el editor, lo cierra.
@@ -142,7 +168,10 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                 configuracion: configuracionDe({ ...quizEdit, preguntas }),
                 xpRecompensa: xpRecompensaDe({ ...quizEdit, preguntas })
             });
-            setQuizEdit({ ...quizEdit, retoId: data?.id ?? quizEdit.retoId, preguntas, estado: 'publicado', publicadoEnBD: true });
+            const publicadoQuiz = { ...quizEdit, retoId: data?.id ?? quizEdit.retoId, preguntas, estado: 'publicado', publicadoEnBD: true };
+            setQuizEdit(publicadoQuiz);
+            // Lo publicado es la nueva base: "Deshacer" ya no revierte más atrás.
+            tomarSnapshot(publicadoQuiz);
             refrescar();
             setAviso('¡Quiz publicado! Ya es visible para los estudiantes.');
             setTimeout(() => setAviso(''), 4000);
@@ -201,10 +230,12 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
             } catch (err) {
                 console.warn('El borrador no se pudo guardar en el servidor:', err.message);
             }
-            setQuizEdit({
+            const nuevo = {
                 retoId, tema: tema.trim(), preguntas: quiz, estado: 'borrador', publicadoEnBD: false,
                 mezclarPreguntas: true, mezclarRespuestas: true, preguntasPorIntento: 0
-            });
+            };
+            setQuizEdit(nuevo);
+            tomarSnapshot(nuevo);
         } catch (err) {
             console.error('Error al generar el quiz:', err);
             const detalle = err?.message ? ` (${err.message})` : '';
@@ -248,7 +279,7 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
         setError('');
         try {
             const detalle = await abrirDetalle(entrada.id);
-            setQuizEdit({
+            const abierto = {
                 retoId: detalle.id,
                 tema: detalle.titulo,
                 preguntas: detalle.configuracion?.preguntas || [],
@@ -259,7 +290,9 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                 mezclarPreguntas: detalle.configuracion?.mezclar_preguntas !== false,
                 mezclarRespuestas: detalle.configuracion?.mezclar_respuestas !== false,
                 preguntasPorIntento: Number(detalle.configuracion?.preguntas_por_intento) || 0
-            });
+            };
+            setQuizEdit(abierto);
+            tomarSnapshot(abierto);
         } catch (err) {
             setError(`No se pudo abrir la actividad: ${err.message}`);
             setTimeout(() => setError(''), 4000);
@@ -344,6 +377,8 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                     onGuardarEnBanco={guardarPreguntaEnBanco}
                     onVistaPrevia={() => setPreviewAbierta(true)}
                     onCerrar={() => setQuizEdit(null)}
+                    onDeshacer={deshacerCambios}
+                    hayCambios={hayCambios}
                     mezclarPreguntas={quizEdit.mezclarPreguntas}
                     mezclarRespuestas={quizEdit.mezclarRespuestas}
                     preguntasPorIntento={quizEdit.preguntasPorIntento}
@@ -374,6 +409,7 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                 items={historial}
                 activoId={quizEdit?.retoId}
                 onAbrir={abrirDelHistorial}
+                onCerrar={() => setQuizEdit(null)}
                 onEliminar={eliminarDelHistorial}
             />
         </section>

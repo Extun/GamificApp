@@ -12,6 +12,7 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import ArrowUpwardRoundedIcon from '@mui/icons-material/ArrowUpwardRounded';
 import ArrowDownwardRoundedIcon from '@mui/icons-material/ArrowDownwardRounded';
+import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import { BarraAccionesEditor } from './BarraAccionesEditor';
@@ -60,6 +61,9 @@ const contarItems = (tipo, config) => {
 const CLAVE_ITEMS = { memorama: 'parejas', 'linea-tiempo': 'eventos', completar: 'frases' };
 const MAX_ITEMS = { memorama: 10, 'linea-tiempo': 8, completar: 8 };
 
+// Copia profunda simple (el estado del editor es JSON puro).
+const clon = (v) => JSON.parse(JSON.stringify(v));
+
 // Nombre del ítem en plural para el botón "Agregar…" (SPEC-013, Fase 2).
 const NOMBRE_ITEM_PLURAL = { memorama: 'parejas', 'linea-tiempo': 'eventos', completar: 'frases' };
 
@@ -87,6 +91,14 @@ export function GeneradorActividadIA({ materia, tipo }) {
     const [cursos, setCursos] = useState([]);
     // Borrador en edición: { titulo, descripcion, configuracion }
     const [actividad, setActividad] = useState(null);
+    // "Deshacer cambios": foto de {actividad, publicado} al generar/abrir/guardar.
+    const [snapshot, setSnapshot] = useState(null);
+    const tomarSnapshot = (act, pub = false) =>
+        setSnapshot(act ? { actividad: clon(act), publicado: pub } : null);
+    const hayCambios = Boolean(
+        actividad && snapshot &&
+        JSON.stringify(actividad) !== JSON.stringify(snapshot.actividad)
+    );
     const [cargando, setCargando] = useState(false);
     const [guardando, setGuardando] = useState(false);
     // "Añadir con IA" incremental (menú Agregar): suma ítems sin borrar nada.
@@ -193,15 +205,17 @@ export function GeneradorActividadIA({ materia, tipo }) {
             } catch (err) {
                 console.warn('El borrador no se pudo guardar en el servidor:', err.message);
             }
-            setActividad({
+            const nueva = {
                 retoId,
                 titulo: data.titulo,
                 descripcion: data.descripcion,
                 configuracion,
                 estado: 'borrador',
                 publicadoEnBD: false
-            });
+            };
+            setActividad(nueva);
             setPublicado(false);
+            tomarSnapshot(nueva, false);
         } catch (err) {
             setError(`No se pudo generar con la IA: ${err.message}`);
         } finally {
@@ -285,10 +299,31 @@ export function GeneradorActividadIA({ materia, tipo }) {
     // Cierra el editor sin perder nada: el borrador ya vive en la BD (y en
     // "Últimos generados"); se puede reabrir desde ahí cuando se quiera.
     const cerrarEditor = () => {
+        setSnapshot(null);
         setActividad(null);
         setPublicado(false);
         setAviso('');
         setError('');
+    };
+
+    // "Deshacer cambios": foto de la actividad tal como quedó al generarla,
+    // abrirla o guardarla. Restaurarla revierte las ediciones de la sesión
+    // (y re-sincroniza el borrador en BD).
+    const deshacerCambios = () => {
+        if (!hayCambios) return;
+        const s = snapshot;
+        const restaurada = clon(s.actividad);
+        setActividad(restaurada);
+        setPublicado(s.publicado);
+        if (restaurada.retoId && !restaurada.publicadoEnBD) {
+            sincronizar(restaurada.retoId, {
+                titulo: restaurada.titulo,
+                configuracion: restaurada.configuracion,
+                xp_recompensa: Math.max(contarItems(tipo, restaurada.configuracion), 1) * PUNTOS_POR_ACIERTO
+            });
+        }
+        setAviso('Cambios deshechos: la actividad volvió a como estaba al abrirla.');
+        setTimeout(() => setAviso(''), 4000);
     };
 
     // Reabre una entrada del historial: trae del servidor el reto completo
@@ -298,17 +333,19 @@ export function GeneradorActividadIA({ materia, tipo }) {
         setError('');
         try {
             const detalle = await abrirDetalle(entrada.id);
-            setActividad({
+            const abierta = {
                 retoId: detalle.id,
                 titulo: detalle.titulo,
                 descripcion: detalle.descripcion,
                 configuracion: detalle.configuracion || {},
                 estado: detalle.estado,
                 publicadoEnBD: detalle.estado === 'publicado'
-            });
+            };
+            setActividad(abierta);
             setDificultad(detalle.dificultad || 'media');
             setCursoId(detalle.curso_id ? String(detalle.curso_id) : '');
             setPublicado(detalle.estado === 'publicado');
+            tomarSnapshot(abierta, detalle.estado === 'publicado');
         } catch (err) {
             setError(`No se pudo abrir la actividad: ${err.message}`);
             setTimeout(() => setError(''), 4000);
@@ -360,13 +397,16 @@ export function GeneradorActividadIA({ materia, tipo }) {
                 dificultad,
                 cursoId: cursoId ? Number(cursoId) : undefined
             });
-            setActividad({
+            const guardada = {
                 ...actividad,
                 retoId: data?.id ?? actividad.retoId,
                 configuracion,
                 estado,
                 publicadoEnBD: estado === 'publicado'
-            });
+            };
+            setActividad(guardada);
+            // Lo guardado/publicado es la nueva base de "Deshacer".
+            tomarSnapshot(guardada, estado === 'publicado');
             refrescar();
             if (estado === 'publicado') {
                 setPublicado(true);
@@ -656,6 +696,16 @@ export function GeneradorActividadIA({ materia, tipo }) {
                         }}
                         acciones={[
                             {
+                                id: 'deshacer',
+                                label: 'Deshacer cambios',
+                                Icon: UndoRoundedIcon,
+                                onClick: deshacerCambios,
+                                disabled: guardando || agregandoIA || !hayCambios,
+                                title: hayCambios
+                                    ? 'Vuelve la actividad a como estaba al abrirla o generarla'
+                                    : 'No hay cambios sin guardar que deshacer'
+                            },
+                            {
                                 id: 'config',
                                 label: 'Configuración',
                                 Icon: SettingsRoundedIcon,
@@ -752,6 +802,7 @@ export function GeneradorActividadIA({ materia, tipo }) {
                 items={historial}
                 activoId={actividad?.retoId}
                 onAbrir={abrirDelHistorial}
+                onCerrar={cerrarEditor}
                 onEliminar={quitarDelHistorial}
             />
         </section>

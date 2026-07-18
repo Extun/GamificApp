@@ -15,9 +15,13 @@ import { BarraAccionesEditor } from '../../components/juegos/BarraAccionesEditor
 import { ModalConfigActividad } from '../../components/juegos/ModalConfigActividad';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
+import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import '../../components/mision/misionNarrativa.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+// Copia profunda simple (el estado del editor es JSON puro).
+const clon = (v) => JSON.parse(JSON.stringify(v));
 
 const LETRAS = ['A', 'B', 'C'];
 // Mínimo de desafíos que exige el validador del servidor (validadoresRetos.js).
@@ -90,6 +94,32 @@ export function GeneradorMision({ materia = 'la materia' }) {
         docenteService.listarCursos().then(setCursos).catch(() => setCursos([]));
     }, []);
 
+    // "Deshacer cambios": foto de la misión tal como quedó al generarla, abrirla
+    // o guardarla. Restaurarla revierte las ediciones de la sesión (y re-sincroniza
+    // el borrador en BD).
+    const [snapshot, setSnapshot] = useState(null);
+    const tomarSnapshot = (m, pub = false) => setSnapshot(m ? { mision: clon(m), publicada: pub } : null);
+    const hayCambios = Boolean(
+        mision && snapshot &&
+        JSON.stringify(mision) !== JSON.stringify(snapshot.mision)
+    );
+    const deshacerCambios = () => {
+        if (!hayCambios) return;
+        const s = snapshot;
+        const restaurada = clon(s.mision);
+        setMision(restaurada);
+        setPublicada(s.publicada);
+        if (entradaId && !publicadoEnBD) {
+            sincronizar(entradaId, {
+                titulo: restaurada.titulo,
+                configuracion: configuracionActual(restaurada),
+                xp_recompensa: Math.max((restaurada.desafios || []).length, 1) * 100
+            });
+        }
+        setAviso('Cambios deshechos: la misión volvió a como estaba al abrirla.');
+        setTimeout(() => setAviso(''), 4000);
+    };
+
     const desafios = mision?.desafios || [];
     const xp = Math.max(desafios.length, 1) * 100;
     const listaParaPublicar = Boolean(
@@ -136,6 +166,7 @@ export function GeneradorMision({ materia = 'la materia' }) {
     // generados"), así que no se pierde nada.
     const cerrarEditor = () => {
         cancelarSincronizacion(entradaId);
+        tomarSnapshot(null);
         setMision(null);
         setEntradaId(null);
         setPublicada(false);
@@ -193,6 +224,7 @@ export function GeneradorMision({ materia = 'la materia' }) {
             setEntradaId(retoId);
             setPublicadoEnBD(false);
             setMision(data.mision);
+            tomarSnapshot(data.mision, false);
         } catch (err) {
             console.error('Error al generar la misión:', err);
             setError(`No se pudo generar la misión. ${err.message || 'Verifica tu conexión.'}`);
@@ -228,6 +260,8 @@ export function GeneradorMision({ materia = 'la materia' }) {
                 cursoId: cursoId ? Number(cursoId) : undefined
             });
             setEntradaId(data?.id ?? entradaId);
+            // Lo guardado/publicado es la nueva base de "Deshacer".
+            tomarSnapshot(mision, estado === 'publicado');
             refrescar();
             if (estado === 'publicado') {
                 setPublicada(true);
@@ -419,6 +453,16 @@ export function GeneradorMision({ materia = 'la materia' }) {
                         }}
                         acciones={[
                             {
+                                id: 'deshacer',
+                                label: 'Deshacer cambios',
+                                Icon: UndoRoundedIcon,
+                                onClick: deshacerCambios,
+                                disabled: guardando || !hayCambios,
+                                title: hayCambios
+                                    ? 'Vuelve la misión a como estaba al abrirla o generarla'
+                                    : 'No hay cambios sin guardar que deshacer'
+                            },
+                            {
                                 id: 'config',
                                 label: 'Configuración',
                                 Icon: SettingsRoundedIcon,
@@ -514,6 +558,7 @@ export function GeneradorMision({ materia = 'la materia' }) {
                 titulo="Últimas misiones generadas"
                 items={historial}
                 activoId={entradaId}
+                onCerrar={cerrarEditor}
                 onAbrir={async (e) => {
                     setAviso('');
                     setError('');
@@ -521,6 +566,7 @@ export function GeneradorMision({ materia = 'la materia' }) {
                         const detalle = await abrirDetalle(e.id);
                         cancelarSincronizacion(entradaId);
                         setMision(detalle.configuracion || null);
+                        tomarSnapshot(detalle.configuracion || null, detalle.estado === 'publicado');
                         setTema(detalle.configuracion?._tema || '');
                         setTematica(detalle.configuracion?._tematica || TEMATICAS[0].id);
                         setDificultad(detalle.dificultad || 'media');

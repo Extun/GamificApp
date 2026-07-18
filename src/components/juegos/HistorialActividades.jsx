@@ -129,7 +129,9 @@ export function useHistorialRetos(tipo, materia) {
 
 // Lista visual del historial, paginada de a POR_PAGINA entradas. Reutiliza
 // las clases quiz-historial-* para verse idéntico en todos los juegos.
-export function HistorialActividades({ titulo = 'Últimas actividades generadas', items, activoId, onAbrir, onEliminar, meta, etiqueta }) {
+// `onCerrar` (opcional): si se pasa, volver a hacer clic en la entrada ya
+// abierta la CIERRA en vez de recargarla (toggle abrir/cerrar).
+export function HistorialActividades({ titulo = 'Últimas actividades generadas', items, activoId, onAbrir, onEliminar, onCerrar, meta, etiqueta }) {
     const [pagina, setPagina] = useState(0);
 
     if (!items.length) return null;
@@ -147,12 +149,14 @@ export function HistorialActividades({ titulo = 'Últimas actividades generadas'
                 {visibles.map((e) => {
                     const publicado = e.estado === 'publicado';
                     const nombre = etiqueta ? etiqueta(e) : e.titulo;
+                    const activo = activoId === e.id;
                     return (
                         <li key={e.id} className="quiz-historial-fila">
                             <button
                                 type="button"
-                                className={`quiz-historial-item ${activoId === e.id ? 'is-activo' : ''}`}
-                                onClick={() => onAbrir(e)}
+                                className={`quiz-historial-item ${activo ? 'is-activo' : ''}`}
+                                title={activo && onCerrar ? 'Clic para cerrar este editor' : 'Clic para abrir en el editor'}
+                                onClick={() => (activo && onCerrar ? onCerrar() : onAbrir(e))}
                             >
                                 <span className="quiz-historial-tema">
                                     {nombre || 'Sin título'}
