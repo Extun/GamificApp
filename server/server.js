@@ -20,6 +20,7 @@ import misionesRouter from './routes/misiones.js';
 import adminMisionesRouter from './routes/adminMisiones.js';
 import adminResetRouter from './routes/adminReset.js';
 import bancoPreguntasRouter from './routes/bancoPreguntas.js';
+import estudiantesImportRouter from './routes/estudiantesImport.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -104,6 +105,9 @@ app.use('/api/cursos', cursosRouter);
 app.use('/api/misiones', misionesRouter);
 app.use('/api/ia', iaRouter);
 app.use('/api/banco', bancoPreguntasRouter);
+// Carga masiva de estudiantes (SPEC-014): importación Excel y regeneración
+// de códigos de activación. Admin o docente (validado dentro por curso).
+app.use('/api/estudiantes', estudiantesImportRouter);
 
 // Manejador central de errores: nunca filtra detalles internos al cliente.
 app.use((err, _req, res, _next) => {

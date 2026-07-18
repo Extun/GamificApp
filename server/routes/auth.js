@@ -135,6 +135,17 @@ router.post('/login', async (req, res, next) => {
             return res.status(403).json({ error: 'Tu cuenta está desactivada. Contacta al administrador principal.' });
         }
 
+        // Estudiante importado por Excel (SPEC-014) aún sin activar: debe
+        // pasar primero por Curso → Nombre → Código. Estado derivado, sin
+        // columna extra: hay código vigente y nunca se ha usado. Las cuentas
+        // por invitación tienen codigo_acceso_hash NULL y no se ven afectadas
+        // (igual que una BD sin la migración 012: columna ausente = no bloquea).
+        if (usuario.codigo_acceso_hash && !usuario.codigo_acceso_usado_en) {
+            return res.status(403).json({
+                error: 'Tu cuenta aún no está activada. Entra por "Crear mi cuenta" con el código que te dio tu docente.'
+            });
+        }
+
         await limpiarFallos(usuario.id);
         // Auditoría (SPEC-003): los inicios de sesión de estudiantes se
         // registran para la tarjeta "Actividad Estudiantes".
@@ -266,6 +277,14 @@ router.post('/emergencia', async (req, res, next) => {
         }
         if (estaBloqueado(usuario)) {
             return res.status(429).json({ error: `Demasiados intentos. Espera ${MINUTOS_BLOQUEO} minutos.` });
+        }
+
+        // Importado sin activar (SPEC-014): el código de emergencia tampoco
+        // salta la activación (viene en el mismo Excel de credenciales).
+        if (usuario.codigo_acceso_hash && !usuario.codigo_acceso_usado_en) {
+            return res.status(403).json({
+                error: 'Tu cuenta aún no está activada. Entra por "Crear mi cuenta" con el código que te dio tu docente.'
+            });
         }
 
         // El PIN vuelve al de nacimiento para que el flujo normal funcione mañana.

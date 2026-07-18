@@ -43,6 +43,7 @@ import { PerfilDocente } from '../docente/PerfilDocente';
 import { MisionesDocente } from '../docente/MisionesDocente';
 import MilitaryTechRoundedIcon from '@mui/icons-material/MilitaryTechRounded';
 import { FichaEstudiante } from '../docente/FichaEstudiante';
+import ImportarEstudiantes from '../../components/ImportarEstudiantes';
 
 const TIPO_RETO_LABEL = { quiz: 'Quiz', clasificador: 'Juego', mision: 'Misión' };
 
@@ -319,6 +320,8 @@ export function Dashboard() {
     }, [pagina]);
 
     const [fichaEstudiante, setFichaEstudiante] = useState(null);
+    // Asistente de importación de estudiantes por Excel (SPEC-014).
+    const [importando, setImportando] = useState(false);
 
     const usuarioActual = authService.getUsuario();
     const nombreDocente = usuarioActual?.nombre_completo || usuarioActual?.username || 'docente';
@@ -938,6 +941,11 @@ export function Dashboard() {
                                 <h3>Estudiantes registrados con mis códigos</h3>
                                 <div className="section-head-extra">
                                     <span className="card-tag">{misEstudiantes.length}</span>
+                                    {cursos.length > 0 && (
+                                        <button type="button" className="section-accion" onClick={() => setImportando(true)}>
+                                            📥 Importar desde Excel
+                                        </button>
+                                    )}
                                     <button type="button" className="section-accion" onClick={() => setPagina('ranking')}>
                                         Ver ranking completo
                                     </button>
@@ -1114,6 +1122,16 @@ export function Dashboard() {
                 <FichaEstudiante
                     estudiante={fichaEstudiante}
                     onCerrar={() => setFichaEstudiante(null)}
+                />
+            )}
+
+            {/* Asistente de importación de estudiantes por Excel (SPEC-014).
+                `cursos` ya viene filtrado por el servidor: solo SUS cursos. */}
+            {importando && (
+                <ImportarEstudiantes
+                    cursos={cursos}
+                    onCerrar={() => setImportando(false)}
+                    onImportado={cargarEstudiantes}
                 />
             )}
         </SidebarLayout>

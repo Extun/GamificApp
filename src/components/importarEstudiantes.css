@@ -1,0 +1,146 @@
+/* SPEC-014 — Asistente de importación de estudiantes por Excel.
+   Reutiliza el modal estándar (preview-*) y la tabla admin; aquí solo lo
+   propio del asistente, con los tokens de tema de siempre. */
+
+.imp-modal { max-width: 720px; width: min(720px, 94vw); }
+
+.imp-avatar {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md, 12px);
+    background: var(--color-primary-soft, #e0f2fe);
+    color: var(--color-primary, #0284c7);
+}
+
+.imp-paso { display: flex; flex-direction: column; gap: 16px; }
+
+.imp-campo { display: flex; flex-direction: column; gap: 6px; }
+.imp-campo > span { font-weight: 600; font-size: 0.92rem; }
+.imp-campo select {
+    padding: 10px 12px;
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: var(--radius-md, 12px);
+    font: inherit;
+    background: var(--color-surface, #fff);
+}
+
+.imp-btn-plantilla { align-self: flex-start; }
+
+.imp-dropzone {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 18px 16px;
+    border: 2px dashed var(--color-border, #cbd5e1);
+    border-radius: var(--radius-lg, 16px);
+    background: var(--color-surface-2, #f8fafc);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.imp-dropzone:hover { border-color: var(--color-primary, #0284c7); }
+.imp-dropzone.is-cargado {
+    border-style: solid;
+    border-color: var(--color-success, #16a34a);
+    background: var(--color-success-soft, #f0fdf4);
+}
+
+.imp-nota {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--color-text-soft, #64748b);
+}
+.imp-nota-importante { color: var(--color-danger, #dc2626); font-weight: 600; }
+
+.imp-aviso {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: var(--radius-md, 12px);
+    margin-bottom: 12px;
+    font-size: 0.9rem;
+}
+.imp-aviso-error { background: var(--color-danger-soft, #fef2f2); color: var(--color-danger, #dc2626); }
+
+/* Resumen del análisis: cifras grandes y claras. */
+.imp-resumen {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    padding: 12px 14px;
+    border-radius: var(--radius-md, 12px);
+    background: var(--color-surface-2, #f8fafc);
+    font-size: 0.92rem;
+}
+.imp-cifra strong { font-size: 1.05rem; }
+.imp-cifra.imp-ok strong { color: var(--color-success, #16a34a); }
+.imp-cifra.imp-omitido strong { color: var(--color-warning, #d97706); }
+.imp-cifra.imp-error strong { color: var(--color-danger, #dc2626); }
+
+/* La tabla nunca desborda el modal: scroll propio (obligatorio en móvil). */
+.imp-tabla-scroll { overflow-x: auto; max-height: 46vh; overflow-y: auto; }
+
+.imp-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.imp-badge.imp-ok { background: var(--color-success-soft, #f0fdf4); color: var(--color-success, #16a34a); }
+.imp-badge.imp-omitido { background: var(--color-warning-soft, #fffbeb); color: var(--color-warning, #d97706); }
+.imp-badge.imp-error { background: var(--color-danger-soft, #fef2f2); color: var(--color-danger, #dc2626); }
+
+.imp-motivo { font-size: 0.85rem; color: var(--color-text-soft, #64748b); }
+tr.fila-error td { background: var(--color-danger-soft, #fef2f2); }
+
+.imp-exito {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: var(--radius-md, 12px);
+    background: var(--color-success-soft, #f0fdf4);
+    color: var(--color-success, #15803d);
+}
+.imp-exito h4 { margin: 0 0 2px; }
+.imp-exito p { margin: 0; font-size: 0.88rem; }
+
+/* Botones del pie: mismos gestos que el resto de modales. */
+.imp-btn-pri, .imp-btn-sec {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 18px;
+    border-radius: var(--radius-md, 12px);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+.imp-btn-pri {
+    background: var(--color-primary, #0284c7);
+    color: #fff;
+}
+.imp-btn-pri:disabled { opacity: 0.5; cursor: not-allowed; }
+.imp-btn-sec {
+    background: var(--color-surface, #fff);
+    border-color: var(--color-border, #e2e8f0);
+    color: inherit;
+}
+
+/* Móvil: el modal ocupa casi todo y los pasos respiran menos. */
+@media (max-width: 640px) {
+    .imp-modal { width: 96vw; }
+    .imp-resumen { flex-direction: column; gap: 4px; }
+    .imp-tabla-scroll { max-height: 38vh; }
+}

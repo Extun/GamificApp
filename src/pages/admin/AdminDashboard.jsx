@@ -34,6 +34,7 @@ import ModuloInstitucion from './modulos/ModuloInstitucion';
 import ModuloAdministradores from './modulos/ModuloAdministradores';
 import ModuloAuditoria from './modulos/ModuloAuditoria';
 import ModuloPapelera from './modulos/ModuloPapelera';
+import ImportarEstudiantes from '../../components/ImportarEstudiantes';
 import {
     DashboardHeader,
     StatCard,
@@ -168,6 +169,9 @@ export function AdminDashboard() {
     const [materiasSel, setMateriasSel] = useState([]);
     const [cursosSel, setCursosSel] = useState([]);
 
+    // Asistente de importación de estudiantes por Excel (SPEC-014).
+    const [importando, setImportando] = useState(false);
+
     // Modal "Editar asignaciones" de un docente existente.
     const [docenteEditando, setDocenteEditando] = useState(null);
     const [materiasEdicion, setMateriasEdicion] = useState([]);
@@ -212,7 +216,7 @@ export function AdminDashboard() {
     // Refresco automático (SPEC-002): el panel se mantiene al día sin F5.
     // Se pausa con el modal de materias del docente abierto para no pisar
     // la edición en curso.
-    useAutoRefresh(cargar, 20000, Boolean(docenteEditando));
+    useAutoRefresh(cargar, 20000, Boolean(docenteEditando) || importando);
 
     const ejecutar = async (accion, mensajeOk) => {
         try {
@@ -585,6 +589,7 @@ export function AdminDashboard() {
                                     titulo="Estudiantes registrados"
                                     Icon={GroupsRoundedIcon}
                                     tag={estudiantes.length ? `${estudiantes.length}` : undefined}
+                                    accion={{ label: '📥 Importar desde Excel', onClick: () => setImportando(true) }}
                                 >
                                     {estudiantes.length ? (
                                         <TablaPro
@@ -867,6 +872,15 @@ export function AdminDashboard() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Asistente de importación de estudiantes por Excel (SPEC-014). */}
+            {importando && (
+                <ImportarEstudiantes
+                    cursos={cursos.filter((c) => c.activo).map((c) => ({ id: c.id, etiqueta: c.etiqueta }))}
+                    onCerrar={() => setImportando(false)}
+                    onImportado={cargar}
+                />
             )}
         </SidebarLayout>
     );
