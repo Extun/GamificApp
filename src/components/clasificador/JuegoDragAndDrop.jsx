@@ -1,12 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
-import ReplayRoundedIcon from '@mui/icons-material/ReplayRounded';
-import StarRoundedIcon from '@mui/icons-material/StarRounded';
-import CloudDoneRoundedIcon from '@mui/icons-material/CloudDoneRounded';
+import { useMemo, useState } from 'react';
 import TouchAppRoundedIcon from '@mui/icons-material/TouchAppRounded';
-import gamificationService from '../../services/gamificationService';
-import { LogroToast } from '../quiz/QuizInteractivo';
-import { ResultadoActividad } from '../juegos/ResultadoActividad';
+import { useRecompensa, useReporteIntento, PantallaFinal, LogroToast } from '../juegos/juegosComunes';
 import { COLORES_CATEGORIA } from './EditorClasificador';
 import './juegoDragAndDrop.css';
 
@@ -40,7 +34,7 @@ const partirEmoji = (texto) => {
 
 // `soloPrueba` (SPEC-012): vista previa del docente — se juega igual pero no
 // se otorga XP ni se guarda progreso.
-export function JuegoDragAndDrop({ reto, estudianteId, onSalir, onCompletado, soloPrueba = false }) {
+export function JuegoDragAndDrop({ reto, estudianteId, onSalir, onCompletado, soloPrueba = false, onEstadoIntento }) {
     const categorias = reto?.configuracion?.categorias || [];
 
     // Aplana la configuración del docente en fichas jugables y las mezcla.
@@ -62,13 +56,24 @@ export function JuegoDragAndDrop({ reto, estudianteId, onSalir, onCompletado, so
     const [seleccionada, setSeleccionada] = useState(null);  // fallback táctil
     const [rebotando, setRebotando] = useState(null);        // ficha en animación de error
     const [canastaFeliz, setCanastaFeliz] = useState(null);  // canasta en animación de acierto
-    const [puntosGanados, setPuntosGanados] = useState(0);
-    const [toast, setToast] = useState(null);
 
     const pendientes = fichas.filter((f) => !colocadas[f.id]);
     const total = fichas.length;
     const aciertos = fichas.filter((f) => colocadas[f.id] && !conError.has(f.id)).length;
     const completado = total > 0 && pendientes.length === 0;
+
+    // Recompensa unificada (mismo flujo que memorama/línea/completar): XP
+    // confirmado por el backend + toasts, idempotente por partida.
+    const { puntosGanados, toast, setToast, xpIntento } = useRecompensa({
+        completado, estudianteId, reto, tipo: 'clasificador', aciertos, total, semilla, onCompletado, soloPrueba
+    });
+
+    // Guardia de salida: hay progreso real desde la primera ficha colocada o
+    // el primer error (ambos afectan el puntaje del intento).
+    useReporteIntento(
+        onEstadoIntento,
+        !soloPrueba && !completado && (Object.keys(colocadas).length > 0 || conError.size > 0)
+    );
 
     const reiniciar = () => {
         setColocadas({});
@@ -76,7 +81,6 @@ export function JuegoDragAndDrop({ reto, estudianteId, onSalir, onCompletado, so
         setSeleccionada(null);
         setRebotando(null);
         setCanastaFeliz(null);
-        setPuntosGanados(0);
         setSemilla((s) => s + 1);
     };
 
@@ -99,57 +103,9 @@ export function JuegoDragAndDrop({ reto, estudianteId, onSalir, onCompletado, so
         }
     };
 
-    // Al completar: XP local + persistencia en la BD central (las misiones
-    // desbloqueadas llegan en la respuesta del servidor).
-    const recompensado = useRef(false);
-    useEffect(() => {
-        if (!completado || recompensado.current) return;
-        recompensado.current = true;
-
-        if (soloPrueba) {
-            // Puntaje simulado: la pantalla final se ve igual, nada se guarda.
-            setPuntosGanados(aciertos * 100);
-            setToast({ titulo: 'Modo prueba', mensaje: 'Nada se guardó: así lo verá el estudiante.' });
-            return;
-        }
-
-        const { puntos, servidor } = gamificationService.completarReto({
-            estudianteId,
-            reto,
-            aciertos
-        });
-        setPuntosGanados(puntos);
-
-        if (aciertos === total) {
-            setToast({ mensaje: '¡Clasificación perfecta! 🌟' });
-        }
-
-        servidor.then((data) => {
-            onCompletado?.();
-            if (!data) return;
-            const mision = data.nuevas_misiones?.[0];
-            if (mision) {
-                setToast({ titulo: '¡Misión completada!', mensaje: mision.titulo });
-            } else {
-                setToast({
-                    titulo: 'Progreso guardado',
-                    mensaje: `+${data.xp_abonado} XP registrados en tu cuenta`,
-                    icono: <CloudDoneRoundedIcon />
-                });
-            }
-        });
-    }, [completado, aciertos, total, estudianteId, reto, onCompletado, soloPrueba]);
-
-    // Permite reintentar tras reiniciar la partida.
-    useEffect(() => {
-        recompensado.current = false;
-    }, [semilla, reto?.id]);
-
     if (!categorias.length) {
         return <p className="vacio-msg">Este juego no tiene configuración válida.</p>;
     }
-
-    const estrellas = total ? Math.max(1, Math.round((aciertos / total) * 3)) : 0;
 
     return (
         <div className="juego-dnd">
@@ -230,29 +186,18 @@ export function JuegoDragAndDrop({ reto, estudianteId, onSalir, onCompletado, so
                 </div>
             )}
 
-            {/* Pantalla de celebración final */}
+            {/* Pantalla de celebración final compartida (overlay + trofeo). */}
             {completado && (
-                <div className="juego-dnd-final">
-                    <EmojiEventsRoundedIcon className="juego-dnd-final-trofeo" />
-                    <div className="juego-dnd-estrellas" aria-label={`${estrellas} de 3 estrellas`}>
-                        {[1, 2, 3].map((n) => (
-                            <StarRoundedIcon key={n} className={n <= estrellas ? 'is-ganada' : ''} />
-                        ))}
-                    </div>
-                    <strong>¡Lo lograste!</strong>
-                    {/* Calificación /100 + retroalimentación + XP separado. */}
-                    <ResultadoActividad aciertos={aciertos} total={total} puntosGanados={puntosGanados} />
-                    <div className="juego-dnd-final-acciones">
-                        <button type="button" className="juego-dnd-btn" onClick={reiniciar}>
-                            <ReplayRoundedIcon sx={{ fontSize: '1.1rem' }} /> Jugar otra vez
-                        </button>
-                        {onSalir && (
-                            <button type="button" className="juego-dnd-btn juego-dnd-btn-ghost" onClick={onSalir}>
-                                Volver a los juegos
-                            </button>
-                        )}
-                    </div>
-                </div>
+                <PantallaFinal
+                    aciertos={aciertos}
+                    total={total}
+                    puntosGanados={puntosGanados}
+                    xp={xpIntento}
+                    detalle={`${aciertos} de ${total} al primer intento`}
+                    etiquetaRevisar="Ver mis estrellas"
+                    onReiniciar={reiniciar}
+                    onSalir={onSalir}
+                />
             )}
 
             {toast && <LogroToast {...toast} onClose={() => setToast(null)} />}

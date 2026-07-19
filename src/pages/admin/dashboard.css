@@ -1388,13 +1388,38 @@
 .opcion-atenuada { opacity: 0.55; }
 
 /* Respuesta registrada SIN revelar corrección (fase de evaluación del quiz):
-   solo marca la elección con el color de la marca, sin verde/rojo. */
+   marca la elección en ámbar (acento del tema), deliberadamente distinto del
+   verde de acierto — comunica "esta es tu respuesta", no "correcta". */
 .opcion-elegida {
-    border-color: var(--color-primary);
-    background: var(--color-primary-soft);
+    border: 2px solid var(--color-accent);
+    background: var(--color-accent-soft);
 }
-.opcion-elegida .opcion-letra { background: var(--color-primary); color: #fff; }
-.opcion-elegida .opcion-icono { color: var(--color-primary); }
+/* Ámbar oscuro #b45309: contraste ≥ 4.5:1 con texto blanco (accesibilidad). */
+.opcion-elegida .opcion-letra { background: #b45309; color: #fff; }
+
+/* Chip textual "Tu respuesta": el estado seleccionado se entiende sin
+   depender del color (accesibilidad). También se usa en la revisión. */
+.opcion-tu-respuesta {
+    flex-shrink: 0;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    background: #b45309;
+    color: #fff;
+}
+.opcion-correcta .opcion-tu-respuesta { background: #16a34a; }
+.opcion-incorrecta .opcion-tu-respuesta { background: #ef4444; }
+
+/* Revisión: la respuesta correcta que el niño NO eligió se muestra en verde
+   pero "hueca" (borde discontinuo, sin relleno), distinta de la elegida. */
+.opcion-correcta-no-elegida {
+    background: var(--color-surface);
+    border-style: dashed;
+    border-width: 2px;
+}
+.opcion-correcta-no-elegida .opcion-letra { background: #dcfce7; color: #16a34a; }
 
 .pregunta-justificacion {
     display: flex;

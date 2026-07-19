@@ -7,6 +7,7 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import CloudDoneRoundedIcon from '@mui/icons-material/CloudDoneRounded';
 import gamificationService from '../../services/gamificationService';
 import { ResultadoOverlay } from '../juegos/ResultadoActividad';
+import { useReporteIntento } from '../../hooks/useGuardiaActividad';
 import './quizInteractivo.css';
 
 const LETRAS = ['A', 'B', 'C', 'D'];
@@ -94,11 +95,17 @@ export function PreguntaCard({ pregunta, indice, onResponder, revelar = true }) 
 
                     let estado = '';
                     if (respondida && revelar) {
-                        if (letra === correcta) estado = 'opcion-correcta';
-                        else if (letra === elegida) estado = 'opcion-incorrecta';
+                        // Revisión: la correcta elegida va en verde sólido; la
+                        // correcta NO elegida en verde "hueco" (variante), la
+                        // incorrecta elegida en rojo y el resto neutro.
+                        if (letra === correcta) {
+                            estado = letra === elegida
+                                ? 'opcion-correcta'
+                                : 'opcion-correcta opcion-correcta-no-elegida';
+                        } else if (letra === elegida) estado = 'opcion-incorrecta';
                         else estado = 'opcion-atenuada';
                     } else if (respondida) {
-                        // Sin revelar: solo se distingue la elección del niño.
+                        // Intento en curso: ámbar neutral, nunca verde ni ✓.
                         estado = letra === elegida ? 'opcion-elegida' : 'opcion-atenuada';
                     }
 
@@ -112,12 +119,12 @@ export function PreguntaCard({ pregunta, indice, onResponder, revelar = true }) 
                         >
                             <span className="opcion-letra">{letra}</span>
                             <span className="opcion-texto">{texto}</span>
+                            {respondida && letra === elegida && (
+                                <span className="opcion-tu-respuesta">Tu respuesta</span>
+                            )}
                             {respondida && revelar && letra === correcta && <CheckCircleRoundedIcon className="opcion-icono" />}
                             {respondida && revelar && letra === elegida && letra !== correcta && (
                                 <CancelRoundedIcon className="opcion-icono" />
-                            )}
-                            {respondida && !revelar && letra === elegida && (
-                                <CheckCircleRoundedIcon className="opcion-icono" />
                             )}
                         </button>
                     );
@@ -243,14 +250,10 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
 
     // Guardia de salida: hay intento en curso si el niño ya respondió algo y
     // aún no termina. En vista previa del docente no se protege nada.
-    const enProgreso = mostrarPuntaje && !soloPrueba && respondidas > 0 && !completado;
-    useEffect(() => {
-        onEstadoIntento?.(enProgreso);
-    }, [enProgreso, onEstadoIntento]);
-    // Al desmontar el reproductor, el intento deja de existir.
-    const estadoRef = useRef(onEstadoIntento);
-    estadoRef.current = onEstadoIntento;
-    useEffect(() => () => estadoRef.current?.(false), []);
+    useReporteIntento(
+        onEstadoIntento,
+        mostrarPuntaje && !soloPrueba && respondidas > 0 && !completado
+    );
 
     // Al completar el quiz: suma XP automáticamente y verifica logros.
     useEffect(() => {

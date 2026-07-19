@@ -1,13 +1,11 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import AutoStoriesRoundedIcon from '@mui/icons-material/AutoStoriesRounded';
 import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
 import LightbulbRoundedIcon from '@mui/icons-material/LightbulbRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import ReplayRoundedIcon from '@mui/icons-material/ReplayRounded';
-import CloudDoneRoundedIcon from '@mui/icons-material/CloudDoneRounded';
-import gamificationService, { PUNTOS_POR_ACIERTO } from '../../services/gamificationService';
-import { LogroToast } from '../quiz/QuizInteractivo';
-import { ResultadoActividad } from '../juegos/ResultadoActividad';
+import { useRecompensa, useReporteIntento, LogroToast } from '../juegos/juegosComunes';
+import { ResultadoActividad, ResultadoCierre } from '../juegos/ResultadoActividad';
 import './misionNarrativa.css';
 
 // Reproductor de Misiones Narrativas (estilo aventura gráfica / RPG por
@@ -24,7 +22,7 @@ const LETRAS = ['A', 'B', 'C'];
 
 // `soloPrueba` (SPEC-012): vista previa del docente — se juega igual pero no
 // se otorga XP ni se guarda progreso.
-export function MisionNarrativa({ reto, estudianteId, onSalir, onCompletado, soloPrueba = false }) {
+export function MisionNarrativa({ reto, estudianteId, onSalir, onCompletado, soloPrueba = false, onEstadoIntento }) {
     const mision = reto?.configuracion || {};
     const desafios = mision.desafios || [];
     const total = desafios.length;
@@ -35,24 +33,33 @@ export function MisionNarrativa({ reto, estudianteId, onSalir, onCompletado, sol
     const [elegida, setElegida] = useState(null);    // letra elegida en el intento actual
     const [fallidos, setFallidos] = useState(() => new Set()); // desafíos con algún error
     const [superado, setSuperado] = useState(false); // el desafío activo ya se resolvió
-    const [puntosGanados, setPuntosGanados] = useState(0);
-    const [toast, setToast] = useState(null);
+    const [semilla, setSemilla] = useState(0);       // nº de partida (reinicia la recompensa)
 
     const desafio = desafios[capitulo];
     const correcta = String(desafio?.correcta || '').trim().toUpperCase();
     const aciertos = total - fallidos.size;
 
-    // Evita otorgar XP/registrar progreso más de una vez por partida.
-    const recompensado = useRef(false);
+    // Recompensa unificada (mismo flujo que los demás juegos): al llegar a la
+    // fase final otorga una sola vez, con XP confirmado por el backend.
+    const { puntosGanados, toast, setToast, xpIntento } = useRecompensa({
+        completado: fase === 'final',
+        estudianteId, reto, tipo: 'mision', aciertos, total, semilla, onCompletado, soloPrueba
+    });
+
+    // Guardia de salida: hay progreso real desde la primera respuesta (la
+    // portada/introducción todavía no compromete nada).
+    useReporteIntento(
+        onEstadoIntento,
+        !soloPrueba && fase === 'jugando' && (capitulo > 0 || elegida !== null || superado || fallidos.size > 0)
+    );
 
     const reiniciar = () => {
-        recompensado.current = false;
         setFase('intro');
         setCapitulo(0);
         setElegida(null);
         setFallidos(new Set());
         setSuperado(false);
-        setPuntosGanados(0);
+        setSemilla((s) => s + 1);
     };
 
     const responder = (letra) => {
@@ -66,56 +73,14 @@ export function MisionNarrativa({ reto, estudianteId, onSalir, onCompletado, sol
         }
     };
 
-    // Al superar el último capítulo: flujo único de gamificación
-    // (XP local + logros + persistencia en MySQL vía completarReto).
-    // Se dispara desde el handler del botón, así que corre una sola vez
-    // por partida (recompensado la protege ante dobles clics).
-    const terminarMision = () => {
-        setFase('final');
-        if (recompensado.current) return;
-        recompensado.current = true;
-
-        if (soloPrueba) {
-            // Puntaje simulado: la pantalla final se ve igual, nada se guarda.
-            setPuntosGanados(aciertos * PUNTOS_POR_ACIERTO);
-            setToast({ titulo: 'Modo prueba', mensaje: 'Nada se guardó: así lo verá el estudiante.' });
-            return;
-        }
-
-        const { puntos, servidor } = gamificationService.completarReto({
-            estudianteId,
-            reto,
-            aciertos
-        });
-        setPuntosGanados(puntos);
-
-        if (aciertos === total) {
-            setToast({ mensaje: 'Maestro de la Materia' });
-        }
-
-        servidor.then((data) => {
-            onCompletado?.();
-            if (!data) return;
-            const mision = data.nuevas_misiones?.[0];
-            if (mision) {
-                setToast({ titulo: '¡Misión completada!', mensaje: mision.titulo });
-            } else {
-                setToast({
-                    titulo: 'Progreso guardado',
-                    mensaje: `+${data.xp_abonado} XP registrados en tu cuenta`,
-                    icono: <CloudDoneRoundedIcon />
-                });
-            }
-        });
-    };
-
     const avanzar = () => {
         if (capitulo + 1 < total) {
             setCapitulo((c) => c + 1);
             setElegida(null);
             setSuperado(false);
         } else {
-            terminarMision();
+            // La recompensa la dispara useRecompensa al entrar a la fase final.
+            setFase('final');
         }
     };
 
@@ -203,6 +168,20 @@ export function MisionNarrativa({ reto, estudianteId, onSalir, onCompletado, sol
             {/* ---- Final de la aventura ---- */}
             {fase === 'final' && (
                 <div className="mision-escena mision-portada">
+                    {/* Overlay gamificado sobre el final narrativo; cerrarlo
+                        deja la escena final a la vista (con reabrir). */}
+                    <ResultadoCierre
+                        aciertos={aciertos}
+                        total={total}
+                        puntosGanados={puntosGanados}
+                        xp={xpIntento ?? { estado: 'cargando' }}
+                        detalle={`${aciertos} de ${total} desafíos al primer intento`}
+                        etiquetaRevisar="Ver el final de la historia"
+                        onReintentar={reiniciar}
+                        etiquetaReintentar="Jugar de nuevo"
+                        onContinuar={onSalir}
+                        etiquetaContinuar="Otras misiones"
+                    />
                     <EmojiEventsRoundedIcon className="mision-portada-icono mision-icono-oro" />
                     <h2>¡Misión cumplida!</h2>
                     <p className="mision-texto">{mision.final}</p>
@@ -213,6 +192,7 @@ export function MisionNarrativa({ reto, estudianteId, onSalir, onCompletado, sol
                         total={total}
                         puntosGanados={puntosGanados}
                         detalle={`${aciertos} de ${total} desafíos al primer intento`}
+                        xp={xpIntento ?? { estado: 'cargando' }}
                     />
                     <div className="mision-final-acciones">
                         <button className="mision-btn mision-btn-secundario" onClick={reiniciar}>

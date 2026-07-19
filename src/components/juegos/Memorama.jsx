@@ -6,10 +6,10 @@
 // que el clasificador). El juego siempre se termina ganando.
 import { useMemo, useState } from 'react';
 import TouchAppRoundedIcon from '@mui/icons-material/TouchAppRounded';
-import { mezclar, useRecompensa, PantallaFinal, LogroToast } from './juegosComunes';
+import { mezclar, useRecompensa, useReporteIntento, PantallaFinal, LogroToast } from './juegosComunes';
 import './juegos.css';
 
-export function Memorama({ reto, estudianteId, onSalir, onCompletado, soloPrueba }) {
+export function Memorama({ reto, estudianteId, onSalir, onCompletado, soloPrueba, onEstadoIntento }) {
     const parejas = reto?.configuracion?.parejas || [];
     const instruccion = reto?.configuracion?.instruccion || 'Encuentra las parejas que se corresponden.';
 
@@ -34,9 +34,16 @@ export function Memorama({ reto, estudianteId, onSalir, onCompletado, soloPrueba
         (i) => emparejadas.has(`${i}-a`) && !falladas.has(i)
     ).length;
 
-    const { puntosGanados, toast, setToast } = useRecompensa({
+    const { puntosGanados, toast, setToast, xpIntento } = useRecompensa({
         completado, estudianteId, reto, tipo: 'memorama', aciertos, total, semilla, onCompletado, soloPrueba
     });
+
+    // Guardia de salida: hay progreso real cuando ya se resolvió o falló
+    // alguna pareja (voltear una sola carta aún no pierde nada).
+    useReporteIntento(
+        onEstadoIntento,
+        !soloPrueba && !completado && (emparejadas.size > 0 || falladas.size > 0)
+    );
 
     const reiniciar = () => {
         setVolteadas([]);
@@ -119,6 +126,9 @@ export function Memorama({ reto, estudianteId, onSalir, onCompletado, soloPrueba
                     aciertos={aciertos}
                     total={total}
                     puntosGanados={puntosGanados}
+                    xp={xpIntento}
+                    detalle={`${aciertos} de ${total} parejas al primer intento`}
+                    etiquetaRevisar="Ver mis estrellas"
                     onReiniciar={reiniciar}
                     onSalir={onSalir}
                 />

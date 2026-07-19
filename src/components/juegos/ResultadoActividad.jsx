@@ -116,7 +116,7 @@ function CuerpoResultado({ aciertos, total, puntosGanados, detalle, animado = fa
 }
 
 // Tarjeta incrustada (compatibilidad con las pantallas finales de los juegos).
-export function ResultadoActividad({ aciertos, total, puntosGanados, detalle }) {
+export function ResultadoActividad({ aciertos, total, puntosGanados, detalle, xp }) {
     return (
         <div className="resultado-actividad">
             <CuerpoResultado
@@ -124,8 +124,42 @@ export function ResultadoActividad({ aciertos, total, puntosGanados, detalle }) 
                 total={total}
                 puntosGanados={puntosGanados}
                 detalle={detalle}
+                xp={xp}
             />
         </div>
+    );
+}
+
+// Momento de cierre autocontenido para los juegos: muestra el overlay al
+// montarse y, al cerrarlo (Revisar/clic fuera/Escape), lo reemplaza por el
+// botón "Ver mi resultado" para reabrirlo. El Quiz no lo usa porque su clave
+// de intento gobierna ese estado; los demás juegos montan este componente
+// dentro de su pantalla final (que solo existe cuando la partida terminó).
+export function ResultadoCierre({ etiquetaRevisar = 'Ver mi resultado', ...props }) {
+    const [cerrado, setCerrado] = useState(false);
+    const reabrirRef = useRef(null);
+
+    if (cerrado) {
+        return (
+            <button
+                type="button"
+                ref={reabrirRef}
+                className="resultado-reabrir"
+                onClick={() => setCerrado(false)}
+            >
+                🏅 Ver mi resultado
+            </button>
+        );
+    }
+    return (
+        <ResultadoOverlay
+            {...props}
+            etiquetaRevisar={etiquetaRevisar}
+            onRevisar={() => {
+                setCerrado(true);
+                requestAnimationFrame(() => reabrirRef.current?.focus());
+            }}
+        />
     );
 }
 

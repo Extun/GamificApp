@@ -531,13 +531,14 @@ export function DashboardEstudiante() {
                                 <section className="card materia-subvista">
                                     <div className="card-head">
                                         <h3>{misionActiva.titulo}</h3>
-                                        <button className="back-btn back-btn-inline" onClick={() => setMisionActiva(null)}>← Otras misiones</button>
+                                        <button className="back-btn back-btn-inline" onClick={proteger(() => setMisionActiva(null))}>← Otras misiones</button>
                                     </div>
                                     <MisionNarrativa
                                         reto={misionActiva}
                                         estudianteId={estudianteId}
                                         onSalir={() => setMisionActiva(null)}
                                         onCompletado={refrescarProgreso}
+                                        onEstadoIntento={marcarIntento}
                                     />
                                 </section>
                             )}
@@ -546,7 +547,7 @@ export function DashboardEstudiante() {
                                 <section className="card materia-subvista">
                                     <div className="card-head">
                                         <h3>{juegoActivo.titulo}</h3>
-                                        <button className="back-btn back-btn-inline" onClick={() => setJuegoActivo(null)}>← Otros juegos</button>
+                                        <button className="back-btn back-btn-inline" onClick={proteger(() => setJuegoActivo(null))}>← Otros juegos</button>
                                     </div>
                                     {(() => {
                                         const Player = JUEGOS_UI[juegoActivo.tipo]?.Player;
@@ -556,6 +557,7 @@ export function DashboardEstudiante() {
                                                 estudianteId={estudianteId}
                                                 onSalir={() => setJuegoActivo(null)}
                                                 onCompletado={refrescarProgreso}
+                                                onEstadoIntento={marcarIntento}
                                             />
                                         ) : (
                                             <p className="vacio-msg">Este juego no está disponible en tu versión de la app.</p>

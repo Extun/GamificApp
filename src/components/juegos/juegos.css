@@ -275,6 +275,54 @@
     opacity: 0.5;
 }
 
+/* Elección registrada SIN revelar corrección (corrección diferida): ámbar
+   del tema, distinto del verde de acierto. */
+.completar-opcion.opcion-elegida {
+    background: var(--color-accent-soft);
+    border-color: var(--color-accent);
+    color: var(--color-accent-dark);
+    font-weight: 700;
+}
+
+.completar-hueco.is-elegido {
+    color: var(--color-accent-dark);
+    border-color: var(--color-accent);
+}
+
+/* Revisión final del intento (verde/rojo recién aquí). */
+.completar-revision {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.completar-revision h4 {
+    margin: 0;
+    font-family: var(--font-head);
+    color: var(--color-text);
+}
+
+.completar-revision-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+}
+
+.completar-revision-item .completar-frase { margin: 0; font-size: 0.95rem; }
+
+.completar-revision-icono { flex-shrink: 0; display: flex; margin-top: 2px; }
+
+.completar-revision-correcta {
+    margin: 4px 0 0;
+    font-size: 0.88rem;
+    color: var(--color-text-muted);
+}
+
 .completar-opcion:disabled {
     cursor: default;
 }

@@ -9,10 +9,10 @@ import TouchAppRoundedIcon from '@mui/icons-material/TouchAppRounded';
 import ArrowUpwardRoundedIcon from '@mui/icons-material/ArrowUpwardRounded';
 import ArrowDownwardRoundedIcon from '@mui/icons-material/ArrowDownwardRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
-import { mezclar, useRecompensa, PantallaFinal, LogroToast } from './juegosComunes';
+import { mezclar, useRecompensa, useReporteIntento, PantallaFinal, LogroToast } from './juegosComunes';
 import './juegos.css';
 
-export function LineaTiempo({ reto, estudianteId, onSalir, onCompletado, soloPrueba }) {
+export function LineaTiempo({ reto, estudianteId, onSalir, onCompletado, soloPrueba, onEstadoIntento }) {
     const eventos = reto?.configuracion?.eventos || [];
     const instruccion = reto?.configuracion?.instruccion || 'Ordena los eventos: arriba el primero, abajo el último.';
     const tituloSecuencia = reto?.configuracion?.titulo_secuencia || null;
@@ -44,9 +44,17 @@ export function LineaTiempo({ reto, estudianteId, onSalir, onCompletado, soloPru
     const total = eventos.length;
     const completado = total > 0 && fijados.size === total;
 
-    const { puntosGanados, toast, setToast } = useRecompensa({
+    const { puntosGanados, toast, setToast, xpIntento } = useRecompensa({
         completado, estudianteId, reto, tipo: 'linea-tiempo', aciertos, total, semilla, onCompletado, soloPrueba
     });
+
+    // Guardia de salida: hay progreso real si ya comprobó al menos una vez o
+    // movió algún evento respecto del orden barajado inicial.
+    const reordeno = orden !== ordenInicial && orden.some((v, i) => v !== ordenInicial[i]);
+    useReporteIntento(
+        onEstadoIntento,
+        !soloPrueba && !completado && (comprobaciones > 0 || reordeno)
+    );
 
     const mover = (posicion, delta) => {
         const destino = posicion + delta;
@@ -152,6 +160,9 @@ export function LineaTiempo({ reto, estudianteId, onSalir, onCompletado, soloPru
                     aciertos={aciertos}
                     total={total}
                     puntosGanados={puntosGanados}
+                    xp={xpIntento}
+                    detalle={`${aciertos} de ${total} en su lugar a la primera`}
+                    etiquetaRevisar="Ver mis estrellas"
                     onReiniciar={reiniciar}
                     onSalir={onSalir}
                 />

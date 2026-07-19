@@ -66,6 +66,18 @@ function DialogoSalida({ onSeguir, onSalir }) {
     );
 }
 
+// Lado "reproductor" del contrato: informa al contenedor si hay un intento
+// con progreso real sin terminar, y lo apaga al desmontar. `onEstadoIntento`
+// puede ser undefined (vista previa, juego embebido): entonces no hace nada.
+export function useReporteIntento(onEstadoIntento, enProgreso) {
+    const ref = useRef(onEstadoIntento);
+    ref.current = onEstadoIntento;
+    useEffect(() => {
+        ref.current?.(enProgreso);
+    }, [enProgreso]);
+    useEffect(() => () => ref.current?.(false), []);
+}
+
 export function useGuardiaActividad() {
     const [enCurso, setEnCurso] = useState(false);
     // Ref espejo: `proteger` mantiene identidad estable y aun así lee el
