@@ -3,6 +3,7 @@ import pool from '../db.js';
 import { registrarAuditoria } from '../lib/auditoria.js';
 import { actualizarRacha, evaluarMisiones } from '../lib/misiones.js';
 import { esDelAulaDocente } from '../lib/estudiantes.js';
+import { totalEsperado } from '../lib/totalEsperado.js';
 
 const router = Router();
 
@@ -83,17 +84,44 @@ router.post('/', async (req, res, next) => {
     const materiaId = Number(req.body?.materia_id);
     const retoTitulo = typeof req.body?.reto_titulo === 'string' ? req.body.reto_titulo.trim() : '';
     const puntos = Number(req.body?.puntos_obtenidos);
-    // SPEC-015: datos objetivos del intento (opcionales). Solo se aceptan
-    // juntos y coherentes; si algo no cuadra, se ignoran (flujo histórico).
-    const aciertosBody = Number(req.body?.aciertos);
-    const totalBody = Number(req.body?.total);
-    const hayIntento = Number.isInteger(aciertosBody) && Number.isInteger(totalBody)
+    const esEstudiante = req.user.rol === 'estudiante';
+    // SPEC-015: datos objetivos del intento. Estricto a propósito: solo se
+    // acepta un NÚMERO entero exacto. `Number()` a secas no basta —
+    // `Number(null)` y `Number('')` son 0 (y `NaN` viaja como `null` en JSON),
+    // así que un payload roto se colaría como "0 aciertos" en vez de
+    // rechazarse. Los tres clientes legítimos envían números.
+    const enteroDeBody = (v) => {
+        if (typeof v !== 'number' || !Number.isInteger(v)) return null;
+        return v;
+    };
+    const aciertosBody = enteroDeBody(req.body?.aciertos);
+    const totalBody = enteroDeBody(req.body?.total);
+    const enviaIntento = req.body?.aciertos !== undefined || req.body?.total !== undefined;
+    const hayIntento = aciertosBody !== null && totalBody !== null
         && totalBody > 0 && aciertosBody >= 0 && aciertosBody <= totalBody;
 
     const identificaReto = esIdValido(retoIdBody) || (esIdValido(materiaId) && retoTitulo);
     if (!esIdValido(estudianteId) || !identificaReto || !Number.isInteger(puntos) || puntos < 0) {
         return res.status(400).json({
             error: 'Se requieren estudiante_id y puntos_obtenidos válidos, y reto_id o materia_id + reto_titulo'
+        });
+    }
+    // (A) Crear un reto sobre la marcha por (materia, título) es un flujo de
+    // DOCENTE/ADMIN. Un estudiante que lo usara podría publicar retos falsos y,
+    // peor, fijarles él mismo el `xp_recompensa` del que luego cobraría el XP.
+    // Los reproductores del estudiante siempre traen `reto_id` real de
+    // GET /api/retos, así que esto no rompe ningún flujo legítimo.
+    if (esEstudiante && !esIdValido(retoIdBody)) {
+        return res.status(403).json({ error: 'Debes registrar el progreso sobre una actividad existente' });
+    }
+    // (D) Un estudiante NO puede reportar XP arbitrario: en el flujo moderno el
+    // XP lo calcula el servidor con la calificación del intento y el
+    // `xp_recompensa` PERSISTIDO. La ruta legacy (solo `puntos_obtenidos`, sin
+    // aciertos/total) queda reservada al ajuste manual del docente/admin desde
+    // el Libro de Calificaciones — único cliente que la usa.
+    if (esEstudiante && !hayIntento) {
+        return res.status(400).json({
+            error: 'Se requieren aciertos y total válidos del intento (enteros, 0 <= aciertos <= total)'
         });
     }
     // Un estudiante solo puede registrar progreso EN SU PROPIA cuenta: sin
@@ -114,13 +142,34 @@ router.post('/', async (req, res, next) => {
         await conn.beginTransaction();
 
         // Resuelve el reto: por id directo, o por (materia, título) creándolo
-        // si es la primera vez que un estudiante completa ese quiz.
+        // si es la primera vez que se registra progreso sobre ese quiz.
+        // (B) Se cargan también tipo/estado/configuración/materia: el servidor
+        // es la AUTORIDAD sobre el reto — la recompensa y la estructura salen
+        // siempre de la fila persistida, nunca del body.
         let reto;
         if (esIdValido(retoIdBody)) {
             [[reto]] = await conn.query(
-                'SELECT id, xp_recompensa FROM retos WHERE id = ? AND eliminado_en IS NULL',
+                `SELECT id, tipo, estado, configuracion_json, xp_recompensa, materia_id, curso_id
+                 FROM retos WHERE id = ? AND eliminado_en IS NULL`,
                 [retoIdBody]
             );
+            // (B) Un estudiante solo registra progreso sobre lo que legítimamente
+            // puede jugar. Se aplica EXACTAMENTE el mismo criterio que usa
+            // GET /api/retos para listarle actividades (publicado + materia viva
+            // y activa), para que no exista nada visible que no sea enviable ni
+            // viceversa. Ojo: hoy `curso_id` NO delimita el acceso en GET, así
+            // que tampoco se usa aquí — ver SPEC-015 §Modelo de confianza.
+            if (reto && esEstudiante) {
+                const [[accesible]] = await conn.query(
+                    `SELECT 1 AS si FROM materias
+                     WHERE id = ? AND eliminado_en IS NULL AND activa = TRUE`,
+                    [reto.materia_id]
+                );
+                if (reto.estado !== 'publicado' || !accesible) {
+                    await conn.rollback();
+                    return res.status(403).json({ error: 'Esa actividad no está disponible para ti' });
+                }
+            }
         } else {
             [[reto]] = await conn.query(
                 'SELECT id, xp_recompensa FROM retos WHERE materia_id = ? AND titulo = ? AND eliminado_en IS NULL',
@@ -136,6 +185,11 @@ router.post('/', async (req, res, next) => {
                     await conn.rollback();
                     return res.status(404).json({ error: 'Materia no encontrada' });
                 }
+                // `xp_recompensa` del body SOLO define la recompensa al CREAR
+                // el reto, y esta rama ya es exclusiva de docente/admin (un
+                // docente fijando el premio de su actividad es legítimo). Para
+                // calcular el XP de un intento nunca se usa el body: siempre
+                // `reto.xp_recompensa` leído de la fila persistida.
                 const xpRecompensa = esIdValido(Number(req.body?.xp_recompensa))
                     ? Number(req.body.xp_recompensa)
                     : 100;
@@ -144,7 +198,11 @@ router.post('/', async (req, res, next) => {
                      VALUES (?, ?, ?, 'publicado')`,
                     [materiaId, retoTitulo, xpRecompensa]
                 );
-                reto = { id: creado.insertId, xp_recompensa: xpRecompensa };
+                reto = {
+                    id: creado.insertId, xp_recompensa: xpRecompensa,
+                    tipo: 'quiz', estado: 'publicado', configuracion_json: null,
+                    materia_id: materiaId, curso_id: null
+                };
             }
         }
         if (!reto) {
@@ -152,6 +210,45 @@ router.post('/', async (req, res, next) => {
             return res.status(404).json({ error: 'Reto no encontrado' });
         }
         const retoId = reto.id;
+
+        // (C) Validación ESTRUCTURAL del intento: el `total` recibido debe ser
+        // el que ese reto puede producir según su tipo y su configuración
+        // persistida. Sin esto, "1 de 1" bastaba para reclamar 100/100 y toda
+        // la recompensa de cualquier actividad sin jugarla.
+        //
+        // Se rechaza con 400 en vez de caer al flujo histórico: un payload
+        // manipulado no debe poder obtener XP por otra ruta (el fallback
+        // silencioso era precisamente el agujero). Solo aplica cuando el
+        // cliente envía datos de intento; el ajuste manual del docente (sin
+        // aciertos/total) no pasa por aquí.
+        if (hayIntento) {
+            const configuracion = typeof reto.configuracion_json === 'string'
+                ? JSON.parse(reto.configuracion_json)
+                : reto.configuracion_json;
+            const esperado = totalEsperado(reto.tipo, configuracion);
+            if (esperado === null) {
+                // Reto sin configuración derivable (p. ej. filas creadas por la
+                // vieja ruta materia+título, que nacían con configuracion_json
+                // NULL). No son jugables por la UI actual — todos los
+                // reproductores exigen configuración válida — así que esto no
+                // bloquea ningún intento legítimo.
+                await conn.rollback();
+                return res.status(400).json({
+                    error: 'Esta actividad no tiene una configuración válida para registrar progreso'
+                });
+            }
+            if (totalBody !== esperado) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Los datos del intento no corresponden a esta actividad' });
+            }
+        } else if (enviaIntento) {
+            // Envió aciertos/total pero mal formados (decimales, negativos,
+            // aciertos > total, NaN, strings…): se rechaza en vez de ignorarlos.
+            await conn.rollback();
+            return res.status(400).json({
+                error: 'aciertos y total deben ser enteros con 0 <= aciertos <= total'
+            });
+        }
 
         // Bloquea la fila del estudiante: dos envíos simultáneos se serializan.
         const [[estudiante]] = await conn.query(

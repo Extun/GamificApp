@@ -26,16 +26,16 @@ import docenteService from '../../services/docenteService';
 import bancoService from '../../services/bancoService';
 import { TIPOS_ACTIVIDAD } from './registroJuegos';
 import { SelectorBanco } from './SelectorBanco';
+import { CampoTema } from './CampoTema';
+import { DIFICULTADES_UI } from './metadatosActividad';
 import { PreviewJuegoModal } from './PreviewJuegoModal';
 import { useHistorialRetos, HistorialActividades } from './HistorialActividades';
 // Acordeón compartido con el editor del quiz (mismas clases editor-item*).
 import '../quiz/editorQuiz.css';
 
-export const DIFICULTADES_UI = [
-    ['facil', '🙂 Fácil'],
-    ['media', '💪 Media'],
-    ['dificil', '🔥 Difícil']
-];
+// Fuente única en metadatosActividad.js; se re-exporta para no romper a los
+// consumidores existentes (GeneradorMision, BibliotecaActividades).
+export { DIFICULTADES_UI };
 
 // Descripción corta por tipo para la cabecera del formulario.
 const AYUDA_TIPO = {
@@ -76,6 +76,37 @@ const firmaItem = (tipo, item) => {
     const t = (s) => (s || '').trim().toLowerCase();
     if (tipo === 'memorama') return `${t(item.a)}|${t(item.b)}`;
     return t(item.texto);
+};
+
+// Línea del tiempo — `etiqueta` es contenido libre del docente (puede ser un
+// año: "1492"), así que NO se deriva de la posición. Pero cuando la IA (o el
+// banco) devuelve etiquetas ORDINALES ("Paso 1", "Etapa 2"…) al anexar, la
+// numeración vuelve a empezar y se duplica con la que ya existe. Aquí solo
+// esas etiquetas se renumeran para continuar la secuencia; las demás (fechas,
+// nombres, vacías) se respetan tal cual.
+const ORDINAL = /^(paso|etapa|fase|momento|evento)\s*#?\s*(\d+)\s*:?$/i;
+
+const renumerarOrdinales = (tipo, actuales, nuevos) => {
+    if (tipo !== 'linea-tiempo') return nuevos;
+    // Mayor ordinal ya usado por prefijo (en minúsculas), para continuar desde ahí.
+    const tope = new Map();
+    actuales.forEach((it) => {
+        const m = ORDINAL.exec(String(it?.etiqueta || '').trim());
+        if (!m) return;
+        const clave = m[1].toLowerCase();
+        tope.set(clave, Math.max(tope.get(clave) || 0, Number(m[2])));
+    });
+    if (!tope.size) return nuevos;
+    return nuevos.map((it) => {
+        const original = String(it?.etiqueta || '').trim();
+        const m = ORDINAL.exec(original);
+        if (!m) return it;
+        const clave = m[1].toLowerCase();
+        const siguiente = (tope.get(clave) || 0) + 1;
+        tope.set(clave, siguiente);
+        // Conserva la capitalización que traía la etiqueta original.
+        return { ...it, etiqueta: `${m[1]} ${siguiente}` };
+    });
 };
 
 // Plantillas de ítem vacío para "Añadir manual" (SPEC-012, Fase 3): el ítem
@@ -296,7 +327,11 @@ export function GeneradorActividadIA({ materia, tipo }) {
                 setTimeout(() => setAviso(''), 5000);
                 return;
             }
-            const conBanco = await guardarLoteEnBanco(nuevos, temaBase);
+            // Las etiquetas ordinales ("Paso 1"…) continúan la secuencia actual
+            // en vez de reiniciarse y duplicar las que ya tiene la actividad.
+            const conBanco = renumerarOrdinales(
+                tipo, actuales, await guardarLoteEnBanco(nuevos, temaBase)
+            );
             editarConfig({ [claveItems]: [...actuales, ...conBanco] });
             setAviso(`${conBanco.length} ${conBanco.length === 1
                 ? NOMBRE_ITEM_PLURAL[tipo].replace(/s$/, '')
@@ -447,7 +482,7 @@ export function GeneradorActividadIA({ materia, tipo }) {
         if (!actividad || !nuevos.length) return;
         const actuales = actividad.configuracion?.[claveItems] || [];
         const espacio = Math.max(maxItems - actuales.length, 0);
-        const insertados = nuevos.slice(0, espacio);
+        const insertados = renumerarOrdinales(tipo, actuales, nuevos.slice(0, espacio));
         if (insertados.length) {
             editarConfig({ [claveItems]: [...actuales, ...insertados] });
         }
@@ -511,16 +546,11 @@ export function GeneradorActividadIA({ materia, tipo }) {
             <p className="clasificador-intro">{AYUDA_TIPO[tipo]}</p>
 
             <form className="quiz-form gen-ia-form" onSubmit={generar}>
-                <label className="quiz-field">
-                    <span>Tema</span>
-                    <input
-                        type="text"
-                        value={tema}
-                        onChange={(e) => setTema(e.target.value)}
-                        placeholder="Ej. Las partes de la planta"
-                        maxLength={200}
-                    />
-                </label>
+                <CampoTema
+                    value={tema}
+                    onChange={(e) => setTema(e.target.value)}
+                    materia={materia}
+                />
                 <label className="quiz-field">
                     <span>Cantidad</span>
                     <select value={cantidad} onChange={(e) => setCantidad(Number(e.target.value))}>

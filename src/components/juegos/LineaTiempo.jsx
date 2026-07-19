@@ -1,15 +1,19 @@
 // Reproductor de la LÍNEA DEL TIEMPO (SPEC-006, Fase 1) — ordenar secuencias.
 // configuracion_json: { instruccion, titulo_secuencia?, eventos: [{ texto, etiqueta? }] }
 // Los eventos llegan EN ORDEN CORRECTO y se barajan al empezar. El niño los
-// mueve con flechas ▲▼ (táctil e inclusivo) y pulsa "Comprobar": las posiciones
-// correctas se fijan en verde y puede seguir intentando hasta completar todo.
-// Puntaje: acierto = evento en su lugar correcto en la PRIMERA comprobación.
+// mueve libremente con flechas ▲▼ (táctil e inclusivo).
+//
+// A2 — actividad de ordenamiento evaluada AL ENVIAR: mientras organiza, nada
+// se marca en verde, nada se bloquea y nada revela la solución; al pulsar
+// "Comprobar orden" se evalúa la secuencia completa una sola vez.
+// Puntaje: pares de eventos consecutivos correctos (ver ordenSecuencia.js).
 import { useMemo, useState } from 'react';
 import TouchAppRoundedIcon from '@mui/icons-material/TouchAppRounded';
 import ArrowUpwardRoundedIcon from '@mui/icons-material/ArrowUpwardRounded';
 import ArrowDownwardRoundedIcon from '@mui/icons-material/ArrowDownwardRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import { mezclar, useRecompensa, useReporteIntento, PantallaFinal, LogroToast } from './juegosComunes';
+import { evaluarOrden } from './ordenSecuencia';
 import './juegos.css';
 
 export function LineaTiempo({ reto, estudianteId, onSalir, onCompletado, soloPrueba, onEstadoIntento }) {
@@ -26,40 +30,36 @@ export function LineaTiempo({ reto, estudianteId, onSalir, onCompletado, soloPru
         [reto?.id, semilla]
     );
     const [orden, setOrden] = useState(ordenInicial);
-    const [fijados, setFijados] = useState(() => new Set()); // posiciones correctas confirmadas
-    const [comprobaciones, setComprobaciones] = useState(0);
-    const [aciertos, setAciertos] = useState(0); // correctos en la 1.ª comprobación
-    const [sacudir, setSacudir] = useState(false);
+    // Resultado del envío: null mientras organiza, { aciertos, total } al enviar.
+    const [enviado, setEnviado] = useState(null);
 
     // Reset derivado al re-barajar (jugar otra vez u otro reto).
     const [claveOrden, setClaveOrden] = useState(ordenInicial);
     if (claveOrden !== ordenInicial) {
         setClaveOrden(ordenInicial);
         setOrden(ordenInicial);
-        setFijados(new Set());
-        setComprobaciones(0);
-        setAciertos(0);
+        setEnviado(null);
     }
 
-    const total = eventos.length;
-    const completado = total > 0 && fijados.size === total;
+    // La nota se mide en PARES de eventos en orden relativo correcto, no en
+    // posiciones absolutas: `total` es n(n-1)/2 (ver ordenSecuencia.js).
+    const completado = enviado !== null;
+    const aciertos = enviado?.aciertos ?? 0;
+    const total = enviado?.total ?? Math.max(eventos.length - 1, 1);
 
     const { puntosGanados, toast, setToast, xpIntento } = useRecompensa({
         completado, estudianteId, reto, tipo: 'linea-tiempo', aciertos, total, semilla, onCompletado, soloPrueba
     });
 
-    // Guardia de salida: hay progreso real si ya comprobó al menos una vez o
-    // movió algún evento respecto del orden barajado inicial.
+    // Guardia de salida: hay progreso real en cuanto movió algún evento
+    // respecto del orden barajado inicial (aún no ha enviado nada).
     const reordeno = orden !== ordenInicial && orden.some((v, i) => v !== ordenInicial[i]);
-    useReporteIntento(
-        onEstadoIntento,
-        !soloPrueba && !completado && (comprobaciones > 0 || reordeno)
-    );
+    useReporteIntento(onEstadoIntento, !soloPrueba && !completado && reordeno);
 
+    // Movimiento SIEMPRE libre: nada se bloquea durante el intento.
     const mover = (posicion, delta) => {
         const destino = posicion + delta;
-        if (destino < 0 || destino >= orden.length) return;
-        if (fijados.has(posicion) || fijados.has(destino)) return;
+        if (completado || destino < 0 || destino >= orden.length) return;
         setOrden((prev) => {
             const copia = [...prev];
             [copia[posicion], copia[destino]] = [copia[destino], copia[posicion]];
@@ -67,23 +67,16 @@ export function LineaTiempo({ reto, estudianteId, onSalir, onCompletado, soloPru
         });
     };
 
+    // Envío único: evalúa la secuencia completa y cierra el intento.
     const comprobar = () => {
-        const correctas = new Set(fijados);
-        orden.forEach((eventoIdx, posicion) => {
-            if (eventoIdx === posicion) correctas.add(posicion);
-        });
-        if (comprobaciones === 0) {
-            setAciertos(orden.filter((eventoIdx, posicion) => eventoIdx === posicion).length);
-        }
-        setComprobaciones((n) => n + 1);
-        setFijados(correctas);
-        if (correctas.size < total) {
-            setSacudir(true);
-            setTimeout(() => setSacudir(false), 600);
-        }
+        if (completado) return;
+        setEnviado(evaluarOrden(orden));
     };
 
-    const reiniciar = () => setSemilla((s) => s + 1);
+    const reiniciar = () => {
+        setEnviado(null);
+        setSemilla((s) => s + 1);
+    };
 
     if (!eventos.length) {
         return <p className="vacio-msg">Este juego no tiene configuración válida.</p>;
@@ -103,55 +96,47 @@ export function LineaTiempo({ reto, estudianteId, onSalir, onCompletado, soloPru
 
             {!completado && (
                 <>
-                    <ol className={`linea-lista ${sacudir ? 'is-sacudida' : ''}`}>
+                    <ol className="linea-lista">
                         {orden.map((eventoIdx, posicion) => {
                             const evento = eventos[eventoIdx];
-                            const fijado = fijados.has(posicion);
                             return (
-                                <li
-                                    key={eventoIdx}
-                                    className={`linea-evento ${fijado ? 'is-correcto' : ''}`}
-                                >
+                                <li key={eventoIdx} className="linea-evento">
                                     <span className="linea-evento-num" aria-hidden="true">{posicion + 1}</span>
                                     <span className="linea-evento-texto">
                                         {evento.texto}
                                         {evento.etiqueta && <em className="linea-evento-etiqueta">{evento.etiqueta}</em>}
                                     </span>
-                                    {fijado ? (
-                                        <CheckCircleRoundedIcon className="linea-evento-check" />
-                                    ) : (
-                                        <span className="linea-evento-flechas">
-                                            <button
-                                                type="button"
-                                                aria-label="Subir este evento"
-                                                disabled={posicion === 0 || fijados.has(posicion - 1)}
-                                                onClick={() => mover(posicion, -1)}
-                                            >
-                                                <ArrowUpwardRoundedIcon sx={{ fontSize: '1.15rem' }} />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                aria-label="Bajar este evento"
-                                                disabled={posicion === orden.length - 1 || fijados.has(posicion + 1)}
-                                                onClick={() => mover(posicion, 1)}
-                                            >
-                                                <ArrowDownwardRoundedIcon sx={{ fontSize: '1.15rem' }} />
-                                            </button>
-                                        </span>
-                                    )}
+                                    {/* Movimiento libre: las flechas solo se
+                                        deshabilitan en los extremos de la lista. */}
+                                    <span className="linea-evento-flechas">
+                                        <button
+                                            type="button"
+                                            aria-label={`Subir: ${evento.texto}`}
+                                            disabled={posicion === 0}
+                                            onClick={() => mover(posicion, -1)}
+                                        >
+                                            <ArrowUpwardRoundedIcon sx={{ fontSize: '1.15rem' }} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            aria-label={`Bajar: ${evento.texto}`}
+                                            disabled={posicion === orden.length - 1}
+                                            onClick={() => mover(posicion, 1)}
+                                        >
+                                            <ArrowDownwardRoundedIcon sx={{ fontSize: '1.15rem' }} />
+                                        </button>
+                                    </span>
                                 </li>
                             );
                         })}
                     </ol>
                     <button type="button" className="linea-btn-comprobar" onClick={comprobar}>
                         <CheckCircleRoundedIcon sx={{ fontSize: '1.15rem' }} />
-                        {comprobaciones === 0 ? 'Comprobar mi orden' : 'Comprobar otra vez'}
+                        Comprobar orden
                     </button>
-                    {comprobaciones > 0 && fijados.size < total && (
-                        <p className="linea-pista" role="status">
-                            ¡Vas bien! Los verdes ya están en su lugar; acomoda los demás.
-                        </p>
-                    )}
+                    <p className="linea-pista" role="status">
+                        Acomoda todos los eventos y pulsa «Comprobar orden» cuando estés listo.
+                    </p>
                 </>
             )}
 
@@ -161,7 +146,7 @@ export function LineaTiempo({ reto, estudianteId, onSalir, onCompletado, soloPru
                     total={total}
                     puntosGanados={puntosGanados}
                     xp={xpIntento}
-                    detalle={`${aciertos} de ${total} en su lugar a la primera`}
+                    detalle={`${aciertos} de ${total} parejas de eventos bien ordenadas`}
                     etiquetaRevisar="Ver mis estrellas"
                     onReiniciar={reiniciar}
                     onSalir={onSalir}

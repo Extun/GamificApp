@@ -5,7 +5,7 @@ import LightbulbRoundedIcon from '@mui/icons-material/LightbulbRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import ReplayRoundedIcon from '@mui/icons-material/ReplayRounded';
 import { useRecompensa, useReporteIntento, LogroToast } from '../juegos/juegosComunes';
-import { ResultadoActividad, ResultadoCierre } from '../juegos/ResultadoActividad';
+import { ResultadoCierre } from '../juegos/ResultadoActividad';
 import './misionNarrativa.css';
 
 // Reproductor de Misiones Narrativas (estilo aventura gráfica / RPG por
@@ -184,16 +184,11 @@ export function MisionNarrativa({ reto, estudianteId, onSalir, onCompletado, sol
                     />
                     <EmojiEventsRoundedIcon className="mision-portada-icono mision-icono-oro" />
                     <h2>¡Misión cumplida!</h2>
+                    {/* La escena final (narrativa propia de la misión) queda a
+                        la vista al cerrar el overlay; la calificación, la
+                        retroalimentación y el XP viven SOLO en el overlay,
+                        reabrible con "Ver mi resultado". */}
                     <p className="mision-texto">{mision.final}</p>
-                    {/* Calificación /100 (desafíos al primer intento) +
-                        retroalimentación por rango + XP separado. */}
-                    <ResultadoActividad
-                        aciertos={aciertos}
-                        total={total}
-                        puntosGanados={puntosGanados}
-                        detalle={`${aciertos} de ${total} desafíos al primer intento`}
-                        xp={xpIntento ?? { estado: 'cargando' }}
-                    />
                     <div className="mision-final-acciones">
                         <button className="mision-btn mision-btn-secundario" onClick={reiniciar}>
                             <ReplayRoundedIcon sx={{ fontSize: '1.1rem' }} /> Jugar de nuevo

@@ -6,7 +6,7 @@ Roadmap de GamificApp: fases, backlog priorizado, dependencias y riesgos. El est
 
 # Última actualización
 
-2026-07-17 (SPEC-013 aprobada: Editor de actividades universal — diseño congelado, implementación por fases)
+2026-07-19 (Backlog ampliado con los diferidos de la auditoría de actividades: ítems 20-23)
 
 # Responsable
 
@@ -58,6 +58,13 @@ Insumos: `docs/audit/Auditoria-UX-Estudiante-v1.md`, `docs/specifications/SPEC-0
 12. Lint: quedan 29 errores frontend (`react-hooks/set-state-in-effect`, `react-refresh/only-export-components`, algunos `no-empty`/`no-unused-vars` previos); corregirlos exige reestructurar componentes (los archivos nuevos de SPEC-006 repiten el patrón registro-de-constantes + componente).
 13. Accesibilidad de modales: sin focus trap, cierre con Escape ni restauración de foco.
 14. Rendimiento menor: `TablaPro` recibe `buscar`/`renderFila` inline (memo inútil); chunks grandes de Vite (`index` ~1.44 MB, `pdf.worker` ~1.29 MB) → code-splitting post-tesis.
+
+### Diferidos de la auditoría de actividades (2026-07-19) — anotados, NO implementar sin decisión
+
+20. **Sesiones/tokens de intento contra falsificación de resultados válidos.** El endurecimiento de `POST /api/progreso` cerró la manipulación trivial (crear retos, `xp_recompensa` arbitrario, `puntos_obtenidos` arbitrario, `total` incoherente), pero un usuario técnico puede seguir enviando un resultado **estructuralmente válido pero no jugado** (p. ej. `5/5` en un quiz que sí tiene 5 preguntas). Riesgo residual **aceptado explícitamente por Fabrizio** (2026-07-19) y documentado en SPEC-015. Cerrarlo exigiría que el servidor emita una sesión de intento firmada al iniciar la actividad y/o validar cada respuesta en backend — cambio de arquitectura mayor, fuera del alcance de la tesis.
+21. **Decisión arquitectónica: acceso a actividades por `curso_id`.** Hoy `curso_id` **no** es frontera de acceso: `GET /api/retos` lista a cualquier estudiante las actividades publicadas de cualquier materia activa, sin filtrar por curso. `POST /api/progreso` replica deliberadamente ese criterio para que no exista nada visible que no sea enviable. Convertirlo en frontera real es una decisión de producto y debe cambiar **ambos endpoints a la vez** (si no, aparecerían actividades listadas pero rechazadas al enviarlas). Pendiente de decisión de Fabrizio.
+22. **Posible duplicación de auditoría posterior al COMMIT.** En `POST /api/progreso`, `registrarAuditoria` se ejecuta **después** del commit y usa `pool` (no la conexión de la transacción). Un reintento de red del cliente podría generar dos entradas de auditoría para un mismo intento. No afecta XP, calificación ni progreso (la transacción es idempotente); es solo ruido en la bitácora. Pre-existente al cambio de 2026-07-19.
+23. **Compatibilidad de notas históricas de Línea del tiempo.** El criterio de calificación pasó de posición absoluta (`n` posiciones) a concordancia de Kendall (`n(n-1)/2` pares). `GREATEST` garantiza que ningún estudiante pierda su mejor nota histórica, pero el Libro de Calificaciones mezcla dos criterios en actividades anteriores al cambio, así que las notas de esa actividad no son comparables entre sí. Pendiente: decidir si se menciona como limitación en la tesis, se recalcula o se deja como está.
 
 ### Diferidos de SPEC-006 (requieren migración propia)
 

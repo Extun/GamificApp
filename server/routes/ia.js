@@ -318,11 +318,17 @@ router.post('/adaptar', soloDocente, async (req, res) => {
 });
 
 // ---- Compatibilidad: POST /api/ia/quiz ----
-// Body: { materia (nombre), tema, cantidad, existentes? } → { preguntas }
+// Body: { materia (nombre), tema, cantidad, existentes?, dificultad?, curso_id? }
+//   → { preguntas }
+// B1: `dificultad` y `curso_id` son OPCIONALES y se comportan igual que en
+// /api/ia/generar (guían el prompt). Sin ellos, el endpoint responde
+// exactamente como antes.
 router.post('/quiz', soloDocente, async (req, res) => {
     const materiaNombre = String(req.body?.materia || '').trim().slice(0, 60);
     const tema = String(req.body?.tema || '').trim().slice(0, 200);
     const cantidad = Math.min(Math.max(Number(req.body?.cantidad) || 3, 1), 10);
+    const dificultad = DIFICULTADES.includes(req.body?.dificultad) ? req.body.dificultad : 'media';
+    const cursoId = Number(req.body?.curso_id) > 0 ? Number(req.body.curso_id) : undefined;
     if (!materiaNombre || !tema) {
         return res.status(400).json({ error: 'Se requieren materia y tema' });
     }
@@ -332,8 +338,8 @@ router.post('/quiz', soloDocente, async (req, res) => {
             [materiaNombre]
         );
         const ctx = materia
-            ? await construirContexto({ materiaId: materia.id, tema, cantidad })
-            : { materia: { nombre: materiaNombre }, curso: null, institucion: null, tema, tematica: null, dificultad: 'media', cantidad };
+            ? await construirContexto({ materiaId: materia.id, cursoId, tema, dificultad, cantidad })
+            : { materia: { nombre: materiaNombre }, curso: null, institucion: null, tema, tematica: null, dificultad, cantidad };
         if (Array.isArray(req.body?.existentes)) {
             ctx.existentes = req.body.existentes.map((p) => String(p).trim()).filter(Boolean).slice(0, 50);
         }

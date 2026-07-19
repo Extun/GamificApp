@@ -9,7 +9,7 @@ import StarRoundedIcon from '@mui/icons-material/StarRounded';
 import CloudDoneRoundedIcon from '@mui/icons-material/CloudDoneRounded';
 import gamificationService, { PUNTOS_POR_ACIERTO } from '../../services/gamificationService';
 import { LogroToast } from '../quiz/QuizInteractivo';
-import { ResultadoActividad, ResultadoCierre } from './ResultadoActividad';
+import { ResultadoCierre } from './ResultadoActividad';
 export { useReporteIntento } from '../../hooks/useGuardiaActividad';
 
 // Mezcla no destructiva (Fisher–Yates) para que cada partida sea distinta.
@@ -28,7 +28,12 @@ export const mezclar = (arr) => {
 // progreso, para que refresque el XP/nivel/premios con la verdad de la BD.
 // `soloPrueba` (SPEC-012): modo vista previa del docente — el juego se
 // comporta igual pero NO otorga nada (ni XP local ni POST /api/progreso).
-export const useRecompensa = ({ completado, estudianteId, reto, tipo, aciertos, total, semilla, onCompletado, soloPrueba = false }) => {
+// `puntosObtenidos` (opcional): XP optimista para la caché local mientras el
+// servidor responde. Los juegos cuya nota NO es "un acierto = un ítem" (el
+// memorama envía la nota sobre base 100) deben pasarlo; si no, el valor por
+// defecto `aciertos × PUNTOS_POR_ACIERTO` inflaría la barra de XP hasta que
+// llegara la respuesta real del backend.
+export const useRecompensa = ({ completado, estudianteId, reto, tipo, aciertos, total, puntosObtenidos, semilla, onCompletado, soloPrueba = false }) => {
     const [puntosGanados, setPuntosGanados] = useState(0);
     const [toast, setToast] = useState(null);
     // XP realmente acreditado por el backend en ESTE intento (SPEC-015):
@@ -46,10 +51,14 @@ export const useRecompensa = ({ completado, estudianteId, reto, tipo, aciertos, 
         if (!completado || recompensado.current) return;
         recompensado.current = true;
 
+        const puntosLocales = Number.isFinite(puntosObtenidos)
+            ? puntosObtenidos
+            : aciertos * PUNTOS_POR_ACIERTO;
+
         if (soloPrueba) {
             // Puntaje simulado para que la pantalla final sea realista.
-            setPuntosGanados(aciertos * PUNTOS_POR_ACIERTO);
-            setXpIntento({ estado: 'ganado', ganado: aciertos * PUNTOS_POR_ACIERTO });
+            setPuntosGanados(puntosLocales);
+            setXpIntento({ estado: 'ganado', ganado: puntosLocales });
             setToast({ titulo: 'Modo prueba', mensaje: 'Nada se guardó: así lo verá el estudiante.' });
             return;
         }
@@ -57,7 +66,7 @@ export const useRecompensa = ({ completado, estudianteId, reto, tipo, aciertos, 
         // `total` viaja al servidor (SPEC-015): calificación /100 y XP
         // proporcional se calculan allá con los datos objetivos del intento.
         const { puntos, servidor } = gamificationService.completarReto({
-            estudianteId, reto, aciertos, total
+            estudianteId, reto, aciertos, total, puntosObtenidos: puntosLocales
         });
         setPuntosGanados(puntos);
 
@@ -97,7 +106,7 @@ export const useRecompensa = ({ completado, estudianteId, reto, tipo, aciertos, 
         }).catch(() => {
             setXpIntento({ estado: 'sinConfirmar' });
         });
-    }, [completado, aciertos, total, estudianteId, reto, tipo, onCompletado, soloPrueba]);
+    }, [completado, aciertos, total, puntosObtenidos, estudianteId, reto, tipo, onCompletado, soloPrueba]);
 
     return { puntosGanados, toast, setToast, xpIntento };
 };
@@ -140,15 +149,11 @@ export function PantallaFinal({
                 ))}
             </div>
             <strong>¡Lo lograste!</strong>
-            {/* Calificación /100 + retroalimentación por rango + XP separado.
-                La nota sale de aciertos/total del intento, nunca del XP. */}
-            <ResultadoActividad
-                aciertos={aciertos}
-                total={total}
-                puntosGanados={puntosGanados}
-                detalle={detalle}
-                xp={xp ?? { estado: 'cargando' }}
-            />
+            {/* La calificación, la retroalimentación y el XP viven SOLO en el
+                overlay (ResultadoCierre): esta pantalla es el estado final de
+                la actividad y se reabre con "Ver mi resultado". Aquí solo va
+                lo propio del juego (trofeo, estrellas, resumen del intento). */}
+            <p className="juego-dnd-final-resumen">{detalle}</p>
             <div className="juego-dnd-final-acciones">
                 <button type="button" className="juego-dnd-btn" onClick={onReiniciar}>
                     <ReplayRoundedIcon sx={{ fontSize: '1.1rem' }} /> Jugar otra vez

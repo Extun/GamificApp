@@ -1,12 +1,14 @@
 // Reproductor del MEMORAMA (SPEC-006, Fase 1) — juego de memoria por parejas.
 // configuracion_json: { instruccion, parejas: [{ a, b }, ...] }
 // Cada pareja produce dos cartas (cara A y cara B) que el niño debe emparejar.
-// Puntaje: una pareja cuenta como acierto si se encuentra sin haber fallado
-// antes con ninguna de sus dos cartas (mismo criterio "al primer intento"
-// que el clasificador). El juego siempre se termina ganando.
+// Puntaje (A3, opcion C): una vuelta completa de exploracion es gratis y a
+// partir de ahi la nota mide la eficiencia — ver calificacionMemorama.js. El
+// juego siempre se termina ganando.
 import { useMemo, useState } from 'react';
 import TouchAppRoundedIcon from '@mui/icons-material/TouchAppRounded';
 import { mezclar, useRecompensa, useReporteIntento, PantallaFinal, LogroToast } from './juegosComunes';
+import { evaluarMemorama } from './calificacionMemorama';
+import { PUNTOS_POR_ACIERTO } from '../../services/gamificationService';
 import './juegos.css';
 
 export function Memorama({ reto, estudianteId, onSalir, onCompletado, soloPrueba, onEstadoIntento }) {
@@ -24,31 +26,42 @@ export function Memorama({ reto, estudianteId, onSalir, onCompletado, soloPrueba
 
     const [volteadas, setVolteadas] = useState([]);          // ids boca arriba (máx. 2)
     const [emparejadas, setEmparejadas] = useState(() => new Set()); // ids resueltas
-    const [falladas, setFalladas] = useState(() => new Set());       // nº de pareja con algún fallo
+    // Intentos fallidos de formar pareja (dos cartas reveladas que no casan).
+    // Es un CONTADOR, no un Set: el mismo par puede fallarse varias veces y
+    // cada intento cuenta, que es lo que mide la formula.
+    const [fallos, setFallos] = useState(0);
     const [bloqueado, setBloqueado] = useState(false);
 
-    const total = parejas.length;
+    const totalParejas = parejas.length;
     const encontradas = emparejadas.size / 2;
-    const completado = total > 0 && encontradas === total;
-    const aciertos = [...Array(total).keys()].filter(
-        (i) => emparejadas.has(`${i}-a`) && !falladas.has(i)
-    ).length;
+    const completado = totalParejas > 0 && encontradas === totalParejas;
+
+    // La nota viaja sobre base 100 (aciertos = nota, total = 100) para no
+    // perder la curva al cuantizarla en tan pocas parejas.
+    const { nota, aciertos, total } = evaluarMemorama({ parejas: totalParejas, fallos });
+    // XP optimista coherente con la nota (el servidor manda igualmente). Si el
+    // reto no trae recompensa (borrador en vista previa del docente) se usa la
+    // regla estándar del editor, para no mostrar "+0 XP" en la prueba.
+    const xpPosible = Number(reto?.xp_recompensa ?? reto?.xpRecompensa)
+        || totalParejas * PUNTOS_POR_ACIERTO;
 
     const { puntosGanados, toast, setToast, xpIntento } = useRecompensa({
-        completado, estudianteId, reto, tipo: 'memorama', aciertos, total, semilla, onCompletado, soloPrueba
+        completado, estudianteId, reto, tipo: 'memorama', aciertos, total,
+        puntosObtenidos: Math.round((nota / 100) * xpPosible),
+        semilla, onCompletado, soloPrueba
     });
 
     // Guardia de salida: hay progreso real cuando ya se resolvió o falló
     // alguna pareja (voltear una sola carta aún no pierde nada).
     useReporteIntento(
         onEstadoIntento,
-        !soloPrueba && !completado && (emparejadas.size > 0 || falladas.size > 0)
+        !soloPrueba && !completado && (emparejadas.size > 0 || fallos > 0)
     );
 
     const reiniciar = () => {
         setVolteadas([]);
         setEmparejadas(new Set());
-        setFalladas(new Set());
+        setFallos(0);
         setBloqueado(false);
         setSemilla((s) => s + 1);
     };
@@ -66,7 +79,7 @@ export function Memorama({ reto, estudianteId, onSalir, onCompletado, soloPrueba
             setEmparejadas((prev) => new Set([...prev, id1, id2]));
             setVolteadas([]);
         } else {
-            setFalladas((prev) => new Set([...prev, c1.pareja, c2.pareja]));
+            setFallos((n) => n + 1);
             setBloqueado(true);
             setTimeout(() => {
                 setVolteadas([]);
@@ -92,10 +105,10 @@ export function Memorama({ reto, estudianteId, onSalir, onCompletado, soloPrueba
                 <div className="progress-track">
                     <div
                         className="progress-fill progress-fill-accent"
-                        style={{ width: `${total ? (encontradas / total) * 100 : 0}%` }}
+                        style={{ width: `${totalParejas ? (encontradas / totalParejas) * 100 : 0}%` }}
                     />
                 </div>
-                <span>{encontradas} / {total} parejas</span>
+                <span>{encontradas} / {totalParejas} parejas</span>
             </div>
 
             {!completado && (
@@ -127,7 +140,7 @@ export function Memorama({ reto, estudianteId, onSalir, onCompletado, soloPrueba
                     total={total}
                     puntosGanados={puntosGanados}
                     xp={xpIntento}
-                    detalle={`${aciertos} de ${total} parejas al primer intento`}
+                    detalle={`${totalParejas} parejas encontradas · ${fallos} ${fallos === 1 ? 'intento fallido' : 'intentos fallidos'}`}
                     etiquetaRevisar="Ver mis estrellas"
                     onReiniciar={reiniciar}
                     onSalir={onSalir}

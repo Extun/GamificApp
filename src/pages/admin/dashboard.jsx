@@ -34,7 +34,8 @@ import {
 } from '../../components/dashboard/DashboardWidgets';
 import estudiantesService from '../../services/estudiantesService';
 import LocalLibraryRoundedIcon from '@mui/icons-material/LocalLibraryRounded';
-import LibraryBooksRoundedIcon from '@mui/icons-material/LibraryBooksRounded';
+// LibraryBooksRoundedIcon: lo usaba la entrada "Banco de preguntas" del menú,
+// hoy oculta (ver más abajo). Se reimporta al reactivarla.
 import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
 import AccountCircleRoundedIcon from '@mui/icons-material/AccountCircleRounded';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
@@ -434,7 +435,14 @@ export function Dashboard() {
                 { id: '', label: 'Inicio', Icon: HomeFilledIcon },
                 { id: 'materias', label: 'Materias', Icon: MenuBookIcon, grupo: 'Enseñanza' },
                 { id: 'biblioteca', label: 'Biblioteca', Icon: LocalLibraryRoundedIcon, grupo: 'Enseñanza' },
-                { id: 'banco', label: 'Banco de preguntas', Icon: LibraryBooksRoundedIcon, grupo: 'Enseñanza' },
+                // Banco de preguntas OCULTO del menú (decisión aprobada, opción B):
+                // el pool de contenido ahora vive en cada actividad, así que la
+                // página global sobra. NO se elimina nada — tabla, endpoints,
+                // servicios, `_banco_id` y el guardado automático siguen
+                // intactos, y la vista `pagina === 'banco'` se sigue renderizando
+                // (accesible por estado) para no romper compatibilidad. Volver a
+                // mostrarla = descomentar esta línea.
+                // { id: 'banco', label: 'Banco de preguntas', Icon: LibraryBooksRoundedIcon, grupo: 'Enseñanza' },
                 { id: 'estudiantes', label: 'Mis Estudiantes', Icon: GroupsRoundedIcon, grupo: 'Mi aula' },
                 { id: 'ranking', label: 'Ranking', Icon: EmojiEventsRoundedIcon, grupo: 'Mi aula' },
                 { id: 'misiones', label: 'Misiones', Icon: MilitaryTechRoundedIcon, grupo: 'Mi aula' },

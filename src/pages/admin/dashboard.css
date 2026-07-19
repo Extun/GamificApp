@@ -1210,7 +1210,8 @@
 }
 
 .quiz-field input,
-.quiz-field select {
+.quiz-field select,
+.quiz-field textarea.campo-tema {
     padding: 11px 14px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
@@ -1222,10 +1223,23 @@
 }
 
 .quiz-field input:focus,
-.quiz-field select:focus {
+.quiz-field select:focus,
+.quiz-field textarea.campo-tema:focus {
     outline: none;
     border-color: var(--color-primary);
     box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+/* Campo Tema autoexpandible (B2): arranca con la altura de un input y crece
+   hasta el tope que fija CampoTema.jsx, luego hace scroll interno. El alto lo
+   controla el JS, así que aquí solo se neutraliza el redimensionado manual. */
+.quiz-field textarea.campo-tema {
+    resize: none;
+    overflow-y: hidden;
+    line-height: 1.4;
+    min-height: 44px;
+    display: block;
+    width: 100%;
 }
 
 .quiz-generar-btn {

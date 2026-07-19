@@ -43,6 +43,87 @@
   legadas. El chip de XP tiene 3 estados: ganó XP (+N), sin mejora (mensaje
   amable), o recompensa completa.
 
+### Qué representan `aciertos/total` en cada juego
+
+El contrato del servidor no cambia (`calificacion = round(aciertos/total × 100)`);
+lo que cambia por juego es **qué se cuenta** como acierto:
+
+| Juego | `aciertos` | `total` |
+|---|---|---|
+| Quiz | respuestas correctas al primer intento | preguntas presentadas en el intento |
+| Clasificador | fichas bien clasificadas al primer intento | fichas del tablero |
+| Completar espacios | frases correctas | frases |
+| Misión Narrativa | desafíos superados al primer intento | desafíos |
+| Línea del tiempo | pares de eventos en orden relativo correcto | n(n−1)/2 pares |
+| Memorama | la nota, sobre base 100 | 100 |
+
+**Línea del tiempo** no puntúa la posición absoluta sino el orden relativo
+entre pares (concordancia de rangos de Kendall): mover un evento desplaza a
+todos los siguientes, así que la posición absoluta daba 0 a intentos que sí
+demostraban comprender la secuencia. Ver `src/components/juegos/ordenSecuencia.js`.
+
+**Memorama** mide eficiencia con exploración tolerada: si `n` = parejas y `f` =
+intentos fallidos de formar pareja, la nota es `100` mientras `f ≤ n` y
+`100 · n / (n + (f − n))` después. Justificación: descubrir dónde está cada
+carta ES la mecánica del juego, así que una vuelta completa de exploración es
+gratuita; a partir de ahí la nota mide con qué eficiencia el estudiante recordó
+lo que ya había visto. `f` cuenta **intentos**, no cartas sueltas, y emparejar
+no suma nada (los fallos previos ya se contaron una vez cada uno). Como con tan
+pocas parejas la nota quedaría cuantizada en muy pocos escalones, se envía sobre
+base 100 (`aciertos` = nota, `total` = 100). Ver
+`src/components/juegos/calificacionMemorama.js`.
+
+## Modelo de confianza (cierre de seguridad)
+
+`POST /api/progreso` **no confía en el cliente** para nada que determine XP o
+calificación. Reglas vigentes:
+
+1. **El estudiante solo registra progreso sobre un `reto_id` existente.** La
+   ruta `materia_id + reto_titulo` —que crea el reto si no existe— queda
+   reservada a docente/admin. Antes, un estudiante podía crear retos publicados
+   y fijarles él mismo el `xp_recompensa` que luego cobraba.
+2. **El servidor es autoridad sobre el reto.** Se cargan de BD `tipo`, `estado`,
+   `configuracion_json`, `xp_recompensa`, `materia_id` y `curso_id`. La
+   recompensa sale **siempre** de la fila persistida; `xp_recompensa` del body
+   solo se usa al CREAR un reto (rama de docente/admin).
+3. **Acceso del estudiante = mismo criterio que `GET /api/retos`**: reto
+   publicado, no eliminado, y materia viva y activa. Se aplica el mismo filtro a
+   propósito, para que no exista nada listable que no sea enviable ni viceversa.
+   ⚠️ Hoy `curso_id` **no** delimita el acceso en `GET /api/retos`: cualquier
+   estudiante ve las actividades publicadas de cualquier materia activa. Por eso
+   tampoco se usa aquí. Convertir el curso en frontera de acceso es una decisión
+   de producto pendiente que debe cambiar **ambos** endpoints a la vez.
+4. **Validación estructural de `aciertos/total`.** `server/lib/totalEsperado.js`
+   (función pura) deriva del `tipo` + `configuracion_json` el `total` que un
+   intento legítimo puede reportar. Si no coincide → **400**, nunca fallback
+   silencioso al flujo histórico (ese fallback era el agujero). `aciertos` y
+   `total` deben ser números enteros exactos: se rechazan decimales, negativos,
+   `aciertos > total`, strings, `null`/`NaN` y valores desproporcionados.
+5. **El estudiante debe enviar siempre `aciertos/total`.** La ruta legacy de
+   solo `puntos_obtenidos` queda reservada a docente/admin: la usa
+   exclusivamente el ajuste manual de XP del Libro de Calificaciones
+   (`LibroCalificaciones.jsx`), que no envía datos de intento y por eso deja la
+   calificación intacta.
+
+**Retos legacy sin configuración derivable.** Las filas creadas por la vieja
+ruta `materia_id + reto_titulo` nacían con `configuracion_json = NULL` y
+`tipo = 'quiz'` (valor por defecto). Para esas, `totalEsperado` devuelve `null`
+y el intento se rechaza con 400. No bloquea ningún juego real: todos los
+reproductores exigen configuración válida y muestran "Este juego no tiene
+configuración válida", así que un intento legítimo nunca puede originarse ahí.
+Su XP histórico ya acreditado no se toca.
+
+### Riesgo residual aceptado
+
+Estas validaciones cierran la manipulación trivial y el XP arbitrario, pero
+**no** convierten el sistema en server-authoritative: alguien con conocimientos
+técnicos puede seguir enviando un resultado estructuralmente válido pero no
+jugado (p. ej. `5/5` en un quiz que sí tiene 5 preguntas). El tope por reto
+limita el daño a la recompensa de esa actividad, y el XP nunca excede
+`xp_recompensa`. Cerrar esto exigiría sesiones de intento firmadas por el
+servidor o validar cada respuesta en backend: queda como **mejora futura**,
+fuera del alcance de la tesis (§6.1 MVP First).
+
 ## Alternativas descartadas
 
 - Persistir `aciertos`/`total` como columnas: más datos de los necesarios para

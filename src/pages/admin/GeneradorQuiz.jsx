@@ -3,6 +3,9 @@ import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import { EditorQuiz } from '../../components/quiz/EditorQuiz';
 import { SelectorBanco } from '../../components/juegos/SelectorBanco';
 import { PreviewJuegoModal } from '../../components/juegos/PreviewJuegoModal';
+import { CampoTema } from '../../components/juegos/CampoTema';
+import { CamposDificultadCurso } from '../../components/juegos/CamposActividad';
+import { useCursos } from '../../components/juegos/metadatosActividad';
 import { useHistorialRetos, HistorialActividades } from '../../components/juegos/HistorialActividades';
 import { publicarReto } from '../../services/retosService';
 import { authFetch } from '../../services/authService';
@@ -37,6 +40,11 @@ const xpRecompensaDe = (quiz) => {
 export function GeneradorQuiz({ materia = 'la materia' }) {
     const [tema, setTema] = useState('');
     const [cantidad, setCantidad] = useState(3);
+    // B1 — mismos metadatos que el resto de editores: guían la generación IA
+    // y persisten en `retos.dificultad` / `retos.curso_id`.
+    const [dificultad, setDificultad] = useState('media');
+    const [cursoId, setCursoId] = useState('');
+    const cursos = useCursos();
     // Quiz actualmente abierto en el editor (en estado borrador o publicado). Null
     // cuando no se está editando nada.
     const [quizEdit, setQuizEdit] = useState(null);
@@ -132,7 +140,10 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                     materiaId,
                     tipo: 'quiz',
                     contenido: p,
-                    tema: temaTxt || undefined
+                    tema: temaTxt || undefined,
+                    // B1: el banco ya guardaba `dificultad` para los demás
+                    // tipos; el quiz también, para que sus filtros sirvan.
+                    dificultad
                 });
                 return { ...p, _banco_id: creada.id };
             } catch {
@@ -166,7 +177,9 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                 titulo: quizEdit.tema,
                 tipo: 'quiz',
                 configuracion: configuracionDe({ ...quizEdit, preguntas }),
-                xpRecompensa: xpRecompensaDe({ ...quizEdit, preguntas })
+                xpRecompensa: xpRecompensaDe({ ...quizEdit, preguntas }),
+                dificultad,
+                cursoId: cursoId ? Number(cursoId) : undefined
             });
             const publicadoQuiz = { ...quizEdit, retoId: data?.id ?? quizEdit.retoId, preguntas, estado: 'publicado', publicadoEnBD: true };
             setQuizEdit(publicadoQuiz);
@@ -193,6 +206,9 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                 materia,
                 tema: temaTxt,
                 cantidad: n,
+                // B1: guían el prompt en el servidor (opcionales allá).
+                dificultad,
+                curso_id: cursoId ? Number(cursoId) : undefined,
                 existentes: existentes.map((p) => (p?.pregunta || '').trim()).filter(Boolean)
             })
         });
@@ -224,7 +240,9 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                     titulo: tema.trim(),
                     configuracion: { preguntas: quiz, mezclar_preguntas: true, mezclar_respuestas: true, preguntas_por_intento: 0 },
                     xpRecompensa: quiz.length * 100,
-                    origen: 'ia'
+                    origen: 'ia',
+                    dificultad,
+                    cursoId: cursoId ? Number(cursoId) : undefined
                 });
                 retoId = creado?.id ?? null;
             } catch (err) {
@@ -292,6 +310,10 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                 preguntasPorIntento: Number(detalle.configuracion?.preguntas_por_intento) || 0
             };
             setQuizEdit(abierto);
+            // B1: los metadatos guardados vuelven al formulario, para que
+            // republicar no los pierda ni los cambie sin querer.
+            setDificultad(detalle.dificultad || 'media');
+            setCursoId(detalle.curso_id ? String(detalle.curso_id) : '');
             tomarSnapshot(abierto);
         } catch (err) {
             setError(`No se pudo abrir la actividad: ${err.message}`);
@@ -334,15 +356,12 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
             </div>
 
             <form className="quiz-form" onSubmit={handleGenerar}>
-                <label className="quiz-field">
-                    <span>Tema del Quiz</span>
-                    <input
-                        type="text"
-                        value={tema}
-                        onChange={(e) => setTema(e.target.value)}
-                        placeholder="Ej. Fracciones equivalentes"
-                    />
-                </label>
+                <CampoTema
+                    etiqueta="Tema del Quiz"
+                    value={tema}
+                    onChange={(e) => setTema(e.target.value)}
+                    materia={materia}
+                />
 
                 <label className="quiz-field">
                     <span>Cantidad de preguntas</span>
@@ -352,6 +371,14 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                         <option value={10}>10 preguntas</option>
                     </select>
                 </label>
+
+                <CamposDificultadCurso
+                    dificultad={dificultad}
+                    onDificultad={setDificultad}
+                    cursoId={cursoId}
+                    onCursoId={setCursoId}
+                    cursos={cursos}
+                />
 
                 <button type="submit" className="quiz-generar-btn" disabled={cargando || !tema.trim()}>
                     {cargando

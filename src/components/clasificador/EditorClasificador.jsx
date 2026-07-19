@@ -15,6 +15,9 @@ import { PUNTOS_POR_ACIERTO } from '../../services/gamificationService';
 import { useHistorialRetos, HistorialActividades } from '../juegos/HistorialActividades';
 import { PreviewJuegoModal } from '../juegos/PreviewJuegoModal';
 import { BarraAccionesEditor } from '../juegos/BarraAccionesEditor';
+import { CampoTema } from '../juegos/CampoTema';
+import { CamposDificultadCurso } from '../juegos/CamposActividad';
+import { useCursos } from '../juegos/metadatosActividad';
 import './editorClasificador.css';
 
 // Editor no-code del juego 'Clasificador de Objetos'. El docente define el
@@ -45,6 +48,11 @@ export function EditorClasificador({ materia }) {
     // título, categorías y elementos en ESTE mismo editor (misma ruta genérica
     // que memorama/línea del tiempo/completar).
     const [temaIA, setTemaIA] = useState('');
+    // B1 — mismos metadatos que el resto de editores: guian la generacion IA
+    // y persisten en `retos.dificultad` / `retos.curso_id`.
+    const [dificultad, setDificultad] = useState('media');
+    const [cursoId, setCursoId] = useState('');
+    const cursos = useCursos();
     const [generandoIA, setGenerandoIA] = useState(false);
     // "Añadir con IA" incremental (menú Agregar): fusiona sin borrar nada.
     const [agregandoIA, setAgregandoIA] = useState(false);
@@ -118,7 +126,9 @@ export function EditorClasificador({ materia }) {
                 materiaId,
                 titulo: tituloTrim,
                 configuracion: configuracionActual(),
-                xpRecompensa: Math.max(totalElementos, 1) * PUNTOS_POR_ACIERTO
+                xpRecompensa: Math.max(totalElementos, 1) * PUNTOS_POR_ACIERTO,
+                dificultad,
+                cursoId: cursoId ? Number(cursoId) : undefined
             })
                 .then((creado) => setEntradaId(creado?.id ?? null))
                 .catch((err) => console.warn('El borrador no se pudo guardar en el servidor:', err.message))
@@ -189,7 +199,9 @@ export function EditorClasificador({ materia }) {
             const data = await generarActividadIA({
                 tipo: 'clasificador',
                 materiaId,
-                tema: temaIA.trim()
+                tema: temaIA.trim(),
+                dificultad,
+                cursoId: cursoId ? Number(cursoId) : undefined
             });
             const nuevasCategorias = (data.configuracion?.categorias || []).map((c) => ({
                 id: idUnico(),
@@ -234,7 +246,10 @@ export function EditorClasificador({ materia }) {
             const existentes = categorias
                 .filter((c) => c.nombre.trim() || c.elementos.length)
                 .map((c) => `Categoría "${c.nombre.trim() || 'sin nombre'}": ${c.elementos.join(', ') || '(vacía)'}`);
-            const data = await generarActividadIA({ tipo: 'clasificador', materiaId, tema: temaBase, existentes });
+            const data = await generarActividadIA({
+                tipo: 'clasificador', materiaId, tema: temaBase, existentes,
+                dificultad, cursoId: cursoId ? Number(cursoId) : undefined
+            });
             const generadas = data.configuracion?.categorias || [];
             const norm = (s) => (s || '').trim().toLowerCase();
             const fusion = categorias.map((c) => ({ ...c, elementos: [...c.elementos] }));
@@ -311,7 +326,9 @@ export function EditorClasificador({ materia }) {
                 // La recompensa se alinea con el resto de la app: cada elemento
                 // bien clasificado al primer intento vale PUNTOS_POR_ACIERTO XP.
                 xpRecompensa: totalElementos * PUNTOS_POR_ACIERTO,
-                configuracion: configuracionActual()
+                configuracion: configuracionActual(),
+                dificultad,
+                cursoId: cursoId ? Number(cursoId) : undefined
             });
             setEntradaId(data?.id ?? entradaId);
             setPublicadoEnBD(true);
@@ -342,17 +359,20 @@ export function EditorClasificador({ materia }) {
             </p>
 
             <form className="quiz-form" onSubmit={generarConIA}>
-                <label className="quiz-field">
-                    <span>Tema (para generar con IA)</span>
-                    <input
-                        type="text"
-                        ref={temaIARef}
-                        value={temaIA}
-                        onChange={(e) => setTemaIA(e.target.value)}
-                        placeholder="Ej. Animales vertebrados e invertebrados"
-                        maxLength={200}
-                    />
-                </label>
+                <CampoTema
+                    etiqueta="Tema (para generar con IA)"
+                    inputRef={temaIARef}
+                    value={temaIA}
+                    onChange={(e) => setTemaIA(e.target.value)}
+                    materia={materia}
+                />
+                <CamposDificultadCurso
+                    dificultad={dificultad}
+                    onDificultad={setDificultad}
+                    cursoId={cursoId}
+                    onCursoId={setCursoId}
+                    cursos={cursos}
+                />
                 <button type="submit" className="quiz-generar-btn" disabled={generandoIA || !temaIA.trim()}>
                     {generandoIA
                         ? <span className="quiz-spinner" aria-hidden="true" />
@@ -549,6 +569,9 @@ export function EditorClasificador({ materia }) {
                         setEntradaId(detalle.id);
                         setPublicadoEnBD(detalle.estado === 'publicado');
                         setTitulo(detalle.titulo || '');
+                        // B1: los metadatos guardados vuelven al formulario.
+                        setDificultad(detalle.dificultad || 'media');
+                        setCursoId(detalle.curso_id ? String(detalle.curso_id) : '');
                         setCategorias(abiertas);
                         setPublicado(detalle.estado === 'publicado');
                         tomarSnapshot({ titulo: detalle.titulo || '', categorias: abiertas });
