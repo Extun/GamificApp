@@ -50,6 +50,7 @@ export const inicializarEsquema = async () => {
         await migrarBackfillBanco(conn);
         await migrarCargaMasiva(conn);
         await migrarCalificacionAcademica(conn);
+        await migrarConfiguracionIA(conn);
         console.log('✅ Esquema verificado/creado en la base de datos.');
         await asegurarAdmin(conn);
         await asegurarAdminPrincipal(conn);
@@ -603,6 +604,28 @@ const migrarCalificacionAcademica = async (conn) => {
         );
         console.log('✅ Migración: calificacion agregada a progreso_estudiante (backfill desde porcentaje).');
     }
+};
+
+// SPEC-016 (migración 013) — configuración administrativa del proveedor de IA.
+//
+// ⚠️ SEGURIDAD: esta tabla NUNCA guarda API keys. Los secretos viven solo en
+// variables de entorno del backend. Aquí únicamente se persiste QUÉ proveedor
+// y QUÉ modelo usar.
+//
+// NO se siembra ninguna fila a propósito: sin fila, `lib/ia/config.js`
+// resuelve 'gemini' con modelo automático, que es exactamente el
+// comportamiento anterior a SPEC-016. Así, desplegar esta migración sobre una
+// base existente no cambia nada de forma silenciosa.
+const migrarConfiguracionIA = async (conn) => {
+    await conn.query(`CREATE TABLE IF NOT EXISTS configuracion_ia (
+        id                 TINYINT UNSIGNED NOT NULL,
+        proveedor          VARCHAR(30)      NOT NULL DEFAULT 'gemini',
+        modelo             VARCHAR(60)      NULL,
+        proveedor_respaldo VARCHAR(30)      NULL,
+        actualizado_en     TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        actualizado_por    INT UNSIGNED     NULL,
+        PRIMARY KEY (id)
+    ) ENGINE = InnoDB`);
 };
 
 // Invariante del sistema: SIEMPRE existe al menos un Administrador Principal

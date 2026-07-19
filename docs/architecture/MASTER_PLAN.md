@@ -6,7 +6,7 @@ Roadmap de GamificApp: fases, backlog priorizado, dependencias y riesgos. El est
 
 # Última actualización
 
-2026-07-19 (Backlog ampliado con los diferidos de la auditoría de actividades: ítems 20-23)
+2026-07-19 (SPEC-016 y SPEC-017 redactadas a partir de las observaciones del revisor de tesis: fases 3.8 y 3.9)
 
 # Responsable
 
@@ -23,6 +23,8 @@ Fabrizio Zurita (Extun)
 | 3.5 | Centro de Administración (SPEC-002 + SPEC-003) | Materias/cursos/institución dinámicos, TablaPro, roles y permisos de admin, auditoría, papelera, sidebar agrupado | ✅ Hecho en código y **desplegado en Aiven** (migraciones 002-004 confirmadas en producción el 2026-07-10, ver `CURRENT_STATE.md`) |
 | 3.6 | Centro de Trabajo Docente (SPEC-006) | 3 juegos nuevos (memorama, línea del tiempo, completar), IA genérica por registro, actividad sorpresa, adaptar con IA, Biblioteca IA con papelera/favoritas/estadísticas, Libro de Calificaciones editable | ✅ Hecho en código (2026-07-09) — **pendiente: migración 008 a Aiven + deploy + prueba end-to-end con BD** |
 | 3.7 | Editor de actividades universal (SPEC-013) | Botón único "Agregar" con menú por acciones, lenguaje docente (sin "Banco"/"IA"/"manual"), toggles "Mezclar" del quiz, selección automática desde preguntas guardadas, autoguardado unificado, modal IA único | 🟡 Aprobada 2026-07-17 — diseño congelado, Fases 1-7 por implementar (Fase 8 shell post-tesis) |
+| 3.8 | Proveedores de IA (SPEC-016) | Arquitectura agnóstica al proveedor: adaptadores Gemini + OpenAI, selección de proveedor/modelo desde administración, "Probar conexión". API Keys solo en variables de entorno | 🟡 Redactada 2026-07-19 — **pendiente de aprobación**, ninguna fase iniciada. Responde a observación del revisor |
+| 3.9 | Arquitectura extensible de juegos (SPEC-017) | Registro central de tipos de juego (backend + frontend), 3 estados (Activo / Solo jugar / Deshabilitado), módulo de administración, documento "Cómo añadir un juego" | 🟡 Redactada 2026-07-19 — **pendiente de aprobación**, ninguna fase iniciada. Responde a observación del revisor. Su Fase 3 debe coordinarse con SPEC-013 |
 | 4 | **Épica 1: Experiencia del estudiante** | Rediseño completo del lado del niño en 5 specs (ver §2) | 🟡 En curso (auditoría y SPEC-001 redactadas; nada implementado) |
 | 5 | Módulos incompletos | Libro de Calificaciones, 3 logros faltantes, UI de edición de docente | ⚪ Pendiente (antes de la defensa, si hay tiempo) |
 | 6 | Post-tesis | Multi-institución, archivos fuera de la BD, fallback de IA, memoria del asistente | ⚪ Futuro |
@@ -66,6 +68,13 @@ Insumos: `docs/audit/Auditoria-UX-Estudiante-v1.md`, `docs/specifications/SPEC-0
 22. **Posible duplicación de auditoría posterior al COMMIT.** En `POST /api/progreso`, `registrarAuditoria` se ejecuta **después** del commit y usa `pool` (no la conexión de la transacción). Un reintento de red del cliente podría generar dos entradas de auditoría para un mismo intento. No afecta XP, calificación ni progreso (la transacción es idempotente); es solo ruido en la bitácora. Pre-existente al cambio de 2026-07-19.
 23. **Compatibilidad de notas históricas de Línea del tiempo.** El criterio de calificación pasó de posición absoluta (`n` posiciones) a concordancia de Kendall (`n(n-1)/2` pares). `GREATEST` garantiza que ningún estudiante pierda su mejor nota histórica, pero el Libro de Calificaciones mezcla dos criterios en actividades anteriores al cambio, así que las notas de esa actividad no son comparables entre sí. Pendiente: decidir si se menciona como limitación en la tesis, se recalcula o se deja como está.
 
+### Diferidos de las specs del revisor (SPEC-016 / SPEC-017, anotados 2026-07-19)
+
+24. **Fallback automático entre proveedores de IA.** Excluido de SPEC-016 por decisión de Fabrizio (2026-07-19) para acotar alcance. El contrato queda preparado: `clasificarError()` en cada adaptador y la columna `configuracion_ia.proveedor_respaldo`, que se **crea pero no se lee**. Incorporarlo después no requiere tocar los adaptadores.
+25. **Mecanismo real de migraciones — documentado, no pendiente.** Ver §6 de este documento. Numeración resuelta por Fabrizio el 2026-07-19 (Opción B): SPEC-016 → `013`, SPEC-017 → `014`, sin archivo retroactivo para SPEC-015. Hueco consciente entre `012` y `013`.
+27. **Evaluar un sistema formal de migraciones versionadas** (post-tesis, NO implementar ahora). Hoy la idempotencia se deriva del estado del esquema vía `faltaColumna()`, sin bitácora de migraciones aplicadas. Un sistema formal aportaría: tabla `migraciones_aplicadas` con marca de tiempo y checksum, ejecución de los `.sql` como artefactos reales en vez de reimplementarlos en JS, orden explícito y reversibilidad verificable. Motivo de diferirlo: el mecanismo actual **funciona y es idempotente**, y reescribirlo sería un refactor grande no pedido (regla §3) sobre la pieza más delicada del despliegue, a semanas de la sustentación.
+26. **Séptimo juego de demostración** (SPEC-017 Fase 7, opcional). Un juego sencillo tipo "Verdadero o Falso" implementado solo con el contrato nuevo, cuyo `git diff --stat` demuestre que no se modificó ninguno de los seis juegos existentes. Es la evidencia más directa para el revisor sobre ese requerimiento.
+
 ### Diferidos de SPEC-006 (requieren migración propia)
 
 15. Actividades **programadas** (fecha de publicación futura): no existe columna en BD.
@@ -80,6 +89,8 @@ Insumos: `docs/audit/Auditoria-UX-Estudiante-v1.md`, `docs/specifications/SPEC-0
 ## 4. Dependencias entre items del backlog
 
 - Specs 2–5 dependen de SPEC-001 (el shell con rutas es la base).
+- **SPEC-017 Fase 3 depende de SPEC-013** (o debe ejecutarse en el mismo bloque): ambas tocan los editores del docente. Hacerlas por separado obliga a reescribirlos dos veces. Las Fases 1, 2, 4, 6 y 7 de SPEC-017 son independientes.
+- **SPEC-016 y SPEC-017 son independientes entre sí** y pueden implementarse en cualquier orden. Recomendado: SPEC-016 primero (menor, contenida, sin colisión con nada congelado).
 - Multi-institución requiere spec propia obligatoria (cambios de BD).
 - Detalle técnico de cada dependencia: ver la spec correspondiente en `docs/specifications/`.
 
@@ -89,11 +100,33 @@ Insumos: `docs/audit/Auditoria-UX-Estudiante-v1.md`, `docs/specifications/SPEC-0
 |--------|---------|------------|
 | Archivos base64 en MySQL (LONGTEXT) crecen sin límite | Lentitud/costos de BD | Post-tesis: mover a almacenamiento de objetos |
 | Plan free de Render (cold start) | Latencia en primer uso | Keep-alive activo vía `/api/health` cada 14 min |
-| Dependencia exclusiva de Gemini | Creación de contenido cae si Google falla | Reintentos multi-modelo ya implementados; fallback de proveedor post-tesis |
+| Dependencia exclusiva de Gemini | Creación de contenido cae si Google falla | Reintentos multi-modelo ya implementados; **SPEC-016 la elimina** (proveedor conmutable Gemini/OpenAI). Fallback automático diferido: backlog §3 ítem 24 |
 | Migración a rutas anidadas (SPEC-001) | Deep-links rotos, regresión CSS, romper docente/admin | Ver §5 de SPEC-001 antes de implementar |
 | Logros del catálogo que nunca se otorgan | Promesa rota al niño | Backlog §3, ítem 2 |
 
+## 6. Cómo funcionan realmente las migraciones (auditado 2026-07-19)
+
+**Regla operativa:** los archivos de `database/migraciones/*.sql` son **referencia y versionado documental**. Las migraciones automáticas que se ejecutan en producción son **funciones idempotentes de `server/initDb.js`**.
+
+Secuencia real en cada arranque del servidor (`inicializarEsquema()`, `initDb.js:17-59`):
+
+1. Se abre una conexión de un solo uso con `multipleStatements` (el pool normal NO lo habilita, por defensa contra inyección).
+2. Se ejecuta `database/produccion_defaultdb.sql` completo — idempotente (`CREATE TABLE IF NOT EXISTS` + upserts).
+3. Se ejecutan en orden las funciones `migrarXxx(conn)` encadenadas en `initDb.js:36-52`, desde `migrarColumnasMaterias` hasta `migrarCalificacionAcademica`. Cada una se protege con `faltaColumna()` contra `information_schema` (MySQL 8 no soporta `ADD COLUMN IF NOT EXISTS`).
+4. Se garantizan los invariantes de admin (`asegurarAdmin`, `asegurarAdminPrincipal`).
+
+Consecuencias que hay que tener presentes al implementar una migración nueva:
+
+- **El `.sql` por sí solo no hace nada.** Escribir el archivo y no añadir la función JS equivalente significa que la migración **nunca se aplica**. Este es el error más fácil de cometer en este repositorio.
+- **No existe tabla de registro de migraciones aplicadas.** La idempotencia se deriva del estado del esquema, no de una bitácora.
+- SPEC-015 está implementada solo como función (`migrarCalificacionAcademica`), sin archivo `.sql`. Es deliberado (decisión del 2026-07-19), no un olvido.
+- Numeración actual: archivos hasta `012`; **`013` reservado a SPEC-016 y `014` a SPEC-017**.
+
+Evolucionar esto a un sistema formal de migraciones versionadas está en §3 ítem 27, diferido a post-tesis.
+
 # Pendientes
 
+- **Revisar y aprobar SPEC-016 y SPEC-017** (redactadas 2026-07-19, responden a las observaciones del revisor de tesis).
+- **Decidir la numeración de migraciones** tras el hallazgo del backlog §3 ítem 25.
 - Aprobar SPEC-001 y arrancar su commit 1.
 - Redactar Spec 2–5 a medida que se necesiten.

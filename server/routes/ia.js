@@ -7,14 +7,16 @@
 //   POST /api/ia/mision    → compatibilidad (GeneradorMision existente)
 //   POST /api/ia/asistente → respuesta libre (sin entrada en la UI actual)
 //
-// El cliente Gemini vive en lib/iaCliente.js y los prompts/esquemas por tipo
-// en lib/actividadesIA.js (registro único, sin prompts duplicados).
+// El cliente de IA vive en lib/ia/ (agnóstico al proveedor, SPEC-016) y los
+// prompts/esquemas por tipo en lib/actividadesIA.js (registro único, sin
+// prompts duplicados). Estas rutas no conocen a ningún proveedor concreto.
 import { Router } from 'express';
-import { Type } from '@google/genai';
+import { Tipo as Type } from '../lib/ia/esquema.js';
 import pool from '../db.js';
 import { soloDocente, puedeGestionarMateria } from '../middleware/auth.js';
 import { registrarAuditoria } from '../lib/auditoria.js';
-import { generarJSON, generarConReintentos } from '../lib/iaCliente.js';
+import { generarJSON, generarTexto } from '../lib/ia/index.js';
+import { registrarErrorIA } from '../lib/ia/errores.js';
 import { VALIDADORES_CONFIG } from '../lib/validadoresRetos.js';
 import {
     ACTIVIDADES_IA,
@@ -32,7 +34,9 @@ const esIdValido = (n) => Number.isInteger(n) && n > 0;
 const XP_POR_ITEM = 100;
 
 const responderErrorIA = (res, contexto, err) => {
-    console.error(`IA/${contexto}:`, err.message);
+    // El log pasa SIEMPRE por el saneador: los SDK incluyen fragmentos de la
+    // API key en sus mensajes de error (SPEC-016, lib/ia/errores.js).
+    registrarErrorIA({ operacion: contexto, error: err });
     const status = err?.status === 503 ? 503 : 502;
     res.status(status).json({ error: `No se pudo generar con la IA. Inténtalo de nuevo.` });
 };
@@ -391,10 +395,10 @@ router.post('/asistente', soloDocente, async (req, res) => {
     if (!mensaje) return res.status(400).json({ error: 'Escribe un mensaje' });
 
     try {
-        const respuesta = await generarConReintentos({ contents: mensaje });
-        res.json({ texto: respuesta.text });
+        const texto = await generarTexto({ prompt: mensaje });
+        res.json({ texto });
     } catch (err) {
-        console.error('IA/asistente:', err.message);
+        registrarErrorIA({ operacion: 'asistente', error: err });
         res.status(502).json({ error: 'No se pudo obtener la respuesta de la IA. Inténtalo de nuevo.' });
     }
 });

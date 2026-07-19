@@ -25,7 +25,7 @@ Con esos 3 documentos ya se puede trabajar. No leer nada más salvo que la tarea
 ## Dónde está la verdad técnica
 
 - **Rutas API**: `server/routes/` (auth, admin, docente, materias, materiales, retos, progreso, ranking, ia).
-- **Esquema BD**: `database/gamificapp.sql` (dev) y `database/produccion_defaultdb.sql` (producción Aiven); migraciones versionadas en `database/migraciones/`, aplicadas de forma idempotente por `server/initDb.js` al arrancar.
+- **Esquema BD**: `database/gamificapp.sql` (dev) y `database/produccion_defaultdb.sql` (producción Aiven); los `.sql` de `database/migraciones/` son **referencia/versionado documental**, mientras que las migraciones que realmente se aplican en cada arranque son **funciones idempotentes de `server/initDb.js`** (ver `docs/architecture/MASTER_PLAN.md` §6). Escribir solo el `.sql` no aplica nada.
 - **Servicios frontend**: `src/services/` (uno por dominio).
 - **Componentes compartidos**: `src/components/dashboard/DashboardWidgets.jsx`, `src/components/archivos/`, etc.
 

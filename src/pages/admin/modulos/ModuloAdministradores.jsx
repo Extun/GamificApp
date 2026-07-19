@@ -19,7 +19,8 @@ import { SectionCard, EmptyState, ModalPanel, TablaPro, formatearFecha } from '.
 const GRUPOS_PERMISOS = [
     { nombre: 'Gestión Académica', claves: [['docentes', 'Docentes'], ['estudiantes', 'Estudiantes'], ['materias', 'Materias'], ['cursos', 'Cursos']] },
     { nombre: 'Gestión Institucional', claves: [['invitaciones', 'Invitaciones'], ['institucion', 'Institución']] },
-    { nombre: 'Seguridad', claves: [['administradores', 'Administradores'], ['auditoria', 'Auditoría'], ['papelera', 'Papelera']] }
+    { nombre: 'Seguridad', claves: [['administradores', 'Administradores'], ['auditoria', 'Auditoría'], ['papelera', 'Papelera']] },
+    { nombre: 'Sistema', claves: [['ia', 'Inteligencia Artificial']] }
 ];
 const PERMISOS_OPERATIVOS = ['docentes', 'estudiantes', 'materias', 'cursos', 'invitaciones'];
 

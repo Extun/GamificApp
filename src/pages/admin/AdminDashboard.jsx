@@ -20,6 +20,7 @@ import ApartmentRoundedIcon from '@mui/icons-material/ApartmentRounded';
 import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
 import HistoryEduRoundedIcon from '@mui/icons-material/HistoryEduRounded';
 import DeleteSweepRoundedIcon from '@mui/icons-material/DeleteSweepRounded';
+import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
 import authService from '../../services/authService';
 import adminService from '../../services/adminService';
@@ -34,6 +35,7 @@ import ModuloInstitucion from './modulos/ModuloInstitucion';
 import ModuloAdministradores from './modulos/ModuloAdministradores';
 import ModuloAuditoria from './modulos/ModuloAuditoria';
 import ModuloPapelera from './modulos/ModuloPapelera';
+import ModuloIA from './modulos/ModuloIA';
 import ImportarEstudiantes from '../../components/ImportarEstudiantes';
 import AgregarEstudiante from '../../components/AgregarEstudiante';
 import EditarEstudiante from '../../components/EditarEstudiante';
@@ -326,7 +328,8 @@ export function AdminDashboard() {
                 { id: 'institucion', label: 'Institución', Icon: ApartmentRoundedIcon, grupo: 'Gestión Institucional', permiso: 'institucion' },
                 { id: 'administradores', label: 'Administradores', Icon: AdminPanelSettingsRoundedIcon, grupo: 'Seguridad', permiso: 'administradores' },
                 { id: 'auditoria', label: 'Auditoría', Icon: HistoryEduRoundedIcon, grupo: 'Seguridad', permiso: 'auditoria' },
-                { id: 'papelera', label: 'Papelera', Icon: DeleteSweepRoundedIcon, grupo: 'Seguridad', permiso: 'papelera' }
+                { id: 'papelera', label: 'Papelera', Icon: DeleteSweepRoundedIcon, grupo: 'Seguridad', permiso: 'papelera' },
+                { id: 'ia', label: 'Inteligencia Artificial', Icon: AutoAwesomeRoundedIcon, grupo: 'Sistema', permiso: 'ia' }
             ]
                 .filter((item) => !item.permiso || puede(item.permiso))
                 .map((item) => ({ ...item, activo: pagina === item.id, onClick: () => setPagina(item.id) }))}
@@ -771,6 +774,18 @@ export function AdminDashboard() {
                                     subtitulo="Lo que se elimina llega aquí primero. Puedes restaurarlo tal como estaba o eliminarlo definitivamente."
                                 />
                                 <ModuloPapelera elementos={papelera} ejecutar={ejecutar} />
+                            </div>
+                        )}
+
+                        {/* INTELIGENCIA ARTIFICIAL — proveedor y modelo (SPEC-016).
+                            Las API keys NUNCA se gestionan aquí: viven solo en el servidor. */}
+                        {pagina === 'ia' && puede('ia') && (
+                            <div className="dash-secciones">
+                                <DashboardHeader
+                                    titulo="Inteligencia Artificial"
+                                    subtitulo="Elige con qué proveedor genera GamificApp las actividades. Puedes cambiar entre proveedores sin que los docentes noten diferencia."
+                                />
+                                <ModuloIA />
                             </div>
                         )}
 

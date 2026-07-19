@@ -59,7 +59,8 @@ export const soloAdmin = (req, res, next) => {
 export const PERMISOS_VALIDOS = [
     'docentes', 'estudiantes', 'materias', 'cursos',       // Gestión Académica
     'institucion', 'invitaciones',                         // Gestión Institucional
-    'administradores', 'auditoria', 'papelera'             // Seguridad
+    'administradores', 'auditoria', 'papelera',            // Seguridad
+    'ia'                                                   // Sistema (SPEC-016)
 ];
 export const PERMISOS_OPERATIVOS = ['docentes', 'estudiantes', 'materias', 'cursos', 'invitaciones'];
 

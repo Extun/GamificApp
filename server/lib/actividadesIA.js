@@ -6,7 +6,12 @@
 //
 // Agregar un juego nuevo = una entrada aquí + su validador en
 // validadoresRetos.js + su reproductor en el frontend.
-import { Type } from '@google/genai';
+//
+// SPEC-016 Fase 1: los tipos de esquema ya NO vienen del SDK de Gemini sino de
+// lib/ia/esquema.js (mismos valores en mayúscula). Se importa con el alias
+// `Type` para no reescribir los esquemas de abajo: este archivo describe QUÉ
+// generar, nunca CON QUÉ proveedor.
+import { Tipo as Type } from './ia/esquema.js';
 import pool from '../db.js';
 import { VALIDADORES_CONFIG } from './validadoresRetos.js';
 

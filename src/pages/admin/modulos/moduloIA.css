@@ -1,0 +1,146 @@
+/* Módulo Inteligencia Artificial del admin (SPEC-016, Fase 4).
+   CSS plano con los tokens del tema; sin librerías nuevas (regla §9). */
+
+.ia-proveedores {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.ia-tarjeta {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    text-align: left;
+    padding: 14px;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    cursor: pointer;
+    font: inherit;
+    color: var(--color-text);
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.ia-tarjeta:hover { border-color: var(--color-primary-light); }
+
+.ia-tarjeta.is-activa {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
+}
+
+/* Sin clave en el servidor: se puede mirar, pero no activar. */
+.ia-tarjeta.is-no-configurado { opacity: 0.7; }
+
+.ia-tarjeta-nombre { font-weight: 700; font-size: 1rem; }
+
+.ia-estado {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    line-height: 1.3;
+}
+
+.ia-estado.is-ok { color: #15803d; }
+.ia-estado.is-falta { color: #b45309; }
+
+.ia-badge-activo {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.ia-nota-seguridad {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 14px 0 0;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    background: var(--color-surface-alt);
+    color: var(--color-text-muted);
+    font-size: 0.84rem;
+    line-height: 1.45;
+}
+
+.ia-campo {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: 420px;
+    font-size: 0.9rem;
+}
+
+.ia-campo select {
+    padding: 9px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font: inherit;
+}
+
+.ia-campo select:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.ia-ayuda {
+    margin: 8px 0 0;
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+}
+
+.ia-ayuda.is-aviso { color: #b45309; }
+
+.ia-acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.ia-acciones button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ia-resultado {
+    margin: 12px 0 0;
+    font-size: 0.88rem;
+}
+
+.ia-resultado.is-ok { color: #15803d; }
+.ia-resultado.is-error { color: #b91c1c; }
+
+.ia-resultado-prueba {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
+.ia-resultado-prueba.is-ok { border-color: #86efac; background: #f0fdf4; color: #15803d; }
+.ia-resultado-prueba.is-error { border-color: #fca5a5; background: #fef2f2; color: #b91c1c; }
+
+/* Móvil/tablet: los niños y docentes usan dispositivos compartidos, pero el
+   panel de admin también se abre desde tablet (regla §5). */
+@media (max-width: 640px) {
+    .ia-proveedores { grid-template-columns: 1fr; }
+    .ia-campo { max-width: none; }
+    .ia-acciones button { flex: 1 1 100%; justify-content: center; }
+}
