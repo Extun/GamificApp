@@ -12,6 +12,7 @@ import { Router } from 'express';
 import pool from '../db.js';
 import { soloDocente, puedeGestionarMateria } from '../middleware/auth.js';
 import { registrarAuditoria } from '../lib/auditoria.js';
+import { VALIDADORES_ITEM, RESUMEN_ITEM, TIPOS_BANCO } from '../lib/juegos/registro.js';
 
 const router = Router();
 
@@ -20,66 +21,17 @@ const esIdValido = (n) => Number.isInteger(n) && n > 0;
 const DIFICULTADES = ['facil', 'media', 'dificil'];
 const ESTADOS = ['pendiente', 'aprobada', 'archivada'];
 
-// ---- Validadores POR ÍTEM (Fase 1: tipos atómicos) --------------------------
-// Los validadores de validadoresRetos.js validan la configuración COMPLETA de
-// una actividad (con mínimos de 2-3 ítems); aquí se valida UNA sola pregunta,
-// con las mismas formas por tipo.
-const VALIDADORES_ITEM = {
-    // { pregunta, alternativas: {A,B,...}, correcta, justificacion? }
-    quiz: (item) => {
-        if (typeof item?.pregunta !== 'string' || !item.pregunta.trim()) {
-            return 'La pregunta necesita un enunciado';
-        }
-        if (!item?.alternativas?.A || !item?.alternativas?.B) {
-            return 'La pregunta necesita al menos las alternativas A y B';
-        }
-        const correcta = String(item?.correcta || '').trim().toUpperCase().charAt(0);
-        if (!item?.alternativas?.[correcta]) {
-            return 'La respuesta correcta debe existir entre las alternativas';
-        }
-        return null;
-    },
-    // { texto (con ___), opciones: [..], correcta }
-    completar: (item) => {
-        if (typeof item?.texto !== 'string' || !item.texto.includes('___')) {
-            return 'La frase necesita un espacio a completar marcado con ___';
-        }
-        if (!Array.isArray(item.opciones) || item.opciones.length < 2 ||
-            item.opciones.some((o) => typeof o !== 'string' || !o.trim())) {
-            return 'La frase necesita al menos 2 opciones con texto';
-        }
-        if (typeof item?.correcta !== 'string' || !item.opciones.includes(item.correcta)) {
-            return 'La opción correcta debe ser una de las opciones';
-        }
-        return null;
-    },
-    // { a, b }
-    memorama: (item) => {
-        if (typeof item?.a !== 'string' || !item.a.trim() ||
-            typeof item?.b !== 'string' || !item.b.trim()) {
-            return 'La pareja necesita sus dos caras (a y b) con texto';
-        }
-        return null;
-    },
-    // { texto, etiqueta? }
-    'linea-tiempo': (item) => {
-        if (typeof item?.texto !== 'string' || !item.texto.trim()) {
-            return 'El evento necesita un texto';
-        }
-        return null;
-    }
-};
-
-export const TIPOS_BANCO = Object.keys(VALIDADORES_ITEM);
+// ---- Validadores POR ÍTEM (SPEC-017: viven en el registro de juegos) --------
+// `validarConfig` de cada tipo valida la configuración COMPLETA de una
+// actividad (con mínimos de 2-3 ítems); el bloque `banco` de ese mismo tipo
+// valida UN solo ítem, con la misma forma. Ambos viven juntos en
+// lib/juegos/tipos/*.js, así que un juego nuevo trae su soporte de banco sin
+// tocar este archivo.
+export { TIPOS_BANCO } from '../lib/juegos/registro.js';
 
 // Enunciado buscable/legible derivado del contenido, según el tipo.
 const derivarEnunciado = (tipo, item) => {
-    const texto = {
-        quiz: item?.pregunta,
-        completar: item?.texto,
-        memorama: item?.a && item?.b ? `${item.a} ↔ ${item.b}` : '',
-        'linea-tiempo': item?.etiqueta ? `${item.etiqueta}: ${item.texto}` : item?.texto
-    }[tipo];
+    const texto = RESUMEN_ITEM[tipo]?.(item);
     return String(texto || '').trim().slice(0, 255) || null;
 };
 

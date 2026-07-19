@@ -1,0 +1,89 @@
+/* Verdadero o Falso (SPEC-017, Fase 7).
+   Archivo propio del juego: no toca los estilos de los otros seis.
+   CSS plano con tokens del tema (regla §9). */
+
+.vf-tarjeta {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg, 16px);
+    padding: 20px;
+    box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.06));
+}
+
+.vf-afirmacion {
+    margin: 0 0 18px;
+    font-size: 1.25rem;
+    line-height: 1.5;
+    text-align: center;
+    color: var(--color-text);
+}
+
+.vf-opciones {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.vf-opcion {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 18px 12px;
+    font: inherit;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--color-text);
+    background: var(--color-surface-alt);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.vf-opcion span { font-size: 1.8rem; line-height: 1; }
+
+.vf-opcion:hover:not(:disabled) {
+    border-color: var(--color-primary);
+    transform: translateY(-2px);
+}
+
+.vf-opcion:disabled { cursor: default; }
+
+/* Corrección DIFERIDA: la respuesta elegida se marca en ámbar neutro, nunca
+   en verde, para no insinuar que acertó (mismo criterio que el Quiz). */
+.vf-opcion.is-elegida {
+    border-color: #f59e0b;
+    background: #fffbeb;
+    color: #92400e;
+}
+
+.vf-opcion.is-atenuada { opacity: 0.45; }
+
+.vf-revision-texto {
+    margin: 0 0 4px;
+    font-weight: 600;
+    line-height: 1.45;
+}
+
+.vf-revision-respuesta {
+    margin: 0;
+    font-size: 0.88rem;
+}
+
+.vf-revision-respuesta.is-correcta { color: #15803d; }
+.vf-revision-respuesta.is-incorrecta { color: #b91c1c; }
+
+.vf-revision-explicacion {
+    margin: 4px 0 0;
+    font-size: 0.86rem;
+    line-height: 1.45;
+    color: var(--color-text-muted);
+}
+
+/* Dispositivos compartidos de la escuela (regla §5). */
+@media (max-width: 480px) {
+    .vf-afirmacion { font-size: 1.1rem; }
+    .vf-opcion { padding: 14px 10px; }
+    .vf-opcion span { font-size: 1.5rem; }
+}

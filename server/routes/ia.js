@@ -17,6 +17,8 @@ import { soloDocente, puedeGestionarMateria } from '../middleware/auth.js';
 import { registrarAuditoria } from '../lib/auditoria.js';
 import { generarJSON, generarTexto } from '../lib/ia/index.js';
 import { registrarErrorIA } from '../lib/ia/errores.js';
+import { estadoDe, motivoBloqueo } from '../lib/juegos/estados.js';
+
 import { VALIDADORES_CONFIG } from '../lib/validadoresRetos.js';
 import {
     ACTIVIDADES_IA,
@@ -25,6 +27,15 @@ import {
     generarActividad,
     continuarMision
 } from '../lib/actividadesIA.js';
+
+// SPEC-017 — Ninguna vía de IA puede saltarse el estado del tipo: /generar y
+// /quiz|/mision devuelven contenido que el editor guardará después, y
+// /sorpresa y /adaptar escriben un borrador directamente. Todas comprueban.
+const bloqueoCreacionIA = async (tipo) => {
+    const estado = await estadoDe(tipo);
+    if (estado === 'activo') return null;
+    return motivoBloqueo(tipo, estado, ACTIVIDADES_IA[tipo]?.etiqueta);
+};
 
 const router = Router();
 
@@ -122,6 +133,8 @@ router.post('/generar', soloDocente, async (req, res) => {
         if (!await puedeGestionarMateria(req.user, params.materiaId)) {
             return res.status(403).json({ error: 'No tienes asignada esta materia' });
         }
+        const bloqueo = await bloqueoCreacionIA(tipo);
+        if (bloqueo) return res.status(409).json({ error: bloqueo });
         const ctx = await construirContexto(params);
         if (!ctx) return res.status(404).json({ error: 'Materia no encontrada' });
         if (Array.isArray(req.body?.existentes)) {
@@ -173,7 +186,15 @@ router.post('/sorpresa', soloDocente, async (req, res) => {
         if (!base) return res.status(404).json({ error: 'Materia no encontrada' });
 
         // 1) La IA decide qué actividad crear, conociendo el aula real.
-        const tipos = Object.keys(ACTIVIDADES_IA);
+        // SPEC-017: la sorpresa solo puede elegir entre tipos ACTIVOS.
+        const todos = Object.keys(ACTIVIDADES_IA);
+        const tipos = [];
+        for (const t of todos) if (!await bloqueoCreacionIA(t)) tipos.push(t);
+        if (!tipos.length) {
+            return res.status(409).json({
+                error: 'No hay ningún tipo de actividad disponible para crear ahora mismo. Consulta con el administrador.'
+            });
+        }
         const decision = await generarJSON({
             prompt:
                 `Eres un docente experto de educación básica. Elige UNA actividad sorpresa para el aula descrita abajo.\n` +
@@ -189,7 +210,7 @@ router.post('/sorpresa', soloDocente, async (req, res) => {
             schema: SORPRESA_SCHEMA
         });
 
-        const tipo = tipos.includes(decision?.tipo) ? decision.tipo : 'quiz';
+        const tipo = tipos.includes(decision?.tipo) ? decision.tipo : tipos[0];
         const ctx = await construirContexto({
             materiaId,
             cursoId,
@@ -244,6 +265,9 @@ router.post('/adaptar', soloDocente, async (req, res) => {
         if (!ACTIVIDADES_IA[reto.tipo]) {
             return res.status(400).json({ error: `Este tipo de actividad (${reto.tipo}) no se puede adaptar con IA` });
         }
+        // Adaptar guarda una COPIA nueva: se trata como creación.
+        const bloqueoAd = await bloqueoCreacionIA(reto.tipo);
+        if (bloqueoAd) return res.status(409).json({ error: bloqueoAd });
         const configOriginal = typeof reto.configuracion_json === 'string'
             ? JSON.parse(reto.configuracion_json)
             : reto.configuracion_json;
@@ -337,6 +361,8 @@ router.post('/quiz', soloDocente, async (req, res) => {
         return res.status(400).json({ error: 'Se requieren materia y tema' });
     }
     try {
+        const bloqueo = await bloqueoCreacionIA('quiz');
+        if (bloqueo) return res.status(409).json({ error: bloqueo });
         const [[materia]] = await pool.query(
             'SELECT id FROM materias WHERE nombre = ? AND eliminado_en IS NULL',
             [materiaNombre]
@@ -368,6 +394,8 @@ router.post('/mision', soloDocente, async (req, res) => {
         return res.status(400).json({ error: 'Se requieren materia, tema y temática de la aventura' });
     }
     try {
+        const bloqueo = await bloqueoCreacionIA('mision');
+        if (bloqueo) return res.status(409).json({ error: bloqueo });
         const [[materia]] = await pool.query(
             'SELECT id FROM materias WHERE nombre = ? AND eliminado_en IS NULL',
             [materiaNombre]

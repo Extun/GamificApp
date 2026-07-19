@@ -60,7 +60,7 @@ export const PERMISOS_VALIDOS = [
     'docentes', 'estudiantes', 'materias', 'cursos',       // Gestión Académica
     'institucion', 'invitaciones',                         // Gestión Institucional
     'administradores', 'auditoria', 'papelera',            // Seguridad
-    'ia'                                                   // Sistema (SPEC-016)
+    'ia', 'juegos'                                         // Sistema (SPEC-016, SPEC-017)
 ];
 export const PERMISOS_OPERATIVOS = ['docentes', 'estudiantes', 'materias', 'cursos', 'invitaciones'];
 

@@ -6,7 +6,7 @@ Roadmap de GamificApp: fases, backlog priorizado, dependencias y riesgos. El est
 
 # Última actualización
 
-2026-07-19 (SPEC-016 y SPEC-017 redactadas a partir de las observaciones del revisor de tesis: fases 3.8 y 3.9)
+2026-07-19 (SPEC-016 y SPEC-017 implementadas: proveedores de IA agnosticos y arquitectura extensible de juegos con septimo juego de demostracion. Ambas pendientes de validacion en produccion)
 
 # Responsable
 
@@ -22,9 +22,9 @@ Fabrizio Zurita (Extun)
 | 3 | DevOS documental | Sistema documental — **cerrado y simplificado** en la consolidación 2026-07-07 (START_HERE + 4 docs vivos) | ✅ Hecho |
 | 3.5 | Centro de Administración (SPEC-002 + SPEC-003) | Materias/cursos/institución dinámicos, TablaPro, roles y permisos de admin, auditoría, papelera, sidebar agrupado | ✅ Hecho en código y **desplegado en Aiven** (migraciones 002-004 confirmadas en producción el 2026-07-10, ver `CURRENT_STATE.md`) |
 | 3.6 | Centro de Trabajo Docente (SPEC-006) | 3 juegos nuevos (memorama, línea del tiempo, completar), IA genérica por registro, actividad sorpresa, adaptar con IA, Biblioteca IA con papelera/favoritas/estadísticas, Libro de Calificaciones editable | ✅ Hecho en código (2026-07-09) — **pendiente: migración 008 a Aiven + deploy + prueba end-to-end con BD** |
-| 3.7 | Editor de actividades universal (SPEC-013) | Botón único "Agregar" con menú por acciones, lenguaje docente (sin "Banco"/"IA"/"manual"), toggles "Mezclar" del quiz, selección automática desde preguntas guardadas, autoguardado unificado, modal IA único | 🟡 Aprobada 2026-07-17 — diseño congelado, Fases 1-7 por implementar (Fase 8 shell post-tesis) |
+| 3.7 | Editor de actividades universal (SPEC-013) | Botón único "Agregar" con menú por acciones, lenguaje docente (sin "Banco"/"IA"/"manual"), toggles "Mezclar" del quiz, selección automática desde preguntas guardadas, autoguardado unificado, modal IA único | 🟡 **Parcial (estado verificado 2026-07-19): F1 ✅, F2 ✅, F3 ⚠️ parcial, F4-F7 ❌ pendientes.** La F8 queda absorbida por SPEC-017. Detalle por fase en `SPEC-013 §7` |
 | 3.8 | Proveedores de IA (SPEC-016) | Arquitectura agnóstica al proveedor: adaptadores Gemini + OpenAI, selección de proveedor/modelo desde administración, "Probar conexión". API Keys solo en variables de entorno | 🟡 Redactada 2026-07-19 — **pendiente de aprobación**, ninguna fase iniciada. Responde a observación del revisor |
-| 3.9 | Arquitectura extensible de juegos (SPEC-017) | Registro central de tipos de juego (backend + frontend), 3 estados (Activo / Solo jugar / Deshabilitado), módulo de administración, documento "Cómo añadir un juego" | 🟡 Redactada 2026-07-19 — **pendiente de aprobación**, ninguna fase iniciada. Responde a observación del revisor. Su Fase 3 debe coordinarse con SPEC-013 |
+| 3.9 | Arquitectura extensible de juegos (SPEC-017) | Registro central de tipos de juego (backend + frontend), 3 estados (Activo / Solo jugar / Deshabilitado), módulo de administración, guía "Cómo añadir un juego" y séptimo juego de demostración | 🟡 **Implementada — pendiente de validación funcional en producción** (2026-07-19). Fases 1-7 en código, migración 014. Extensibilidad demostrada con Verdadero o Falso: 4 archivos propios, 4 líneas de registro, **0 módulos centrales con lógica del tipo y 0 cambios en los 6 juegos existentes** (`docs/COMO-AGREGAR-UN-JUEGO.md`). **NO cerrar** hasta validar en el despliegue |
 | 4 | **Épica 1: Experiencia del estudiante** | Rediseño completo del lado del niño en 5 specs (ver §2) | 🟡 En curso (auditoría y SPEC-001 redactadas; nada implementado) |
 | 5 | Módulos incompletos | Libro de Calificaciones, 3 logros faltantes, UI de edición de docente | ⚪ Pendiente (antes de la defensa, si hay tiempo) |
 | 6 | Post-tesis | Multi-institución, archivos fuera de la BD, fallback de IA, memoria del asistente | ⚪ Futuro |
@@ -73,7 +73,7 @@ Insumos: `docs/audit/Auditoria-UX-Estudiante-v1.md`, `docs/specifications/SPEC-0
 24. **Fallback automático entre proveedores de IA.** Excluido de SPEC-016 por decisión de Fabrizio (2026-07-19) para acotar alcance. El contrato queda preparado: `clasificarError()` en cada adaptador y la columna `configuracion_ia.proveedor_respaldo`, que se **crea pero no se lee**. Incorporarlo después no requiere tocar los adaptadores.
 25. **Mecanismo real de migraciones — documentado, no pendiente.** Ver §6 de este documento. Numeración resuelta por Fabrizio el 2026-07-19 (Opción B): SPEC-016 → `013`, SPEC-017 → `014`, sin archivo retroactivo para SPEC-015. Hueco consciente entre `012` y `013`.
 27. **Evaluar un sistema formal de migraciones versionadas** (post-tesis, NO implementar ahora). Hoy la idempotencia se deriva del estado del esquema vía `faltaColumna()`, sin bitácora de migraciones aplicadas. Un sistema formal aportaría: tabla `migraciones_aplicadas` con marca de tiempo y checksum, ejecución de los `.sql` como artefactos reales en vez de reimplementarlos en JS, orden explícito y reversibilidad verificable. Motivo de diferirlo: el mecanismo actual **funciona y es idempotente**, y reescribirlo sería un refactor grande no pedido (regla §3) sobre la pieza más delicada del despliegue, a semanas de la sustentación.
-26. **Séptimo juego de demostración** (SPEC-017 Fase 7, opcional). Un juego sencillo tipo "Verdadero o Falso" implementado solo con el contrato nuevo, cuyo `git diff --stat` demuestre que no se modificó ninguno de los seis juegos existentes. Es la evidencia más directa para el revisor sobre ese requerimiento.
+26. ~~Séptimo juego de demostración~~ ✅ **Hecho (2026-07-19)**: Verdadero o Falso implementado solo con el contrato del registro. Evidencia medida en `docs/COMO-AGREGAR-UN-JUEGO.md` §Evidencia de extensibilidad. Pendiente de validación funcional en producción.
 
 ### Diferidos de SPEC-006 (requieren migración propia)
 
@@ -89,7 +89,7 @@ Insumos: `docs/audit/Auditoria-UX-Estudiante-v1.md`, `docs/specifications/SPEC-0
 ## 4. Dependencias entre items del backlog
 
 - Specs 2–5 dependen de SPEC-001 (el shell con rutas es la base).
-- **SPEC-017 Fase 3 depende de SPEC-013** (o debe ejecutarse en el mismo bloque): ambas tocan los editores del docente. Hacerlas por separado obliga a reescribirlos dos veces. Las Fases 1, 2, 4, 6 y 7 de SPEC-017 son independientes.
+- **SPEC-017 y SPEC-013 ya NO están acopladas** (revisado 2026-07-19). La dependencia anotada antes partía de suponer que SPEC-013 no estaba implementada; en realidad sus fases 1-2 sí lo están y `BarraAccionesEditor` ya unifica la botonera. La Fase 3 de SPEC-017 se reduce a centralizar los mapas paralelos de `GeneradorActividadIA`, sin tocar `BarraAccionesEditor` ni rehacer SPEC-013.
 - **SPEC-016 y SPEC-017 son independientes entre sí** y pueden implementarse en cualquier orden. Recomendado: SPEC-016 primero (menor, contenida, sin colisión con nada congelado).
 - Multi-institución requiere spec propia obligatoria (cambios de BD).
 - Detalle técnico de cada dependencia: ver la spec correspondiente en `docs/specifications/`.
@@ -126,7 +126,6 @@ Evolucionar esto a un sistema formal de migraciones versionadas está en §3 ít
 
 # Pendientes
 
-- **Revisar y aprobar SPEC-016 y SPEC-017** (redactadas 2026-07-19, responden a las observaciones del revisor de tesis).
-- **Decidir la numeración de migraciones** tras el hallazgo del backlog §3 ítem 25.
+- **Validar SPEC-016 y SPEC-017 en producción** antes de darlas por cerradas (checklists en `SPEC-016 §16` y en el informe de cierre de SPEC-017).
 - Aprobar SPEC-001 y arrancar su commit 1.
 - Redactar Spec 2–5 a medida que se necesiten.

@@ -11,17 +11,14 @@ import { useEffect, useMemo, useState } from 'react';
 import LibraryAddRoundedIcon from '@mui/icons-material/LibraryAddRounded';
 import bancoService from '../../services/bancoService';
 import { ModalPanel, EmptyState } from '../dashboard/DashboardWidgets';
+import { obtenerJuego } from './registro';
 import './selectorBanco.css';
 
 const DIFICULTAD_LABEL = { facil: 'Fácil', media: 'Media', dificil: 'Difícil' };
 
-// Textos por tipo de juego (singular/plural del ítem que se inserta).
-const TEXTOS_TIPO = {
-    quiz: { singular: 'pregunta', plural: 'preguntas', titulo: 'Añadir del banco de preguntas' },
-    memorama: { singular: 'pareja', plural: 'parejas', titulo: 'Añadir parejas del banco' },
-    'linea-tiempo': { singular: 'evento', plural: 'eventos', titulo: 'Añadir eventos del banco' },
-    completar: { singular: 'frase', plural: 'frases', titulo: 'Añadir frases del banco' }
-};
+// SPEC-017 Fase 3: los textos por tipo (singular/plural del ítem, título del
+// modal) y la regla de clasificación por dificultad los declara cada juego en
+// su entrada del registro, no un mapa local.
 
 export function SelectorBanco({ tipo = 'quiz', materiaId, onInsertar, onCerrar }) {
     const [items, setItems] = useState([]);
@@ -36,9 +33,14 @@ export function SelectorBanco({ tipo = 'quiz', materiaId, onInsertar, onCerrar }
     const [seleccion, setSeleccion] = useState(() => new Set());
     const [insertando, setInsertando] = useState(false);
 
-    const textos = TEXTOS_TIPO[tipo] || TEXTOS_TIPO.quiz;
-    // El quiz no clasifica sus preguntas por dificultad; los juegos genéricos sí.
-    const conDificultad = tipo !== 'quiz';
+    const edicion = obtenerJuego(tipo)?.edicion || {};
+    const textos = {
+        singular: edicion.nombreItem?.singular || 'elemento',
+        plural: edicion.nombreItem?.plural || 'elementos',
+        titulo: edicion.tituloReutilizar || 'Reutilizar contenido guardado'
+    };
+    // Cada tipo declara si clasifica su contenido por dificultad (el quiz no).
+    const conDificultad = edicion.clasificaPorDificultad !== false;
 
     // Carga todo el repositorio del docente de una vez (la API ya ordena de
     // más nuevo a más antiguo); los filtros son locales.

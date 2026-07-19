@@ -1,6 +1,6 @@
 # SPEC-016 — Arquitectura de proveedores de IA
 
-**Estado:** 🟡 **Fases 1-4 implementadas en código (2026-07-19), NO validadas en producción.** SPEC-016 **no** se cierra hasta completar las pruebas con proveedor real del §16.
+**Estado:** 🟡 **Implementada y desplegada (2026-07-19). Gemini validado en producción; OpenAI implementado y verificado estructuralmente, pendiente de validación funcional por falta de credenciales.** Ver §16.
 **Fecha:** 2026-07-19
 **Origen:** Observación del revisor de tesis — *"Analizar la viabilidad de reemplazar la API de Gemini por la API de ChatGPT u otro modelo de inteligencia artificial para la generación de actividades y contenido educativo."*
 **Alcance:** Backend (`server/lib/ia/*`, endpoints admin), migración de BD aditiva, un módulo nuevo en el panel de administración. **No toca** áreas protegidas §10 (login, XP, misiones, ranking, permisos) salvo el alta de un permiso nuevo, que sí es §10 y se detalla en §9.
@@ -311,16 +311,25 @@ Consecuencias:
 5. Con la tabla vacía, el sistema se comporta exactamente como antes de esta spec.
 6. `npm run build` sin errores; panel verificado en móvil.
 
-## 16. Pruebas OBLIGATORIAS en producción antes de cerrar la spec
+## 16. Estado de validación (cierre parcial, 2026-07-19)
 
-Sin credenciales en el entorno local, lo siguiente **no se ha probado** y SPEC-016 permanece abierta hasta completarlo en el entorno desplegado:
+### Validado en producción
 
-- [ ] Generación real de una actividad con **Gemini** (los 6 tipos, o al menos quiz + uno de objeto raíz).
-- [ ] Generación real de una actividad con **OpenAI** (obligatorio incluir **quiz**, único esquema con array en raíz).
-- [ ] "Probar conexión" con Gemini → ✅.
-- [ ] "Probar conexión" con OpenAI → ✅.
-- [ ] Al menos una **generación estructurada real** con cada proveedor.
-- [ ] Cambiar Gemini → OpenAI → Gemini desde el panel y confirmar que los generadores siguen funcionando **sin modificar su código**.
-- [ ] Verificar que la migración 013 se aplica sola al arrancar y que, con la tabla vacía, el sistema sigue usando Gemini.
+- ✅ **Gemini es el proveedor validado y en uso.** Sigue generando actividades con normalidad tras el despliegue de SPEC-016; la arquitectura de adaptadores no introdujo regresiones.
+- ✅ Migración 013 aplicada; con la tabla vacía el sistema usa Gemini, exactamente como antes de esta spec.
+- ✅ Módulo de administración, permisos y estado de proveedores.
 
-Riesgo principal a vigilar en esa ronda: el *strict mode* de OpenAI sobre `QUIZ_SCHEMA` (array en raíz, envuelto por el adaptador) y los campos opcionales declarados nullable.
+### Implementado y verificado estructuralmente, NO validado contra la API real
+
+- ⚠️ **Adaptador de OpenAI.** Está implementado y verificado **estructuralmente**: contrato completo, traducción de los 6 esquemas a JSON Schema *strict* válido, envoltura del array raíz del quiz, campos opcionales como nullable, clasificación de errores (confirmada con claves inválidas: el proveedor responde 401 y el adaptador lo clasifica como `credencial`).
+- ⚠️ **La generación real con OpenAI NO se ha probado**, por no disponer de `OPENAI_API_KEY` en el momento del cierre.
+
+**No debe presentarse OpenAI como probado con éxito contra su API real.** La afirmación defendible es: *GamificApp posee una arquitectura agnóstica al proveedor, con Gemini validado en producción y un segundo adaptador (OpenAI) implementado y verificado estructuralmente, pendiente de validación funcional cuando se disponga de credenciales.*
+
+### Pendiente para cuando exista `OPENAI_API_KEY`
+
+- [ ] "Probar conexión" con OpenAI.
+- [ ] Generación real de los 6 tipos con OpenAI — **empezar por el quiz**, único esquema con array en raíz.
+- [ ] Cambiar Gemini → OpenAI → Gemini y confirmar que los generadores siguen funcionando sin tocar su código.
+
+Riesgo principal a vigilar en esa ronda futura: el *strict mode* de OpenAI sobre `QUIZ_SCHEMA` y los campos opcionales declarados nullable. Mitigación ya activa: `PUT /configuracion` valida la combinación contra el proveedor **antes** de aplicarla (§4.5-bis), así que una configuración que no funcione no puede llegar a activarse.

@@ -20,6 +20,7 @@ import misionesRouter from './routes/misiones.js';
 import adminMisionesRouter from './routes/adminMisiones.js';
 import adminResetRouter from './routes/adminReset.js';
 import adminIARouter from './routes/adminIA.js';
+import adminJuegosRouter from './routes/adminJuegos.js';
 import bancoPreguntasRouter from './routes/bancoPreguntas.js';
 import estudiantesImportRouter from './routes/estudiantesImport.js';
 
@@ -96,6 +97,7 @@ app.use('/api', autenticar);
 app.use('/api/admin/misiones', adminMisionesRouter);
 app.use('/api/admin/reset', adminResetRouter);
 app.use('/api/admin/ia', adminIARouter);
+app.use('/api/admin/juegos', adminJuegosRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/docente', docenteRouter);
 app.use('/api/materias/:id/material', materialesRouter);

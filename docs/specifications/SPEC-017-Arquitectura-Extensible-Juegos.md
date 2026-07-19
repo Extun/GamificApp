@@ -1,6 +1,6 @@
 # SPEC-017 — Arquitectura extensible y gestión de tipos de juego
 
-**Estado:** 🟡 REDACTADA — pendiente de aprobación de Fabrizio. Ninguna fase iniciada.
+**Estado:** 🟡 **Implementada — pendiente de validación funcional en producción.** Fases 1, 2, 3, 3b, 4, 5, 6 y 7 en código (2026-07-19), incluido el séptimo juego Verdadero o Falso como prueba de extensibilidad. **NO cerrar** hasta validar en el entorno desplegado.
 **Fecha:** 2026-07-19
 **Origen:** Observación del revisor de tesis — *"Permitir que el administrador pueda agregar e implementar nuevos juegos de gamificación sin afectar los ya existentes."*
 **Alcance:** Registro central de tipos de juego (backend + frontend), migración aditiva, módulo nuevo en el panel de administración, documento "Cómo añadir un nuevo tipo de juego". **No toca** XP, calificación, misiones ni ranking (§10).
@@ -36,6 +36,19 @@ Ya existen **dos registros parciales y desincronizados**, uno por lado:
 | 14 | Dashboard del estudiante | `DashboardEstudiante.jsx` | quiz y misión con pestañas y estado propios ❌ |
 | 15 | Misiones | `misionesSeed.js:48`, `:83` | `filtro: { tipo: 'quiz' }`, evaluador `mision_narrativa` — acoplamiento **de contenido**, legítimo |
 | 16 | Calificación y XP | `calificacion.js`, `routes/progreso.js` | ✅ **ya genérico** (aciertos/total). Área §10 — **no se toca** |
+| 17 | Verbo de auditoría | `routes/progreso.js:332` | mapa **incompleto** con fallback (solo quiz/clasificador/mision) ⚠️ |
+
+### 1.2 `totalEsperado` es un control de SEGURIDAD, no una utilidad
+
+Punto más delicado de toda la spec. `totalEsperado.js` no calcula un dato informativo: `progreso.js:228` lo usa para **rechazar intentos falsificados**, y si devuelve `null` **bloquea el registro de progreso con HTTP 400**.
+
+Un séptimo juego sin entrada en `DERIVADORES` produce esta secuencia:
+
+1. El juego se crea ✅ 2. Se publica ✅ 3. El estudiante lo juega ✅ 4. Al terminar → **400, XP y calificación perdidos**.
+
+Fallo silencioso, tardío y visible solo en producción, sufrido por un niño. **Por eso la guardia de completitud (§4.3) no es un extra: es el requisito central de esta spec.**
+
+Consecuencia de diseño: al mover `totalEsperado` al registro, **el registro pasa a ser código de seguridad** y roza el área protegida §10 (XP). Mitigación: la spec exige que las funciones se muevan **sin alterar una sola fórmula ni denominador**, con pruebas de regresión que comparen la salida vieja y la nueva para los 6 tipos.
 
 **Diagnóstico:** de 16 puntos, 6 ya son mapas limpios, 1 es acoplamiento legítimo de contenido, 1 ya es genérico y **8 requieren trabajo**. La deuda central no es la ausencia de registro, sino que **Quiz y Misión son ciudadanos de primera clase con caminos privilegiados fuera del registro**.
 
@@ -93,15 +106,39 @@ Un registro único por lado, con contrato completo y **guardia de completitud al
 
 **Clave del diseño:** incorporar **quiz y misión** al registro con su `Player` y `Editor`. Desaparecen los casos especiales: `PreviewJuegoModal` se reduce a `const { Player } = REGISTRO[tipo]`, y biblioteca y dashboard iteran en vez de ramificar.
 
-### 4.3 Guardia de completitud
+### 4.3 Guardia de completitud (REQUISITO CENTRAL)
 
-Al arrancar el servidor, verificar que **todo tipo registrado** declara `validarConfig` y `totalEsperado`. Si falta alguno, fallar ruidosamente con el nombre del tipo. Convierte el fallo silencioso de XP (§2.2) en un error de arranque imposible de ignorar.
+Dos barreras, no una:
 
-### 4.4 Conflicto con SPEC-013 (congelada) — resolución
+1. **Al arrancar el servidor**, `contrato.js` verifica que todo tipo registrado declara `validarConfig`, `totalEsperado` y `verboAuditoria`. Si falta alguno, **el proceso no arranca** e informa el tipo y el campo. Convierte el fallo silencioso de XP (§1.2) en un error imposible de ignorar.
+2. **Al publicar una actividad**, `POST /api/retos` verifica que `totalEsperado(tipo, configuracion)` devuelve un número. Una actividad cuya estructura no permita derivar su evaluación **no se publica**, en vez de fallar cuando el estudiante termina de jugarla.
 
-SPEC-013 congela la **matriz de acciones por tipo** (§3) y el editor universal por acciones, y declara que su diseño no se rediscute.
+La barrera 1 protege contra un juego mal implementado; la 2, contra una actividad mal formada de un juego bien implementado.
 
-**Resolución (parte de esta spec, no negociable):** el objeto `capacidades` del registro **es la implementación de esa matriz congelada, no su renegociación**. Cada fila de SPEC-013 §3 se traduce literalmente a flags:
+### 4.3-ter Consistencia entre los dos registros
+
+Al ser dos registros (backend y frontend), el riesgo es que diverjan. Se cubre con una **prueba automática obligatoria** que compara el conjunto de `tipo` de ambos y falla si no coinciden exactamente.
+
+La prueba **no debe introducir dependencias cruzadas entre `server/` y `src/`**: importa cada registro por separado y compara solo listas de identificadores. Nunca un `import` de `src/` dentro de `server/` ni al revés.
+
+### 4.3-quater Relación con SPEC-016 (IA multi-proveedor)
+
+Verificado: `generarJSON({ prompt, schema })` **no conoce el tipo de actividad**. Los adaptadores reciben un esquema genérico y lo traducen.
+
+**Añadir un juego nuevo NO requiere tocar los adaptadores Gemini/OpenAI.** El contrato del registro aporta `ia: { schema, rango, construirPrompt, normalizar }` y los proveedores siguen siendo agnósticos al tipo.
+
+Única condición que el contrato debe documentar: **el esquema declara `required` completo en cada objeto**, porque el modo *strict* de OpenAI lo exige (SPEC-016 §4.3). Los 6 esquemas actuales ya lo cumplen.
+
+### 4.4 Relación con SPEC-013 — revisada tras auditar el código (2026-07-19)
+
+**La auditoría previa a esta spec encontró que SPEC-013 está parcialmente implementada**, al contrario de lo que decía su propio encabezado: F1 y F2 completas, F3 parcial, F4-F7 pendientes (ver `SPEC-013 §7`). Eso **elimina el conflicto** que esta spec anticipaba:
+
+- `BarraAccionesEditor.jsx` ya es el patrón unificado de botonera. **SPEC-017 no lo toca ni lo reemplaza.**
+- Las "capacidades por tipo" **ya existen de facto**, en forma de props que cada editor recibe o no (`onAbrirBanco`, `onAgregarIA`). El registro no inventa el concepto: **centraliza dónde se decide**.
+- La Fase 3 de esta spec **reduce su alcance**: solo los mapas paralelos de `GeneradorActividadIA.jsx:42-115`.
+- La **Fase 8 de SPEC-013** (shell `EditorActividad` vía registro, post-tesis) queda **absorbida** por esta spec.
+
+El objeto `capacidades` del registro **es la implementación de la matriz congelada de SPEC-013 §3, no su renegociación**. Cada fila se traduce literalmente a flags:
 
 | Tipo | 📝 Escribir | 🤖 Generar | 📚 Reutilizar | 🎲 Automático |
 |---|---|---|---|---|
@@ -114,11 +151,35 @@ Ningún flujo de UX de SPEC-013 se replantea. **Orden recomendado: SPEC-013 ante
 
 ## 5. Los tres estados de un tipo de juego
 
-| Estado | Crear nuevas | Jugar existentes | Visible en biblioteca/historial | XP y misiones históricos |
-|---|---|---|---|---|
-| **Activo** | ✅ | ✅ | ✅ | ✅ |
-| **Solo jugar** | ❌ | ✅ | ✅ | ✅ |
-| **Deshabilitado** | ❌ | ❌ | ✅ (marcado "no disponible") | **se conservan** |
+| Estado | Crear nuevas | **Iniciar** partidas | Visible al estudiante | Biblioteca docente | XP/notas históricos |
+|---|---|---|---|---|---|
+| **`activo`** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **`solo_jugar`** | ❌ | ✅ | ✅ | ✅ (marcado) | ✅ |
+| **`deshabilitado`** | ❌ | ❌ | ❌ | ✅ (marcado) | **se conservan** |
+
+### 5.0 Qué ve el estudiante ante un tipo deshabilitado (decisión aprobada)
+
+1. **No lo ve.** `GET /api/retos` excluye los tipos deshabilitados. Vía normal, cubre casi todos los casos.
+2. **Si llega igualmente** (caché del navegador, pestaña abierta antes del cambio): el reproductor no encuentra entrada en el registro y muestra un `EmptyState` amable — *"Esta actividad no está disponible ahora mismo. Pídele a tu profe otra."* **Nunca un error técnico ni una pantalla rota** (regla §10 de lenguaje infantil).
+3. **Si envía progreso de todos modos, `POST /api/progreso` LO ACEPTA.** Es deliberado y es el punto más importante de esta sección: el estado se consulta **solo al crear y al listar**, jamás al calificar. Un niño que estaba jugando cuando el administrador deshabilitó el tipo **no pierde su calificación ni su XP**. Rechazarlo castigaría al estudiante por una acción administrativa que no controla.
+4. **Tipo desconocido** (plugin retirado del código): se trata como deshabilitado pero visible para el docente. La actividad y su progreso sobreviven.
+
+### 5.0-bis ⚠️ LIMITACIÓN ARQUITECTÓNICA: no existe el concepto de "intento iniciado"
+
+**Auditado el 2026-07-19. Esta garantía NO está resuelta por diseño y no debe presentarse como tal.**
+
+El backend **no tiene ningún concepto de sesión o intento iniciado**. `POST /api/progreso` es la única escritura y ocurre **al terminar** la actividad; no existe un "inicio de partida" registrado en el servidor. Por tanto **el servidor no puede distinguir** entre:
+
+- un estudiante que empezó a jugar antes de que se deshabilitara el tipo, y
+- un estudiante que intenta enviar un resultado después.
+
+**Qué ocurre realmente:** el comportamiento deseado se cumple —quien estaba jugando termina y cobra su nota y su XP— **pero por ausencia de comprobación, no porque el sistema lo distinga**. `POST /api/progreso` acepta el resultado en ambos casos.
+
+**Por qué se acepta:** el riesgo residual es el mismo que ya estaba identificado y aceptado en `MASTER_PLAN.md` §3 ítem 20 (un usuario técnico puede enviar un resultado estructuralmente válido sin haber jugado). Deshabilitar un tipo **no abre una clase de vulnerabilidad nueva**; solo hereda la existente. La alternativa —rechazar el progreso de tipos deshabilitados— **castigaría a un niño** por una acción administrativa, que es justo lo que la spec quiere evitar.
+
+**Solución mínima si algún día se quiere cerrar** (NO implementar ahora): es exactamente la misma que el backlog ítem 20 — que el servidor emita un **token de intento firmado** al abrir la actividad y que `POST /api/progreso` lo exija. Cerraría ambos problemas de una vez. Es un cambio de arquitectura mayor sobre un área protegida (§10, XP) y queda fuera del alcance de la tesis. **No debe abordarse solo por SPEC-017.**
+
+Alternativas más baratas evaluadas y descartadas: una ventana de gracia tras deshabilitar (arbitraria e igualmente falsificable) y deducir el inicio de una fila previa de `progreso_estudiante` (no existe en el primer intento, justo el caso que importa).
 
 ### 5.1 Invariantes (no negociables)
 
@@ -188,7 +249,7 @@ Los mapas antiguos (`VALIDADORES_CONFIG`, `DERIVADORES`, `JUEGOS_UI`…) **se co
 |---|---|---|---|
 | **1** | Registro **backend**: mover los 4 mapas existentes a `lib/juegos/tipos/*.js` con re-exports. Guardia de completitud. **Cero cambio de comportamiento** | ✅ Sí | Bajo |
 | **2** | Registro **frontend**: crear `registro/`, incorporar quiz y misión, `registroJuegos.jsx` re-exporta. Eliminar #8, #9, #10 | ✅ Sí | Bajo |
-| **3** | Absorber `GeneradorActividadIA` (#12) y referenciar editores (#13) desde el registro | ⚠️ **Coordinar con SPEC-013** | Medio |
+| **3** | **Alcance reducido** (auditoría 2026-07-19): centralizar solo los mapas paralelos de `GeneradorActividadIA.jsx:42-115` y referenciar editores desde el registro. **NO se toca `BarraAccionesEditor` ni se rehace SPEC-013** | ✅ Sí | Medio |
 | **4** | Migración 015 + `tipos_juego` + endpoints + permiso `'juegos'` + bloqueo **solo en creación** | ✅ Sí (vía API) | Bajo |
 | **5** | `ModuloJuegos` en el panel de administración | ❌ Depende de la 4 | Bajo |
 | **6** | `docs/COMO-AGREGAR-UN-JUEGO.md` — **entregable de tesis** | ✅ Sí | Nulo |
@@ -218,6 +279,31 @@ Contemplada como **demostración final, no obligatoria**. Un juego sencillo (p. 
 | 5 | Sin MySQL local (§16) | Migración 015 y efecto real del estado solo verificables tras deploy |
 | 6 | Regresión silenciosa en un juego migrado | Verificación manual de los 6 juegos al cerrar cada fase (crear, jugar, calificar) |
 
+## 11-bis. Cambios de comportamiento deliberados (Fases 1-2)
+
+La refactorización se hizo con criterio de **cambio cero**: 52 configuraciones por tipo comparadas contra el código anterior devuelven denominadores y mensajes idénticos, y los prompts de IA son iguales byte a byte. Estas son las **únicas** desviaciones, todas conscientes:
+
+### a) Verbos de auditoría propios (MEJORA DELIBERADA, no consecuencia del registro)
+
+Memorama, Línea del tiempo y Completar espacios ahora registran en la bitácora *"Jugó el memorama"*, *"Ordenó la línea del tiempo"* y *"Completó los espacios"*. Antes los tres caían al genérico *"Completó la actividad"*, porque el mapa `VERBO` de `progreso.js:332` solo contemplaba quiz, clasificador y misión.
+
+**Esto es una mejora de trazabilidad decidida a propósito, NO algo que el registro obligue.** El registro habría admitido igual de bien conservar el genérico; se aprovechó que cada tipo ya declara sus metadatos para completar los tres que faltaban. Afecta únicamente al texto de la bitácora de auditoría: ni una nota, ni un XP, ni un progreso cambian.
+
+### b) Orden de `TIPOS_BANCO` — no se restaura, con motivo técnico
+
+El orden histórico (`quiz, completar, memorama, linea-tiempo`) era un artefacto de cómo estaba escrito el objeto `VALIDADORES_ITEM`, sin significado semántico. El registro produce `quiz, memorama, linea-tiempo, completar`.
+
+Se evaluó restaurarlo y **existe una razón técnica para no hacerlo**:
+
+- **Restaurarlo con una lista de orden explícita** reintroduce exactamente el tipo de lista central que esta spec elimina: un séptimo juego con banco tendría que añadirse también ahí, y olvidarlo sería un fallo silencioso.
+- **Restaurarlo reordenando el array `TIPOS`** cambiaría además el orden de `ACTIVIDADES_IA`, que **sí es observable de forma consecuente**: `routes/ia.js:176` inyecta esos slugs en el prompt de la actividad sorpresa. Cambiar el orden de una lista dentro de un prompt es un cambio de comportamiento mayor que el que se pretende evitar.
+
+Alcance real de la diferencia: el orden de las palabras en **un único mensaje de error** (`tipo debe ser uno de: …`) devuelto ante una petición inválida a la API del banco. Ninguna interfaz itera `TIPOS_BANCO`; ningún usuario lo ve. Se acepta conscientemente.
+
+### c) Barrera de publicación (aprobada)
+
+Publicar exige ahora que `totalEsperado` sea derivable. Endurecimiento intencional: una actividad histórica malformada que hoy se pudiera republicar será rechazada con un mensaje claro, en vez de fallar cuando el estudiante termine de jugarla.
+
 ## 12. Compatibilidad
 
 | Garantía | Cómo se sostiene |
@@ -231,7 +317,22 @@ Contemplada como **demostración final, no obligatoria**. Un juego sencillo (p. 
 
 ## 13. Qué configura el administrador / qué requiere desarrollador
 
-**Administrador:** ver los tipos instalados con nombre, descripción y emoji; ver cuántas actividades existen de cada tipo; cambiar entre los tres estados; ver capacidades (IA / reutilizar) en modo lectura.
+**Administrador:** gestiona **exclusivamente juegos ya implementados y registrados por el sistema**. Nunca programa una mecánica desde el navegador — y así debe presentarse, sin ambigüedad, ante el revisor.
+
+El módulo muestra, por tipo:
+
+| Columna | Origen |
+|---|---|
+| Nombre y descripción | registro |
+| Estado (`activo` / `solo jugar` / `deshabilitado`) | BD, editable |
+| Nº de actividades existentes | consulta a `retos` |
+| Reproductor · Editor · IA · Banco/Reutilizar · Evaluación | derivado del registro (chips ✅/—) |
+
+El **estado de integración** es autodocumentación: si un desarrollador registra un juego sin soporte de IA, el panel lo refleja solo, sin que nadie deba actualizar nada.
+
+**Prohibido el borrado físico desde la UI.** No existe botón de eliminar un tipo de juego. Un tipo solo desaparece si un desarrollador retira su archivo del registro, y aun así las actividades y el progreso sobreviven (§5.0 regla 4).
+
+**Confirmación antes de `deshabilitado`:** el panel indica cuántas actividades usan ese tipo y aclara explícitamente que los datos históricos **no** se eliminarán.
 
 **Desarrollador:** implementar el juego (editor, reproductor, validador, esquema de IA, prompt, `totalEsperado`) y registrarlo mediante el contrato. **Esto es correcto y se defiende explícitamente ante el revisor** (§3), no se disimula.
 

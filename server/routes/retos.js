@@ -2,7 +2,18 @@ import { Router } from 'express';
 import pool from '../db.js';
 import { soloDocente, puedeGestionarMateria } from '../middleware/auth.js';
 import { registrarAuditoria } from '../lib/auditoria.js';
-import { VALIDADORES_CONFIG } from '../lib/validadoresRetos.js';
+import { VALIDADORES_CONFIG, totalEsperado, obtenerJuego } from '../lib/juegos/registro.js';
+import { estadoDe, tiposJugables, motivoBloqueo } from '../lib/juegos/estados.js';
+
+// SPEC-017 — Guardia ÚNICA de creación. Toda vía que produzca una actividad
+// nueva (crear, duplicar, publicar un borrador) pasa por aquí, de modo que
+// deshabilitar un tipo no dependa de ocultar botones en el frontend.
+// Devuelve un mensaje de error, o null si se puede crear.
+const bloqueoCreacion = async (tipo) => {
+    const estado = await estadoDe(tipo);
+    if (estado === 'activo') return null;
+    return motivoBloqueo(tipo, estado, obtenerJuego(tipo)?.etiqueta);
+};
 
 const router = Router();
 
@@ -60,6 +71,17 @@ router.get('/', async (req, res, next) => {
     }
 
     try {
+        // SPEC-017: al ESTUDIANTE no se le ofrecen actividades de un tipo
+        // deshabilitado (no puede iniciar partidas nuevas). Las actividades
+        // NO se borran ni se modifican: solo dejan de listarse. El docente y
+        // el administrador las siguen viendo en su biblioteca.
+        if (req.user?.rol === 'estudiante') {
+            const jugables = await tiposJugables();
+            if (!jugables.length) return res.json([]);
+            condiciones.push(`tipo IN (${jugables.map(() => '?').join(', ')})`);
+            params.push(...jugables);
+        }
+
         const [filas] = await pool.query(
             `SELECT id, materia_id, titulo, tipo, descripcion, configuracion_json,
                     xp_recompensa, estado, creado_en
@@ -250,6 +272,10 @@ router.patch('/:id', soloDocente, async (req, res, next) => {
         // PUBLICAR un borrador se valida su configuración (la del body si
         // vino, o la almacenada) con el validador de su tipo.
         if (estado === 'publicado' && reto.estado === 'borrador') {
+            // SPEC-017: publicar un borrador pone una actividad NUEVA a
+            // disposición de los estudiantes; se trata como creación.
+            const bloqueoPub = await bloqueoCreacion(reto.tipo);
+            if (bloqueoPub) return res.status(409).json({ error: bloqueoPub });
             const validarConfig = VALIDADORES_CONFIG[reto.tipo];
             if (validarConfig) {
                 const configFinal = req.body?.configuracion !== undefined
@@ -258,6 +284,15 @@ router.patch('/:id', soloDocente, async (req, res, next) => {
                 const errorConfig = validarConfig(configFinal);
                 if (errorConfig) {
                     return res.status(400).json({ error: `No se puede publicar: ${errorConfig}` });
+                }
+                // SPEC-017 §4.3 (barrera 2): además de tener forma válida, la
+                // configuración debe permitir DERIVAR su evaluación. Si no, el
+                // estudiante jugaría y POST /api/progreso rechazaría su intento
+                // al terminar, perdiendo nota y XP. Se corta aquí.
+                if (totalEsperado(reto.tipo, configFinal) === null) {
+                    return res.status(400).json({
+                        error: 'No se puede publicar: esta actividad no permite calcular su evaluación. Revisa su contenido.'
+                    });
                 }
             }
         }
@@ -322,6 +357,10 @@ router.post('/:id/duplicar', soloDocente, async (req, res, next) => {
     try {
         const reto = await retoGestionable(req, res, Number(req.params.id));
         if (!reto) return;
+        // SPEC-017: duplicar crea una actividad NUEVA, así que respeta el
+        // estado del tipo igual que la creación directa.
+        const bloqueoDup = await bloqueoCreacion(reto.tipo);
+        if (bloqueoDup) return res.status(409).json({ error: bloqueoDup });
 
         // Título único dentro de la materia: "(copia)", "(copia 2)", ...
         const base = reto.titulo.replace(/ \(copia( \d+)?\)$/, '');
@@ -484,6 +523,9 @@ router.post('/', soloDocente, async (req, res, next) => {
         if (!await puedeGestionarMateria(req.user, materiaId)) {
             return res.status(403).json({ error: 'No tienes asignada esta materia' });
         }
+        // SPEC-017: bloqueo de creación en el SERVIDOR, no solo en la UI.
+        const bloqueo = await bloqueoCreacion(tipo);
+        if (bloqueo) return res.status(409).json({ error: bloqueo });
         const configJson = configuracion ? JSON.stringify(configuracion) : null;
 
         // Solo se re-usa (upsert) una fila VIVA: las de la papelera no se

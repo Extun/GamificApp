@@ -51,6 +51,7 @@ export const inicializarEsquema = async () => {
         await migrarCargaMasiva(conn);
         await migrarCalificacionAcademica(conn);
         await migrarConfiguracionIA(conn);
+        await migrarTiposJuego(conn);
         console.log('✅ Esquema verificado/creado en la base de datos.');
         await asegurarAdmin(conn);
         await asegurarAdminPrincipal(conn);
@@ -625,6 +626,26 @@ const migrarConfiguracionIA = async (conn) => {
         actualizado_en     TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         actualizado_por    INT UNSIGNED     NULL,
         PRIMARY KEY (id)
+    ) ENGINE = InnoDB`);
+};
+
+// SPEC-017 (migración 014) — estado administrativo de los tipos de juego.
+//
+// NO guarda juegos: los tipos los implementa el desarrollador en el registro
+// (server/lib/juegos/tipos/). Aquí solo se persiste si cada tipo está
+// disponible para crear y/o para jugar.
+//
+// NO se siembra ninguna fila a propósito: sin fila, un tipo se considera
+// 'activo' (comportamiento previo a SPEC-017). Cambiar de estado nunca elimina
+// actividades, progreso, calificaciones ni XP: esta tabla no tiene ninguna
+// relación de borrado con `retos` ni con `progreso_estudiante`.
+const migrarTiposJuego = async (conn) => {
+    await conn.query(`CREATE TABLE IF NOT EXISTS tipos_juego (
+        tipo            VARCHAR(30)  NOT NULL,
+        estado          ENUM('activo','solo_jugar','deshabilitado') NOT NULL DEFAULT 'activo',
+        actualizado_en  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        actualizado_por INT UNSIGNED NULL,
+        PRIMARY KEY (tipo)
     ) ENGINE = InnoDB`);
 };
 

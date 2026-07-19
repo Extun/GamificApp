@@ -21,6 +21,7 @@ import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSetting
 import HistoryEduRoundedIcon from '@mui/icons-material/HistoryEduRounded';
 import DeleteSweepRoundedIcon from '@mui/icons-material/DeleteSweepRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
+import SportsEsportsRoundedIcon from '@mui/icons-material/SportsEsportsRounded';
 import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
 import authService from '../../services/authService';
 import adminService from '../../services/adminService';
@@ -36,6 +37,7 @@ import ModuloAdministradores from './modulos/ModuloAdministradores';
 import ModuloAuditoria from './modulos/ModuloAuditoria';
 import ModuloPapelera from './modulos/ModuloPapelera';
 import ModuloIA from './modulos/ModuloIA';
+import ModuloJuegos from './modulos/ModuloJuegos';
 import ImportarEstudiantes from '../../components/ImportarEstudiantes';
 import AgregarEstudiante from '../../components/AgregarEstudiante';
 import EditarEstudiante from '../../components/EditarEstudiante';
@@ -329,7 +331,8 @@ export function AdminDashboard() {
                 { id: 'administradores', label: 'Administradores', Icon: AdminPanelSettingsRoundedIcon, grupo: 'Seguridad', permiso: 'administradores' },
                 { id: 'auditoria', label: 'Auditoría', Icon: HistoryEduRoundedIcon, grupo: 'Seguridad', permiso: 'auditoria' },
                 { id: 'papelera', label: 'Papelera', Icon: DeleteSweepRoundedIcon, grupo: 'Seguridad', permiso: 'papelera' },
-                { id: 'ia', label: 'Inteligencia Artificial', Icon: AutoAwesomeRoundedIcon, grupo: 'Sistema', permiso: 'ia' }
+                { id: 'ia', label: 'Inteligencia Artificial', Icon: AutoAwesomeRoundedIcon, grupo: 'Sistema', permiso: 'ia' },
+                { id: 'juegos', label: 'Gestión de juegos', Icon: SportsEsportsRoundedIcon, grupo: 'Sistema', permiso: 'juegos' }
             ]
                 .filter((item) => !item.permiso || puede(item.permiso))
                 .map((item) => ({ ...item, activo: pagina === item.id, onClick: () => setPagina(item.id) }))}
@@ -786,6 +789,18 @@ export function AdminDashboard() {
                                     subtitulo="Elige con qué proveedor genera GamificApp las actividades. Puedes cambiar entre proveedores sin que los docentes noten diferencia."
                                 />
                                 <ModuloIA />
+                            </div>
+                        )}
+
+                        {/* GESTIÓN DE JUEGOS — disponibilidad de los tipos instalados
+                            (SPEC-017). El admin habilita/deshabilita; NO programa mecánicas. */}
+                        {pagina === 'juegos' && puede('juegos') && (
+                            <div className="dash-secciones">
+                                <DashboardHeader
+                                    titulo="Gestión de juegos"
+                                    subtitulo="Los tipos de juego que GamificApp tiene implementados. Decide cuáles pueden usar los docentes y cuáles ven los estudiantes; nada se elimina."
+                                />
+                                <ModuloJuegos />
                             </div>
                         )}
 

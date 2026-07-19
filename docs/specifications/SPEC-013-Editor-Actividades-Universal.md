@@ -1,6 +1,6 @@
 # SPEC-013 — Editor de actividades universal (acciones, no módulos)
 
-**Estado:** APROBADA por Fabrizio (2026-07-17) — diseño congelado; implementación por fases, ninguna iniciada
+**Estado:** APROBADA por Fabrizio (2026-07-17) — diseño congelado. **Implementación PARCIAL: Fases 1 y 2 completas, Fase 3 parcial, Fases 4-7 pendientes** (estado verificado contra el código el 2026-07-19; ver §7). El estado anterior de este documento decía "ninguna iniciada", lo cual era incorrecto.
 **Fecha:** 2026-07-17
 **Alcance:** Frontend (editores del docente). Sin migración de BD, sin endpoints nuevos, sin cambios en reproductores salvo la lectura condicional de 2 flags aditivos en `configuracion_json` del quiz (Fase 1). Áreas protegidas §10 NO se tocan.
 **Congelamiento:** el flujo y el lenguaje aquí descritos NO se replantean salvo problema importante durante el desarrollo. Cualquier duda de diseño se resuelve consultando esta spec, no rediscutiendo.
@@ -82,6 +82,22 @@ Tres campos **aditivos** en `configuracion_json` del quiz:
 Ningún otro cambio de modelo.
 
 ## 7. Roadmap de implementación (aprobado 2026-07-17)
+
+> **Estado real verificado contra el código (2026-07-19), durante la auditoría previa a SPEC-017:**
+>
+> | Fase | Estado | Evidencia |
+> |---|---|---|
+> | 0 — Spec aprobada | ✅ | — |
+> | 1 — Toggles "Mezclar" del Quiz | ✅ **implementada** | `EditorQuiz.jsx:300-309`; leídos por `QuizInteractivo.jsx:29` |
+> | 2 — Botón único + menú por acciones | ✅ **implementada** | `BarraAccionesEditor.jsx` (compartido) usado por los 4 editores |
+> | 3 — Lenguaje y jerarquía | ⚠️ **PARCIAL** | `ModalConfigActividad.jsx` ✅ hecho. **Falta**: el glosario §5 no se aplicó (`SelectorBanco.jsx:20-24` sigue mostrando "Añadir del banco de preguntas" al docente) y no existe el resaltado de ítems recién agregados |
+> | 4 — 🎲 en Quiz | ❌ pendiente | `SelectorAleatorioBanco` no existe |
+> | 5 — 🎲 en Memorama/Línea/Completar | ❌ pendiente | — |
+> | 6 — Autoguardado unificado | ❌ pendiente | "Guardar borrador" sigue en `GeneradorActividadIA.jsx:899` y `GeneradorMision.jsx:633` |
+> | 7 — `ModalGenerarIA` unificado | ❌ pendiente | `ModalConfigActividad` es el modal de *configuración*, no el de generación |
+> | 8 — Shell `EditorActividad` | ⚪ post-tesis | **Absorbida por SPEC-017**: el registro central de tipos cubre este objetivo |
+>
+> **Relación con SPEC-017:** las fases pendientes NO están bloqueadas por SPEC-017 ni al revés. SPEC-017 centraliza *dónde se decide* qué capacidades tiene cada tipo; las fases 4-7 siguen siendo trabajo de UX del docente y se apoyarán en el registro cuando existan.
 
 Cada fase: objetivo único, mínimos archivos, `npm run build` limpio, prueba en navegador (incl. móvil) cuando es visible, `CURRENT_STATE.md` actualizado, visto bueno antes de la siguiente. Lo que necesita IA/BD real se verifica en producción tras deploy (§6.16 CLAUDE.md).
 

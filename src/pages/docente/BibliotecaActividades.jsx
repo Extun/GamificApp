@@ -25,7 +25,7 @@ import {
 } from '../../services/retosService';
 import { adaptarActividadIA } from '../../services/iaService';
 import docenteService from '../../services/docenteService';
-import { TIPOS_ACTIVIDAD, etiquetaTipo } from '../../components/juegos/registroJuegos';
+import { TIPOS_ACTIVIDAD, etiquetaTipo, emojiTipo, obtenerJuego } from '../../components/juegos/registro';
 import { DIFICULTADES_UI } from '../../components/juegos/GeneradorActividadIA';
 import {
     SectionCard, EmptyState, ModalPanel, TablaPro, StatCard, formatearFecha
@@ -41,91 +41,13 @@ const PESTANAS = [
     ['papelera', '🗑 Papelera']
 ];
 
-// Configuración renderizada en modo lectura para la vista previa, por tipo.
+// Configuración renderizada en modo lectura para la vista previa.
+// SPEC-017: cada tipo aporta su propia `VistaLectura` desde el registro, así
+// que agregar un juego nuevo no toca este archivo (antes: cadena de 6 `if`).
 function VistaPreviaConfig({ tipo, config }) {
     if (!config) return <p className="vacio-msg">Esta actividad no tiene contenido guardado.</p>;
-    if (tipo === 'quiz') {
-        return (
-            <ol className="bib-preview-lista">
-                {(config.preguntas || []).map((p, i) => (
-                    <li key={i}>
-                        <strong>{p.pregunta}</strong>
-                        <ul>
-                            {Object.entries(p.alternativas || {}).map(([letra, txt]) => (
-                                <li key={letra} className={letra === p.correcta ? 'is-correcta' : ''}>
-                                    {letra}) {txt}{letra === p.correcta ? ' ✔' : ''}
-                                </li>
-                            ))}
-                        </ul>
-                    </li>
-                ))}
-            </ol>
-        );
-    }
-    if (tipo === 'mision') {
-        return (
-            <div className="bib-preview-texto">
-                {config.introduccion && <p><em>{config.introduccion}</em></p>}
-                <ol className="bib-preview-lista">
-                    {(config.desafios || []).map((d, i) => (
-                        <li key={i}>
-                            <p>{d.narrativa}</p>
-                            <strong>{d.pregunta}</strong>
-                            <ul>
-                                {Object.entries(d.alternativas || {}).map(([letra, txt]) => (
-                                    <li key={letra} className={letra === d.correcta ? 'is-correcta' : ''}>
-                                        {letra}) {txt}{letra === d.correcta ? ' ✔' : ''}
-                                    </li>
-                                ))}
-                            </ul>
-                        </li>
-                    ))}
-                </ol>
-                {config.final && <p><em>{config.final}</em></p>}
-            </div>
-        );
-    }
-    if (tipo === 'clasificador') {
-        return (
-            <ul className="bib-preview-lista">
-                {(config.categorias || []).map((c, i) => (
-                    <li key={i}><strong>{c.nombre}:</strong> {(c.elementos || []).join(' · ')}</li>
-                ))}
-            </ul>
-        );
-    }
-    if (tipo === 'memorama') {
-        return (
-            <ul className="bib-preview-lista">
-                {(config.parejas || []).map((p, i) => (
-                    <li key={i}>{p.a} <span aria-hidden="true">↔</span> {p.b}</li>
-                ))}
-            </ul>
-        );
-    }
-    if (tipo === 'linea-tiempo') {
-        return (
-            <ol className="bib-preview-lista">
-                {(config.eventos || []).map((ev, i) => (
-                    <li key={i}>{ev.etiqueta ? <strong>{ev.etiqueta}: </strong> : null}{ev.texto}</li>
-                ))}
-            </ol>
-        );
-    }
-    if (tipo === 'completar') {
-        return (
-            <ol className="bib-preview-lista">
-                {(config.frases || []).map((f, i) => (
-                    <li key={i}>
-                        {f.texto} <br />
-                        <span className="contenido-sub">
-                            Opciones: {(f.opciones || []).map((o) => (o === f.correcta ? `${o} ✔` : o)).join(' · ')}
-                        </span>
-                    </li>
-                ))}
-            </ol>
-        );
-    }
+    const Vista = obtenerJuego(tipo)?.VistaLectura;
+    if (Vista) return <Vista config={config} />;
     return <pre className="bib-preview-json">{JSON.stringify(config, null, 2)}</pre>;
 }
 
@@ -383,7 +305,7 @@ export function BibliotecaActividades({ onAviso, onError, materiaId = null }) {
                             </td>
                             <td>
                                 <span className="bib-tipo-chip">
-                                    <span aria-hidden="true">{TIPOS_ACTIVIDAD[r.tipo]?.emoji || '🎯'}</span>
+                                    <span aria-hidden="true">{emojiTipo(r.tipo)}</span>
                                     {etiquetaTipo(r.tipo)}
                                 </span>
                             </td>
@@ -575,7 +497,7 @@ export function BibliotecaActividades({ onAviso, onError, materiaId = null }) {
 
             {preview && (
                 <ModalPanel
-                    titulo={`${TIPOS_ACTIVIDAD[preview.reto.tipo]?.emoji || '🎯'} ${preview.reto.titulo}`}
+                    titulo={`${emojiTipo(preview.reto.tipo)} ${preview.reto.titulo}`}
                     subtitulo={`${etiquetaTipo(preview.reto.tipo)} · ${preview.reto.materia} · ${preview.reto.estado}`}
                     onCerrar={() => setPreview(null)}
                 >

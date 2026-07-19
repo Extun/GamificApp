@@ -2,7 +2,7 @@
 
 # Última actualización
 
-2026-07-19 (SPEC-016 Fases 1-4: arquitectura de proveedores de IA agnostica, migracion 013, ModuloIA, sanitizacion de logs y validacion previa al guardado. Pendiente de validacion con proveedor real en produccion)
+2026-07-19 (SPEC-017 completa en codigo: registro central, migracion 014, Gestion de juegos y septimo juego Verdadero o Falso como prueba de extensibilidad. Pendiente de validacion en produccion)
 
 # Responsable
 
@@ -20,6 +20,7 @@ Fabrizio Zurita (Extun)
 | Material de estudio (base64 en MySQL, preview PDF/docx) | ✅ |
 | Quiz / Clasificador / Misión Narrativa | ✅ (crear con/sin IA y jugar) |
 | Memorama / Línea del tiempo / Completar espacios | ✅ (100% IA, SPEC-006) |
+| Verdadero o Falso | 🟡 SPEC-017 Fase 7 en código — prueba de la arquitectura extensible |
 | Actividad sorpresa / Adaptar con IA / Biblioteca IA (papelera, estadísticas) | ✅ |
 | XP / niveles / ranking | ✅ (transaccional, idempotente) |
 | Misiones (reemplaza logros de `localStorage`) | ✅ Fases 1 y 2 (SPEC-007), e2e confirmado en producción |
@@ -31,8 +32,10 @@ Fabrizio Zurita (Extun)
 | Permisos / Auditoría / Papelera (SPEC-003) | ✅ |
 | Asistente IA | ⚪ Retirado del menú — endpoint sigue existiendo sin entrada en la UI |
 | Navegación del estudiante (shell con rutas anidadas) | 🔴 Épica 1 / SPEC-001 — nada implementado, ver `MASTER_PLAN.md` |
-| Proveedores de IA conmutables (Gemini/OpenAI) | 🟡 SPEC-016 Fases 1-4 en código (2026-07-19) — **sin validar con proveedor real ni BD**; pruebas obligatorias en `SPEC-016 §16` antes de cerrar. Incluye sanitización de logs (`lib/ia/errores.js`): los SDK filtran fragmentos de la API key en sus mensajes de error y ninguno llega ya a consola |
-| Gestión de tipos de juego por el administrador | 🟡 SPEC-017 redactada 2026-07-19, pendiente de aprobación — hoy los 6 tipos son fijos en código |
+| Proveedores de IA conmutables (Gemini/OpenAI) | 🟢 SPEC-016 desplegada (2026-07-19). **Gemini validado en producción y en uso.** **OpenAI implementado y verificado estructuralmente, SIN validación funcional: no hay `OPENAI_API_KEY` disponible** — no presentarlo como probado contra su API real (ver `SPEC-016 §16`). Incluye sanitización de logs (`lib/ia/errores.js`) y validación previa al guardado |
+| Gestión de tipos de juego por el administrador | 🟡 SPEC-017 Fases 1-5 y 3b en código (2026-07-19) — registro central (backend + frontend), 3 estados, migración 014, `ModuloJuegos`. **Sin validar en navegador ni con BD real.** Séptimo juego de demostración pendiente |
+| Extensibilidad: añadir un juego nuevo | 🟢 **Demostrada**: Verdadero o Falso se incorporó con 4 archivos propios + 4 líneas en los 2 índices de registro, **0 archivos centrales con lógica del tipo y 0 modificaciones a los 6 juegos existentes**. Guía y evidencia en `docs/COMO-AGREGAR-UN-JUEGO.md` |
+| Verdadero o Falso (7º juego) | 🟡 En código (2026-07-19) — reproductor, IA, banco, editor genérico y Gestión de juegos. **Sin validar en navegador ni con BD real** |
 
 ## Último sprint
 
@@ -94,6 +97,7 @@ Fabrizio Zurita (Extun)
 - **Caché localStorage vs BD**: el servidor siempre pisa la caché al leer; mantener esa regla.
 - **Riesgo residual de seguridad ACEPTADO (2026-07-19)**: las validaciones de `POST /api/progreso` cierran la manipulación trivial y el XP arbitrario, pero el sistema **no** es server-authoritative. Alguien con conocimientos técnicos puede enviar un resultado estructuralmente válido pero no jugado (p. ej. `5/5` en un quiz que sí tiene 5 preguntas). El daño está acotado a la recompensa de esa actividad (`xp_recompensa` nunca se excede). Cerrarlo exige sesiones de intento firmadas o validar respuestas en backend; queda en backlog, fuera del alcance de la tesis.
 - **Decisión pendiente: `curso_id` como frontera de acceso (2026-07-19)**: hoy `curso_id` **no** delimita el acceso. `GET /api/retos` deja ver a cualquier estudiante las actividades publicadas de cualquier materia activa, sin filtrar por curso, y `POST /api/progreso` aplica deliberadamente el mismo criterio para no crear incoherencias (actividades visibles pero rechazadas al enviarlas). Convertir el curso en frontera real es una decisión de producto que debe cambiar **ambos** endpoints a la vez.
+- **⚠️ No existe concepto de "intento iniciado" en el backend (auditado 2026-07-19)**: `POST /api/progreso` es la única escritura y ocurre al TERMINAR. El servidor **no distingue** entre un estudiante que ya estaba jugando cuando se deshabilitó un tipo y otro que intenta enviar un resultado después: acepta ambos. El comportamiento deseado (que el niño pueda terminar y cobrar su XP) se cumple **por ausencia de comprobación, no por diseño**. Riesgo residual idéntico al ya aceptado en `MASTER_PLAN.md` §3 ítem 20; la solución (token de intento firmado) cerraría ambos y queda fuera del alcance de la tesis. Detalle en `SPEC-017 §5.0-bis`.
 - **Migraciones: los `.sql` son documentación, la ejecución real vive en `initDb.js` (auditado 2026-07-19)**. `database/migraciones/*.sql` funciona como **referencia y versionado documental**; las migraciones automáticas de producción se ejecutan mediante **funciones idempotentes de `server/initDb.js`** (`initDb.js:36-52`), guardadas con `faltaColumna()` contra `information_schema`. No hay tabla de migraciones aplicadas. **Escribir solo el `.sql` no aplica nada**: hace falta la función JS. Mecanismo completo en `MASTER_PLAN.md` §6; evolución a un sistema formal versionado en §3 ítem 27 (post-tesis). Afirmaciones contrarias en la bitácora histórica de este archivo (línea ~198) quedan superadas por esta entrada.
 - **Notas históricas de Línea del tiempo no son comparables (2026-07-19)**: cambiaron el criterio y el denominador (de `n` posiciones a `n(n-1)/2` pares). `GREATEST` impide que nadie pierda nota, pero el Libro mezclará dos criterios en actividades anteriores al cambio. Conviene mencionarlo en la tesis.
 

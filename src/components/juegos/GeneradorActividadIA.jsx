@@ -24,7 +24,7 @@ import { publicarReto } from '../../services/retosService';
 import { PUNTOS_POR_ACIERTO } from '../../services/gamificationService';
 import docenteService from '../../services/docenteService';
 import bancoService from '../../services/bancoService';
-import { TIPOS_ACTIVIDAD } from './registroJuegos';
+import { obtenerJuego } from './registro';
 import { SelectorBanco } from './SelectorBanco';
 import { CampoTema } from './CampoTema';
 import { DIFICULTADES_UI } from './metadatosActividad';
@@ -37,89 +37,38 @@ import '../quiz/editorQuiz.css';
 // consumidores existentes (GeneradorMision, BibliotecaActividades).
 export { DIFICULTADES_UI };
 
-// Descripción corta por tipo para la cabecera del formulario.
-const AYUDA_TIPO = {
-    memorama: 'Escribe el tema y la IA crea las parejas para emparejar (término y definición, operación y resultado…).',
-    'linea-tiempo': 'Escribe el tema y la IA crea los eventos o pasos que el estudiante deberá ordenar.',
-    completar: 'Escribe el tema y la IA crea frases con un espacio en blanco y sus opciones.'
-};
-
-// Cuántos ítems ofrecer por tipo (mismo rango que valida el servidor).
-const CANTIDADES = {
-    memorama: [4, 6, 8, 10],
-    'linea-tiempo': [3, 4, 5, 6, 8],
-    completar: [3, 4, 5, 6, 8]
-};
-
-// Cuenta de ítems puntuables según el tipo (misma regla de XP que el servidor).
-const contarItems = (tipo, config) => {
-    if (tipo === 'memorama') return config?.parejas?.length || 0;
-    if (tipo === 'linea-tiempo') return config?.eventos?.length || 0;
-    return config?.frases?.length || 0;
-};
-
-// SPEC-010 — Banco de Preguntas: clave del arreglo de ítems dentro de la
-// configuración y máximo de ítems que acepta el validador del servidor
-// (validadoresRetos.js); el tope evita insertar del banco más de lo publicable.
-const CLAVE_ITEMS = { memorama: 'parejas', 'linea-tiempo': 'eventos', completar: 'frases' };
-const MAX_ITEMS = { memorama: 10, 'linea-tiempo': 8, completar: 8 };
+// SPEC-017 Fase 3: los metadatos de edición por tipo (clave de ítems, tope,
+// cantidades ofrecidas, plantilla de ítem vacío, firma para deduplicar, ayuda
+// y el hook `alAnexar`) ya NO viven aquí en seis mapas paralelos: los declara
+// cada juego en src/components/juegos/registro/. Este editor es genérico.
 
 // Copia profunda simple (el estado del editor es JSON puro).
 const clon = (v) => JSON.parse(JSON.stringify(v));
 
-// Nombre del ítem en plural para el botón "Agregar…" (SPEC-013, Fase 2).
-const NOMBRE_ITEM_PLURAL = { memorama: 'parejas', 'linea-tiempo': 'eventos', completar: 'frases' };
-
-// Firma de un ítem para detectar duplicados al "Añadir con IA" (se compara
-// solo el texto visible, sin mayúsculas ni espacios).
-const firmaItem = (tipo, item) => {
-    const t = (s) => (s || '').trim().toLowerCase();
-    if (tipo === 'memorama') return `${t(item.a)}|${t(item.b)}`;
-    return t(item.texto);
-};
-
-// Línea del tiempo — `etiqueta` es contenido libre del docente (puede ser un
-// año: "1492"), así que NO se deriva de la posición. Pero cuando la IA (o el
-// banco) devuelve etiquetas ORDINALES ("Paso 1", "Etapa 2"…) al anexar, la
-// numeración vuelve a empezar y se duplica con la que ya existe. Aquí solo
-// esas etiquetas se renumeran para continuar la secuencia; las demás (fechas,
-// nombres, vacías) se respetan tal cual.
-const ORDINAL = /^(paso|etapa|fase|momento|evento)\s*#?\s*(\d+)\s*:?$/i;
-
-const renumerarOrdinales = (tipo, actuales, nuevos) => {
-    if (tipo !== 'linea-tiempo') return nuevos;
-    // Mayor ordinal ya usado por prefijo (en minúsculas), para continuar desde ahí.
-    const tope = new Map();
-    actuales.forEach((it) => {
-        const m = ORDINAL.exec(String(it?.etiqueta || '').trim());
-        if (!m) return;
-        const clave = m[1].toLowerCase();
-        tope.set(clave, Math.max(tope.get(clave) || 0, Number(m[2])));
-    });
-    if (!tope.size) return nuevos;
-    return nuevos.map((it) => {
-        const original = String(it?.etiqueta || '').trim();
-        const m = ORDINAL.exec(original);
-        if (!m) return it;
-        const clave = m[1].toLowerCase();
-        const siguiente = (tope.get(clave) || 0) + 1;
-        tope.set(clave, siguiente);
-        // Conserva la capitalización que traía la etiqueta original.
-        return { ...it, etiqueta: `${m[1]} ${siguiente}` };
-    });
-};
-
-// Plantillas de ítem vacío para "Añadir manual" (SPEC-012, Fase 3): el ítem
-// aparece en la lista editable y el docente lo completa ahí mismo.
-const ITEM_VACIO = {
-    memorama: () => ({ a: '', b: '' }),
-    'linea-tiempo': () => ({ texto: '', etiqueta: '' }),
-    completar: () => ({ texto: '', opciones: ['', ''], correcta: '' })
-};
+// Cantidades por defecto para un tipo que no declare las suyas.
+const CANTIDADES_POR_DEFECTO = [3, 5, 8];
 
 export function GeneradorActividadIA({ materia, tipo }) {
+    // Definición del tipo en el registro: única fuente de las decisiones que
+    // antes eran mapas por tipo en este archivo.
+    const juego = obtenerJuego(tipo);
+    const edicion = juego?.edicion || {};
+    const claveItems = edicion.claveItems;
+    const maxItems = edicion.maxItems || 10;
+    const cantidades = edicion.cantidades || CANTIDADES_POR_DEFECTO;
+    const nombrePlural = edicion.nombreItem?.plural || 'elementos';
+    const nombreSingular = edicion.nombreItem?.singular || 'elemento';
+    const firmaItem = edicion.firmaItem || ((item) => JSON.stringify(item));
+    const itemVacio = edicion.itemVacio || (() => ({}));
+    // Hook opcional al anexar (línea del tiempo renumera ordinales).
+    const alAnexar = edicion.alAnexar || ((_actuales, nuevos) => nuevos);
+    const FormularioItem = edicion.FormularioItem;
+    const textoParaIA = edicion.textoParaIA || ((item) => (item?.texto || '').trim());
+    // Cuenta de ítems puntuables (misma regla de XP que el servidor).
+    const contarItems = (config) => config?.[claveItems]?.length || 0;
+
     const [tema, setTema] = useState('');
-    const [cantidad, setCantidad] = useState(CANTIDADES[tipo]?.[1] || 5);
+    const [cantidad, setCantidad] = useState(cantidades[1] || 5);
     const [dificultad, setDificultad] = useState('media');
     const [cursoId, setCursoId] = useState('');
     const [cursos, setCursos] = useState([]);
@@ -160,10 +109,8 @@ export function GeneradorActividadIA({ materia, tipo }) {
         docenteService.listarCursos().then(setCursos).catch(() => setCursos([]));
     }, []);
 
-    const etiqueta = TIPOS_ACTIVIDAD[tipo]?.etiqueta || tipo;
-    const claveItems = CLAVE_ITEMS[tipo];
-    const maxItems = MAX_ITEMS[tipo] || 10;
-    const items = contarItems(tipo, actividad?.configuracion);
+    const etiqueta = juego?.etiqueta || tipo;
+    const items = contarItems(actividad?.configuracion);
     const xp = Math.max(items, 1) * PUNTOS_POR_ACIERTO;
 
     // SPEC-010 — guarda en el banco (siempre automático, igual que el quiz)
@@ -273,7 +220,7 @@ export function GeneradorActividadIA({ materia, tipo }) {
                 sincronizar(actualizado.retoId, {
                     titulo: actualizado.titulo,
                     configuracion: actualizado.configuracion,
-                    xp_recompensa: Math.max(contarItems(tipo, actualizado.configuracion), 1) * PUNTOS_POR_ACIERTO
+                    xp_recompensa: Math.max(contarItems(actualizado.configuracion), 1) * PUNTOS_POR_ACIERTO
                 });
             }
             return actualizado;
@@ -300,7 +247,7 @@ export function GeneradorActividadIA({ materia, tipo }) {
         try {
             // Se pide una tanda dentro del rango válido del tipo; los repetidos
             // se descartan y se anexan hasta `n` (o hasta llenar el máximo).
-            const rango = CANTIDADES[tipo] || [3, 5, 8];
+            const rango = cantidades;
             const pedir = Math.min(Math.max(n + 2, rango[0]), rango[rango.length - 1]);
             const actuales = actividad.configuracion?.[claveItems] || [];
             const data = await generarActividadIA({
@@ -312,15 +259,11 @@ export function GeneradorActividadIA({ materia, tipo }) {
                 cursoId: cursoId ? Number(cursoId) : undefined,
                 // El contenido actual viaja como contexto: la IA complementa la
                 // actividad en vez de generar otra desde cero (y no se repite).
-                existentes: actuales
-                    .map((it) => (tipo === 'memorama'
-                        ? `${(it.a || '').trim()} ↔ ${(it.b || '').trim()}`
-                        : (it.texto || '').trim()))
-                    .filter((t) => t && t.replace('↔', '').trim())
+                existentes: actuales.map(textoParaIA).filter(Boolean)
             });
-            const firmas = new Set(actuales.map((it) => firmaItem(tipo, it)));
+            const firmas = new Set(actuales.map((it) => firmaItem(it)));
             const nuevos = (data.configuracion?.[claveItems] || [])
-                .filter((it) => !firmas.has(firmaItem(tipo, it)))
+                .filter((it) => !firmas.has(firmaItem(it)))
                 .slice(0, Math.min(n, maxItems - actuales.length));
             if (!nuevos.length) {
                 setAviso('La IA no encontró ítems distintos a los que ya tienes. Prueba afinando el tema.');
@@ -329,13 +272,13 @@ export function GeneradorActividadIA({ materia, tipo }) {
             }
             // Las etiquetas ordinales ("Paso 1"…) continúan la secuencia actual
             // en vez de reiniciarse y duplicar las que ya tiene la actividad.
-            const conBanco = renumerarOrdinales(
+            const conBanco = alAnexar(
                 tipo, actuales, await guardarLoteEnBanco(nuevos, temaBase)
             );
             editarConfig({ [claveItems]: [...actuales, ...conBanco] });
             setAviso(`${conBanco.length} ${conBanco.length === 1
-                ? NOMBRE_ITEM_PLURAL[tipo].replace(/s$/, '')
-                : NOMBRE_ITEM_PLURAL[tipo]} más, sin tocar lo que ya tenías.`);
+                ? nombreSingular
+                : nombrePlural} más, sin tocar lo que ya tenías.`);
             setTimeout(() => setAviso(''), 5000);
         } catch (err) {
             setError(`No se pudo añadir con la IA: ${err.message}`);
@@ -369,7 +312,7 @@ export function GeneradorActividadIA({ materia, tipo }) {
             sincronizar(restaurada.retoId, {
                 titulo: restaurada.titulo,
                 configuracion: restaurada.configuracion,
-                xp_recompensa: Math.max(contarItems(tipo, restaurada.configuracion), 1) * PUNTOS_POR_ACIERTO
+                xp_recompensa: Math.max(contarItems(restaurada.configuracion), 1) * PUNTOS_POR_ACIERTO
             });
         }
         setAviso('Cambios deshechos: la actividad volvió a como estaba al abrirla.');
@@ -482,7 +425,7 @@ export function GeneradorActividadIA({ materia, tipo }) {
         if (!actividad || !nuevos.length) return;
         const actuales = actividad.configuracion?.[claveItems] || [];
         const espacio = Math.max(maxItems - actuales.length, 0);
-        const insertados = renumerarOrdinales(tipo, actuales, nuevos.slice(0, espacio));
+        const insertados = alAnexar(actuales, nuevos.slice(0, espacio));
         if (insertados.length) {
             editarConfig({ [claveItems]: [...actuales, ...insertados] });
         }
@@ -514,28 +457,10 @@ export function GeneradorActividadIA({ materia, tipo }) {
         setItemAbierto((prev) => (prev === indice ? destino : prev === destino ? indice : prev));
     };
 
-    // ¿El ítem tiene todo lo necesario? (misma regla que valida el servidor).
-    const itemCompleto = (item) => {
-        if (tipo === 'memorama') return Boolean(item.a?.trim() && item.b?.trim());
-        if (tipo === 'linea-tiempo') return Boolean(item.texto?.trim());
-        return Boolean(
-            item.texto?.trim() &&
-            (item.opciones || []).length >= 2 &&
-            (item.opciones || []).every((o) => (o || '').trim()) &&
-            (item.opciones || []).includes(item.correcta)
-        );
-    };
-
-    // Texto que resume el ítem en su fila colapsada del acordeón.
-    const resumenItem = (item, i) => {
-        if (tipo === 'memorama') {
-            return (item.a?.trim() || item.b?.trim())
-                ? `${item.a?.trim() || '…'} ↔ ${item.b?.trim() || '…'}`
-                : `Pareja ${i + 1} (sin escribir)`;
-        }
-        const base = tipo === 'linea-tiempo' ? 'Evento' : 'Frase';
-        return item.texto?.trim() || `${base} ${i + 1} (sin escribir)`;
-    };
+    // SPEC-017 Fase 3b: completitud y resumen del ítem los define cada juego
+    // en su entrada del registro. Este editor no conoce sus campos.
+    const itemCompleto = edicion.itemCompleto || (() => true);
+    const resumenItem = edicion.resumenItem || ((_item, i) => `Elemento ${i + 1}`);
 
     return (
         <section className="card materia-subvista gen-ia">
@@ -543,7 +468,7 @@ export function GeneradorActividadIA({ materia, tipo }) {
                 <h3><AutoAwesomeRoundedIcon sx={{ fontSize: '1.15rem', verticalAlign: 'middle' }} /> {etiqueta} con IA</h3>
                 <span className="card-tag">{materia}</span>
             </div>
-            <p className="clasificador-intro">{AYUDA_TIPO[tipo]}</p>
+            <p className="clasificador-intro">{edicion.ayudaIA}</p>
 
             <form className="quiz-form gen-ia-form" onSubmit={generar}>
                 <CampoTema
@@ -554,8 +479,8 @@ export function GeneradorActividadIA({ materia, tipo }) {
                 <label className="quiz-field">
                     <span>Cantidad</span>
                     <select value={cantidad} onChange={(e) => setCantidad(Number(e.target.value))}>
-                        {(CANTIDADES[tipo] || [3, 5, 8]).map((n) => (
-                            <option key={n} value={n}>{n} {tipo === 'memorama' ? 'parejas' : tipo === 'linea-tiempo' ? 'eventos' : 'frases'}</option>
+                        {cantidades.map((n) => (
+                            <option key={n} value={n}>{n} {nombrePlural}</option>
                         ))}
                     </select>
                 </label>
@@ -617,9 +542,9 @@ export function GeneradorActividadIA({ materia, tipo }) {
                         />
                     </label>
 
-                    {tipo === 'linea-tiempo' && (
+                    {edicion.notaLista && (
                         <p className="contenido-sub" style={{ margin: 0 }}>
-                            Este es el orden CORRECTO: el juego lo desordenará para el estudiante.
+                            {edicion.notaLista}
                         </p>
                     )}
 
@@ -646,119 +571,30 @@ export function GeneradorActividadIA({ materia, tipo }) {
                                     </button>
                                     {expandido && (
                                         <div className="editor-item-body">
-                                            {tipo === 'memorama' && (
-                                                <>
-                                                    <label className="editor-campo">
-                                                        <span>Primera carta</span>
-                                                        <input
-                                                            type="text"
-                                                            className="editor-alt-input"
-                                                            value={item.a}
-                                                            placeholder="Ej. 5 + 3"
-                                                            onChange={(e) => editarLista('parejas', i, { a: e.target.value })}
-                                                        />
-                                                    </label>
-                                                    <label className="editor-campo">
-                                                        <span>Segunda carta (su pareja)</span>
-                                                        <input
-                                                            type="text"
-                                                            className="editor-alt-input"
-                                                            value={item.b}
-                                                            placeholder="Ej. 8"
-                                                            onChange={(e) => editarLista('parejas', i, { b: e.target.value })}
-                                                        />
-                                                    </label>
-                                                </>
-                                            )}
-
-                                            {tipo === 'linea-tiempo' && (
-                                                <>
-                                                    <label className="editor-campo">
-                                                        <span>Evento o paso</span>
-                                                        <input
-                                                            type="text"
-                                                            className="editor-alt-input"
-                                                            value={item.texto}
-                                                            placeholder="Ej. La semilla germina"
-                                                            onChange={(e) => editarLista('eventos', i, { texto: e.target.value })}
-                                                        />
-                                                    </label>
-                                                    <label className="editor-campo">
-                                                        <span>Etiqueta (opcional, ej. fecha o número)</span>
-                                                        <input
-                                                            type="text"
-                                                            className="editor-alt-input"
-                                                            value={item.etiqueta || ''}
-                                                            placeholder="Ej. Paso 1, 1492…"
-                                                            onChange={(e) => editarLista('eventos', i, { etiqueta: e.target.value })}
-                                                        />
-                                                    </label>
-                                                </>
-                                            )}
-
-                                            {tipo === 'completar' && (
-                                                <>
-                                                    <label className="editor-campo">
-                                                        <span>Frase (usa ___ para el espacio en blanco)</span>
-                                                        <input
-                                                            type="text"
-                                                            className="editor-alt-input"
-                                                            value={item.texto}
-                                                            placeholder="Ej. El sol sale por el ___"
-                                                            onChange={(e) => editarLista('frases', i, { texto: e.target.value })}
-                                                        />
-                                                    </label>
-                                                    <div className="editor-alternativas">
-                                                        <span className="editor-campo-label">
-                                                            Opciones · marca la respuesta correcta
-                                                        </span>
-                                                        {item.opciones.map((op, j) => (
-                                                            <div key={j} className={`editor-alt-row ${op === item.correcta ? 'is-correcta' : ''}`}>
-                                                                <label className="editor-alt-radio" title="Marcar como correcta">
-                                                                    <input
-                                                                        type="radio"
-                                                                        name={`correcta-${i}`}
-                                                                        checked={op === item.correcta}
-                                                                        onChange={() => editarLista('frases', i, { correcta: op })}
-                                                                        aria-label={`Marcar la opción ${j + 1} como correcta en la frase ${i + 1}`}
-                                                                    />
-                                                                    <span className="editor-alt-letra">{j + 1}</span>
-                                                                </label>
-                                                                <input
-                                                                    type="text"
-                                                                    className="editor-alt-input"
-                                                                    value={op}
-                                                                    placeholder={`Opción ${j + 1}`}
-                                                                    onChange={(e) => {
-                                                                        const opciones = item.opciones.map((o, k) => (k === j ? e.target.value : o));
-                                                                        editarLista('frases', i, {
-                                                                            opciones,
-                                                                            correcta: op === item.correcta ? e.target.value : item.correcta
-                                                                        });
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </>
+                                            {FormularioItem && (
+                                                <FormularioItem
+                                                    item={item}
+                                                    indice={i}
+                                                    onCambiar={(parcial) => editarLista(claveItems, i, parcial)}
+                                                />
                                             )}
 
                                             <div className="editor-item-acciones gen-ia-item-acciones">
-                                                {tipo === 'linea-tiempo' && (
+                                                {edicion.reordenable && (
                                                     <>
                                                         <button
                                                             type="button"
                                                             className="editor-btn editor-btn-ghost"
                                                             disabled={i === 0}
-                                                            onClick={() => moverEnLista('eventos', i, -1)}
+                                                            onClick={() => moverEnLista(claveItems, i, -1)}
                                                         >
                                                             <ArrowUpwardRoundedIcon sx={{ fontSize: '1.05rem' }} /> Subir
                                                         </button>
                                                         <button
                                                             type="button"
                                                             className="editor-btn editor-btn-ghost"
-                                                            disabled={i === (config?.eventos?.length || 0) - 1}
-                                                            onClick={() => moverEnLista('eventos', i, 1)}
+                                                            disabled={i === (config?.[claveItems]?.length || 0) - 1}
+                                                            onClick={() => moverEnLista(claveItems, i, 1)}
                                                         >
                                                             <ArrowDownwardRoundedIcon sx={{ fontSize: '1.05rem' }} /> Bajar
                                                         </button>
@@ -782,21 +618,21 @@ export function GeneradorActividadIA({ materia, tipo }) {
                     {/* SPEC-013 Fase 2: botón único "Agregar" con menú por acciones. */}
                     <BarraAccionesEditor
                         agregar={{
-                            label: agregandoIA ? 'Generando…' : `Agregar ${NOMBRE_ITEM_PLURAL[tipo]}`,
-                            pregunta: tipo === 'linea-tiempo' ? '¿Cómo deseas agregarlos?' : '¿Cómo deseas agregarlas?',
+                            label: agregandoIA ? 'Generando…' : `Agregar ${nombrePlural}`,
+                            pregunta: `¿Cómo deseas agregar${edicion.articuloPlural === 'los' ? 'los' : 'las'}?`,
                             disabled: guardando || agregandoIA,
                             opciones: [
                                 {
                                     id: 'escribir',
                                     emoji: '📝',
-                                    titulo: `Escribir ${NOMBRE_ITEM_PLURAL[tipo]}`,
+                                    titulo: `Escribir ${nombrePlural}`,
                                     detalle: items >= maxItems
                                         ? `Ya está el máximo de ${maxItems} para esta actividad.`
                                         : 'Añade un ítem vacío y complétalo aquí mismo.',
                                     disabled: items >= maxItems,
                                     onClick: () => {
                                         editarConfig({
-                                            [claveItems]: [...(config?.[claveItems] || []), ITEM_VACIO[tipo]()]
+                                            [claveItems]: [...(config?.[claveItems] || []), itemVacio()]
                                         });
                                         setItemAbierto(items); // abre el recién creado
                                     }
@@ -810,7 +646,7 @@ export function GeneradorActividadIA({ materia, tipo }) {
                                         : 'La IA suma más sobre el mismo tema, sin borrar lo que tienes.',
                                     disabled: items >= maxItems,
                                     sub: {
-                                        pregunta: `¿Cuántas ${NOMBRE_ITEM_PLURAL[tipo]} más?`,
+                                        pregunta: `¿Cuántas ${nombrePlural} más?`,
                                         opciones: [1, 2, 3]
                                             .filter((n) => n <= maxItems - items)
                                             .map((n) => ({ label: String(n), onClick: () => agregarMasConIA(n) }))
@@ -819,7 +655,7 @@ export function GeneradorActividadIA({ materia, tipo }) {
                                 {
                                     id: 'reutilizar',
                                     emoji: '📚',
-                                    titulo: `Reutilizar ${NOMBRE_ITEM_PLURAL[tipo]}`,
+                                    titulo: `Reutilizar ${nombrePlural}`,
                                     detalle: items >= maxItems
                                         ? `Ya está el máximo de ${maxItems} para esta actividad.`
                                         : 'Elige entre lo que ya has usado antes.',

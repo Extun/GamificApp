@@ -62,13 +62,11 @@ const leerComoDataUrl = (file) => new Promise((resolve, reject) => {
     reader.readAsDataURL(file);
 });
 
-import { GeneradorQuiz } from './GeneradorQuiz';
-import { GeneradorMision } from './GeneradorMision';
-import { EditorClasificador } from '../../components/clasificador/EditorClasificador';
-import { GeneradorActividadIA } from '../../components/juegos/GeneradorActividadIA';
 import { actividadSorpresa } from '../../services/iaService';
 import { LibroCalificaciones } from '../../components/dashboard/LibroCalificaciones';
 import { Grid, Card } from '@mui/material';
+import { TIPOS_CREABLES, obtenerJuego } from '../../components/juegos/registro';
+import { obtenerEditor } from '../../components/juegos/registro/editores';
 import { SidebarLayout } from '../../components/dashboard/SidebarLayout';
 
 function WidgetsRendimiento({ materia, topEstudiantes, retosPublicados, siguientePaso, onAccion }) {
@@ -783,72 +781,34 @@ export function Dashboard() {
                                 </div>
                             )}
 
+                            {/* SPEC-017 Fase 3: las tarjetas y el editor salen del
+                                registro de juegos. Un tipo nuevo aparece aquí solo con
+                                declarar su `tarjetaCrear`, sin tocar este archivo. */}
                             <div className="crear-tipos">
-                                <button
-                                    className={`crear-tipo ${subVistaMateria === 'quiz' ? 'crear-tipo-activo' : ''}`}
-                                    onClick={() => setSubVistaMateria('quiz')}
-                                >
-                                    <span className="crear-tipo-emoji" aria-hidden="true">✨</span>
-                                    <strong>Quiz</strong>
-                                    <span className="crear-tipo-desc">Preguntas con opciones, generadas con IA a partir de un tema</span>
-                                </button>
-                                <button
-                                    className={`crear-tipo ${subVistaMateria === 'clasificador' ? 'crear-tipo-activo' : ''}`}
-                                    onClick={() => setSubVistaMateria('clasificador')}
-                                >
-                                    <span className="crear-tipo-emoji" aria-hidden="true">🧩</span>
-                                    <strong>Juego Clasificador</strong>
-                                    <span className="crear-tipo-desc">Arrastrar y soltar elementos en su categoría correcta</span>
-                                </button>
-                                <button
-                                    className={`crear-tipo ${subVistaMateria === 'mision' ? 'crear-tipo-activo' : ''}`}
-                                    onClick={() => setSubVistaMateria('mision')}
-                                >
-                                    <span className="crear-tipo-emoji" aria-hidden="true">🗺️</span>
-                                    <strong>Misión Narrativa</strong>
-                                    <span className="crear-tipo-desc">Una historia por capítulos con desafíos para avanzar</span>
-                                </button>
-                                <button
-                                    className={`crear-tipo ${subVistaMateria === 'memorama' ? 'crear-tipo-activo' : ''}`}
-                                    onClick={() => setSubVistaMateria('memorama')}
-                                >
-                                    <span className="crear-tipo-emoji" aria-hidden="true">🃏</span>
-                                    <strong>Memorama</strong>
-                                    <span className="crear-tipo-desc">Parejas para emparejar, generadas con IA desde un tema</span>
-                                </button>
-                                <button
-                                    className={`crear-tipo ${subVistaMateria === 'linea-tiempo' ? 'crear-tipo-activo' : ''}`}
-                                    onClick={() => setSubVistaMateria('linea-tiempo')}
-                                >
-                                    <span className="crear-tipo-emoji" aria-hidden="true">⏳</span>
-                                    <strong>Línea del tiempo</strong>
-                                    <span className="crear-tipo-desc">Eventos o pasos para ordenar, generados con IA</span>
-                                </button>
-                                <button
-                                    className={`crear-tipo ${subVistaMateria === 'completar' ? 'crear-tipo-activo' : ''}`}
-                                    onClick={() => setSubVistaMateria('completar')}
-                                >
-                                    <span className="crear-tipo-emoji" aria-hidden="true">✏️</span>
-                                    <strong>Completar espacios</strong>
-                                    <span className="crear-tipo-desc">Frases con espacios en blanco y opciones, con IA</span>
-                                </button>
+                                {TIPOS_CREABLES.map((juego) => (
+                                    <button
+                                        key={juego.tipo}
+                                        className={`crear-tipo ${subVistaMateria === juego.tipo ? 'crear-tipo-activo' : ''}`}
+                                        onClick={() => setSubVistaMateria(juego.tipo)}
+                                    >
+                                        <span className="crear-tipo-emoji" aria-hidden="true">{juego.emoji}</span>
+                                        <strong>{juego.tarjetaCrear.titulo}</strong>
+                                        <span className="crear-tipo-desc">{juego.tarjetaCrear.descripcion}</span>
+                                    </button>
+                                ))}
                             </div>
 
-                            {subVistaMateria === 'quiz' && (
-                                <GeneradorQuiz materia={materiaSeleccionada} />
-                            )}
-
-                            {subVistaMateria === 'mision' && (
-                                <GeneradorMision materia={materiaSeleccionada} />
-                            )}
-
-                            {subVistaMateria === 'clasificador' && (
-                                <EditorClasificador materia={materiaSeleccionada} />
-                            )}
-
-                            {['memorama', 'linea-tiempo', 'completar'].includes(subVistaMateria) && (
-                                <GeneradorActividadIA key={subVistaMateria} materia={materiaSeleccionada} tipo={subVistaMateria} />
-                            )}
+                            {(() => {
+                                if (!obtenerJuego(subVistaMateria)) return null;
+                                const Editor = obtenerEditor(subVistaMateria);
+                                return (
+                                    <Editor
+                                        key={subVistaMateria}
+                                        materia={materiaSeleccionada}
+                                        tipo={subVistaMateria}
+                                    />
+                                );
+                            })()}
                         </section>
                         )}
 
