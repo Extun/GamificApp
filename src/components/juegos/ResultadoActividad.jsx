@@ -153,6 +153,8 @@ export function ResultadoOverlay({
     xp,
     onRevisar,
     etiquetaRevisar = 'Revisar respuestas',
+    onReintentar,
+    etiquetaReintentar = 'Jugar otra vez',
     onContinuar,
     etiquetaContinuar = 'Continuar'
 }) {
@@ -188,7 +190,13 @@ export function ResultadoOverlay({
     }, [onRevisar]);
 
     return (
-        <div className="resultado-overlay">
+        <div
+            className="resultado-overlay"
+            // Clic en el fondo (fuera de la tarjeta) = misma acción que
+            // "Revisar respuestas": cerrar el popup sin navegar. Los clics
+            // dentro de la tarjeta no llegan aquí (target !== currentTarget).
+            onClick={(e) => { if (e.target === e.currentTarget) onRevisar?.(); }}
+        >
             <div
                 ref={dialogoRef}
                 className={`resultado-dialogo ${nota === 100 ? 'es-perfecto' : nota >= 71 ? 'es-alto' : ''}`}
@@ -209,14 +217,25 @@ export function ResultadoOverlay({
                     animado
                 />
 
+                {/* Jerarquía: "Jugar otra vez" es la acción primaria (invita a
+                    mejorar el resultado); revisar y salir son secundarias. */}
                 <div className="resultado-acciones">
+                    {onReintentar && (
+                        <button type="button" className="resultado-btn" onClick={onReintentar}>
+                            {etiquetaReintentar}
+                        </button>
+                    )}
                     {onRevisar && (
                         <button type="button" className="resultado-btn resultado-btn-ghost" onClick={onRevisar}>
                             {etiquetaRevisar}
                         </button>
                     )}
                     {onContinuar && (
-                        <button type="button" className="resultado-btn" onClick={onContinuar}>
+                        <button
+                            type="button"
+                            className={`resultado-btn ${onReintentar ? 'resultado-btn-ghost' : ''}`}
+                            onClick={onContinuar}
+                        >
                             {etiquetaContinuar}
                         </button>
                     )}

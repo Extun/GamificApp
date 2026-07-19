@@ -26,6 +26,7 @@ import { nombreInstitucion } from '../../services/institucionService';
 import { obtenerMisiones } from '../../services/misionesService';
 import { EmptyState } from '../../components/dashboard/DashboardWidgets';
 import { PanelMisiones } from './PanelMisiones';
+import { useGuardiaActividad } from '../../hooks/useGuardiaActividad';
 
 export function DashboardEstudiante() {
     const navigate = useNavigate();
@@ -64,6 +65,11 @@ export function DashboardEstudiante() {
 
     // Identidad del estudiante en sesión: habilita la persistencia en MySQL.
     const estudianteId = gamificationService.getEstudianteId();
+
+    // Guardia contra abandonar una actividad con progreso sin terminar: los
+    // reproductores marcan su estado (onEstadoIntento) y toda navegación que
+    // los desmonta pasa por `proteger` (confirmación amigable si hace falta).
+    const { marcar: marcarIntento, proteger, dialogo: dialogoSalida } = useGuardiaActividad();
 
     // Contador que fuerza releer el progreso del servidor tras completar una
     // actividad (lo disparan los reproductores mediante onCompletado).
@@ -218,7 +224,7 @@ export function DashboardEstudiante() {
             ].map((item) => ({
                 ...item,
                 activo: pagina === item.id,
-                onClick: () => { setPagina(item.id); setMateriaSeleccionada(null); }
+                onClick: proteger(() => { setPagina(item.id); setMateriaSeleccionada(null); })
             }))}
             usuario={{
                 inicial: nombreEstudiante.charAt(0).toUpperCase(),
@@ -227,7 +233,7 @@ export function DashboardEstudiante() {
             }}
             accionesFooter={[
                 { label: 'Cambiar mi PIN', Icon: LockRoundedIcon, onClick: handleCambiarPin },
-                { label: 'Cerrar sesión', Icon: LogoutRoundedIcon, onClick: cerrarSesion }
+                { label: 'Cerrar sesión', Icon: LogoutRoundedIcon, onClick: proteger(cerrarSesion) }
             ]}
         >
 
@@ -346,7 +352,7 @@ export function DashboardEstudiante() {
                     {/* MATERIA DETALLE */}
                     {pagina === "materias" && materiaSeleccionada && (
                         <>
-                            <button className="back-btn" onClick={volver}>← Volver a mis mundos</button>
+                            <button className="back-btn" onClick={proteger(volver)}>← Volver a mis mundos</button>
 
                             {(() => {
                                 const ui = uiMateria(materiaSeleccionada);
@@ -364,25 +370,25 @@ export function DashboardEstudiante() {
                             <div className="materia-panel materia-panel-est">
                                 <button
                                     className={`opcion ${subVista === 'material' ? 'opcion-activa' : ''}`}
-                                    onClick={() => { setSubVista('material'); setQuizActivo(null); }}
+                                    onClick={proteger(() => { setSubVista('material'); setQuizActivo(null); })}
                                 >
                                     📚 Material de estudio
                                 </button>
                                 <button
                                     className={`opcion ${subVista === 'quizzes' ? 'opcion-activa' : ''}`}
-                                    onClick={() => { setSubVista('quizzes'); setJuegoActivo(null); }}
+                                    onClick={proteger(() => { setSubVista('quizzes'); setJuegoActivo(null); })}
                                 >
                                     ✨ Quizzes
                                 </button>
                                 <button
                                     className={`opcion ${subVista === 'juegos' ? 'opcion-activa' : ''}`}
-                                    onClick={() => { setSubVista('juegos'); setQuizActivo(null); setMisionActiva(null); }}
+                                    onClick={proteger(() => { setSubVista('juegos'); setQuizActivo(null); setMisionActiva(null); })}
                                 >
                                     🧩 Juegos
                                 </button>
                                 <button
                                     className={`opcion ${subVista === 'misiones' ? 'opcion-activa' : ''}`}
-                                    onClick={() => { setSubVista('misiones'); setQuizActivo(null); setJuegoActivo(null); }}
+                                    onClick={proteger(() => { setSubVista('misiones'); setQuizActivo(null); setJuegoActivo(null); })}
                                 >
                                     🗺️ Misiones
                                 </button>
@@ -441,7 +447,7 @@ export function DashboardEstudiante() {
                                 <section className="card materia-subvista">
                                     <div className="card-head">
                                         <h3>{quizActivo.titulo}</h3>
-                                        <button className="back-btn back-btn-inline" onClick={() => setQuizActivo(null)}>← Otros quizzes</button>
+                                        <button className="back-btn back-btn-inline" onClick={proteger(() => setQuizActivo(null))}>← Otros quizzes</button>
                                     </div>
                                     <QuizInteractivo
                                         preguntas={quizActivo.configuracion.preguntas}
@@ -450,6 +456,7 @@ export function DashboardEstudiante() {
                                         reto={quizActivo}
                                         onCompletado={refrescarProgreso}
                                         onSalir={() => setQuizActivo(null)}
+                                        onEstadoIntento={marcarIntento}
                                     />
                                 </section>
                             )}
@@ -561,6 +568,8 @@ export function DashboardEstudiante() {
 
                     {/* LOGROS */}
                     {pagina === "logros" && <PanelMisiones />}
+
+            {dialogoSalida}
 
             <FilePreviewModal
                 archivo={archivoPreview}

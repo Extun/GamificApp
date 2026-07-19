@@ -65,7 +65,11 @@ const barajarQuiz = (preguntas, { mezclarPreguntas = true, mezclarRespuestas = t
 // marcan acierto/error y revelan la justificación.
 // `onResponder(esCorrecta)` es opcional y permite a un contenedor superior (p. ej.
 // el modo estudiante) llevar la cuenta del puntaje.
-export function PreguntaCard({ pregunta, indice, onResponder }) {
+// `revelar` (SPEC-015): con false, al responder solo se marca la elección
+// (fase de evaluación, sin pistas); la corrección, la respuesta correcta y la
+// justificación aparecen recién cuando el contenedor lo pone en true (fase de
+// revisión). La captura de la respuesta y el conteo de aciertos no cambian.
+export function PreguntaCard({ pregunta, indice, onResponder, revelar = true }) {
     const [elegida, setElegida] = useState(null);
     const correcta = (pregunta.correcta || '').trim().toUpperCase().charAt(0);
     const respondida = elegida !== null;
@@ -89,10 +93,13 @@ export function PreguntaCard({ pregunta, indice, onResponder }) {
                     if (!texto) return null;
 
                     let estado = '';
-                    if (respondida) {
+                    if (respondida && revelar) {
                         if (letra === correcta) estado = 'opcion-correcta';
                         else if (letra === elegida) estado = 'opcion-incorrecta';
                         else estado = 'opcion-atenuada';
+                    } else if (respondida) {
+                        // Sin revelar: solo se distingue la elección del niño.
+                        estado = letra === elegida ? 'opcion-elegida' : 'opcion-atenuada';
                     }
 
                     return (
@@ -105,16 +112,19 @@ export function PreguntaCard({ pregunta, indice, onResponder }) {
                         >
                             <span className="opcion-letra">{letra}</span>
                             <span className="opcion-texto">{texto}</span>
-                            {respondida && letra === correcta && <CheckCircleRoundedIcon className="opcion-icono" />}
-                            {respondida && letra === elegida && letra !== correcta && (
+                            {respondida && revelar && letra === correcta && <CheckCircleRoundedIcon className="opcion-icono" />}
+                            {respondida && revelar && letra === elegida && letra !== correcta && (
                                 <CancelRoundedIcon className="opcion-icono" />
+                            )}
+                            {respondida && !revelar && letra === elegida && (
+                                <CheckCircleRoundedIcon className="opcion-icono" />
                             )}
                         </button>
                     );
                 })}
             </div>
 
-            {respondida && (
+            {respondida && revelar && (
                 <div className="pregunta-justificacion">
                     <LightbulbRoundedIcon className="justificacion-icono" />
                     <div>
@@ -161,7 +171,11 @@ export function LogroToast({ titulo = '¡Logro desbloqueado!', mensaje, icono, o
 // se otorga XP ni se guarda progreso.
 // `onSalir` (opcional): navegación de "Otros quizzes" en el overlay de
 // resultado; sin él (vista previa, quiz embebido) la acción no se muestra.
-export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteId, reto, onCompletado, soloPrueba = false, onSalir }) {
+// `onEstadoIntento(enProgreso)` (opcional): contrato de "actividad en curso"
+// para la guardia de salida del contenedor. Se llama con true cuando hay al
+// menos una respuesta y el intento no terminó; con false en caso contrario y
+// al desmontar. Debe ser una función estable (useCallback).
+export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteId, reto, onCompletado, soloPrueba = false, onSalir, onEstadoIntento }) {
     const [aciertos, setAciertos] = useState(0);
     const [respondidas, setRespondidas] = useState(0);
     const [puntosGanados, setPuntosGanados] = useState(0);
@@ -184,6 +198,13 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
         [preguntas, reto?.id]
     );
 
+    // Número de intento dentro de la sesión: "Jugar otra vez" lo incrementa y
+    // eso re-sortea muestra/orden y remonta las preguntas (respuestas limpias),
+    // sin depender de que cambie el reto. La clave de intento gobierna todo el
+    // estado por-intento (marcador, overlay, recompensa).
+    const [intento, setIntento] = useState(0);
+    const claveIntento = `${claveQuiz}::${intento}`;
+
     // Cada partida toma su muestra del pool (si el quiz guarda más preguntas de
     // las que muestra por intento) y baraja según la configuración del reto.
     // Estable mientras se juega: solo se re-sortea al cambiar de quiz o volver
@@ -196,7 +217,7 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
         // `claveQuiz` representa a `preguntas` (así un array nuevo con el mismo
         // contenido no re-sortea la muestra a mitad de partida).
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [claveQuiz, mezclarPreguntas, mezclarRespuestas, porIntento]
+        [claveIntento, mezclarPreguntas, mezclarRespuestas, porIntento]
     );
     // El marcador y el XP se calculan sobre lo que el estudiante realmente
     // juega en este intento, no sobre todo el pool guardado.
@@ -211,7 +232,7 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
         setPuntosGanados(0);
         setXpIntento(null);
         setResultadoCerradoDe(null);
-    }, [claveQuiz]);
+    }, [claveIntento]);
 
     const registrar = (esCorrecta) => {
         setRespondidas((n) => n + 1);
@@ -219,6 +240,17 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
     };
 
     const completado = mostrarPuntaje && respondidas === total && total > 0;
+
+    // Guardia de salida: hay intento en curso si el niño ya respondió algo y
+    // aún no termina. En vista previa del docente no se protege nada.
+    const enProgreso = mostrarPuntaje && !soloPrueba && respondidas > 0 && !completado;
+    useEffect(() => {
+        onEstadoIntento?.(enProgreso);
+    }, [enProgreso, onEstadoIntento]);
+    // Al desmontar el reproductor, el intento deja de existir.
+    const estadoRef = useRef(onEstadoIntento);
+    estadoRef.current = onEstadoIntento;
+    useEffect(() => () => estadoRef.current?.(false), []);
 
     // Al completar el quiz: suma XP automáticamente y verifica logros.
     useEffect(() => {
@@ -284,13 +316,13 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
     }, [completado, aciertos, total, estudianteId, reto, onCompletado, soloPrueba]);
 
     return (
-        <div className="quiz-interactivo" key={claveQuiz}>
+        <div className="quiz-interactivo" key={claveIntento}>
             {/* Calificación /100 sobre las preguntas realmente presentadas en
                 este intento (con banco aleatorio, la muestra — nunca el pool),
                 retroalimentación por rango y XP como recompensa separada.
                 Overlay de cierre: "Revisar respuestas" lo cierra dejando el
                 detalle actual de aciertos/errores/justificaciones intacto. */}
-            {completado && resultadoCerradoDe !== claveQuiz && (
+            {completado && resultadoCerradoDe !== claveIntento && (
                 <ResultadoOverlay
                     aciertos={aciertos}
                     total={total}
@@ -298,16 +330,17 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
                     xp={xpIntento ?? { estado: 'cargando' }}
                     detalle={`${aciertos} de ${total} correctas`}
                     onRevisar={() => {
-                        setResultadoCerradoDe(claveQuiz);
+                        setResultadoCerradoDe(claveIntento);
                         // Al cerrar, el foco pasa al botón de reabrir (C2):
                         // tras el commit en que el overlay ya se desmontó.
                         requestAnimationFrame(() => reabrirRef.current?.focus());
                     }}
+                    onReintentar={() => setIntento((n) => n + 1)}
                     onContinuar={onSalir}
                     etiquetaContinuar="Otros quizzes"
                 />
             )}
-            {completado && resultadoCerradoDe === claveQuiz && (
+            {completado && resultadoCerradoDe === claveIntento && (
                 <button
                     type="button"
                     ref={reabrirRef}
@@ -324,6 +357,10 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
                     pregunta={p}
                     indice={i}
                     onResponder={mostrarPuntaje ? registrar : undefined}
+                    // Modo evaluación (estudiante y vista previa): la corrección
+                    // se revela recién al terminar todo el intento. Fuera del
+                    // modo puntaje se conserva la retroalimentación inmediata.
+                    revelar={!mostrarPuntaje || completado}
                 />
             ))}
 

@@ -224,6 +224,18 @@
     border: 1px solid var(--color-primary-light);
 }
 
+/* ---------- Diálogo de salida (guardia de actividad en curso) ---------- */
+.salida-emoji {
+    font-size: 2.6rem;
+    line-height: 1;
+}
+
+.salida-texto {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--color-text-muted);
+}
+
 /* Botón discreto para reabrir el resultado tras cerrar a revisar. */
 .resultado-reabrir {
     display: inline-flex;

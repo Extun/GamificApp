@@ -1387,6 +1387,15 @@
 
 .opcion-atenuada { opacity: 0.55; }
 
+/* Respuesta registrada SIN revelar corrección (fase de evaluación del quiz):
+   solo marca la elección con el color de la marca, sin verde/rojo. */
+.opcion-elegida {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
+}
+.opcion-elegida .opcion-letra { background: var(--color-primary); color: #fff; }
+.opcion-elegida .opcion-icono { color: var(--color-primary); }
+
 .pregunta-justificacion {
     display: flex;
     align-items: flex-start;
