@@ -94,6 +94,26 @@
     color: var(--color-accent-dark);
 }
 
+/* Estados sin XP nuevo (SPEC-015): mensaje secundario amable, nunca "+0 XP".
+   Discreto a propósito: la calificación es el elemento principal. */
+.resultado-xp-mensaje {
+    margin: 0;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+    background: var(--color-primary-soft);
+    border: 1px dashed var(--color-primary-light);
+}
+
+.resultado-xp-completo {
+    color: var(--color-accent-dark);
+    background: var(--color-accent-soft);
+    border-color: var(--color-accent);
+}
+
+.resultado-xp-secundario { opacity: 0.75; }
+
 /* ---------- Tarjeta incrustada (pantallas finales de los juegos) ---------- */
 .resultado-actividad {
     display: flex;
@@ -159,6 +179,7 @@
 /* Aparición escalonada dentro del overlay: nota → detalle → mensaje → XP. */
 .resultado-animado .resultado-nota,
 .resultado-animado .resultado-retro,
+.resultado-animado .resultado-xp-mensaje,
 .resultado-animado .resultado-xp {
     opacity: 0;
     animation: resultado-sube 0.4s ease forwards;
@@ -166,6 +187,7 @@
 
 .resultado-animado .resultado-nota { animation-delay: 0.1s; }
 .resultado-animado .resultado-retro { animation-delay: 0.75s; }
+.resultado-animado .resultado-xp-mensaje,
 .resultado-animado .resultado-xp { animation-delay: 1.1s; }
 
 /* Rango bajo: el brote "crece" con suavidad — ánimo, nunca castigo. */
@@ -270,6 +292,7 @@
     .resultado-animado .resultado-nota,
     .resultado-animado .resultado-retro,
     .resultado-animado .resultado-xp,
+    .resultado-animado .resultado-xp-mensaje,
     .resultado-animado.resultado-bajo .resultado-retro-emoji,
     .resultado-confeti span {
         animation: none !important;
@@ -277,7 +300,8 @@
 
     .resultado-animado .resultado-nota,
     .resultado-animado .resultado-retro,
-    .resultado-animado .resultado-xp {
+    .resultado-animado .resultado-xp,
+    .resultado-animado .resultado-xp-mensaje {
         opacity: 1;
     }
 }

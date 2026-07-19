@@ -38,6 +38,7 @@ router.get('/:estudiante_id', async (req, res, next) => {
                     r.tipo,
                     r.xp_recompensa,
                     p.porcentaje,
+                    p.calificacion,
                     p.xp_obtenido,
                     p.completado,
                     p.observacion,
@@ -66,6 +67,12 @@ router.get('/:estudiante_id', async (req, res, next) => {
 //   reto_titulo, xp_recompensa? } — el reto se busca por (materia, título)
 //   y se crea dentro de la misma transacción si no existe.
 //
+// SPEC-015: `aciertos` y `total` (opcionales, enteros del intento realmente
+// jugado) hacen que el SERVIDOR calcule la calificación académica
+// (round(aciertos/total × 100)) y el XP proporcional al desempeño
+// (round(aciertos/total × xp_recompensa)). Sin ellos, el comportamiento es
+// el histórico (XP = min(puntos, recompensa)) y la calificación no se toca.
+//
 // Corre dentro de una transacción con bloqueo de fila (FOR UPDATE):
 // el upsert del progreso y la actualización de xp_total se confirman
 // juntos o se revierten juntos, y reenvíos del mismo reto solo suman
@@ -76,6 +83,12 @@ router.post('/', async (req, res, next) => {
     const materiaId = Number(req.body?.materia_id);
     const retoTitulo = typeof req.body?.reto_titulo === 'string' ? req.body.reto_titulo.trim() : '';
     const puntos = Number(req.body?.puntos_obtenidos);
+    // SPEC-015: datos objetivos del intento (opcionales). Solo se aceptan
+    // juntos y coherentes; si algo no cuadra, se ignoran (flujo histórico).
+    const aciertosBody = Number(req.body?.aciertos);
+    const totalBody = Number(req.body?.total);
+    const hayIntento = Number.isInteger(aciertosBody) && Number.isInteger(totalBody)
+        && totalBody > 0 && aciertosBody >= 0 && aciertosBody <= totalBody;
 
     const identificaReto = esIdValido(retoIdBody) || (esIdValido(materiaId) && retoTitulo);
     if (!esIdValido(estudianteId) || !identificaReto || !Number.isInteger(puntos) || puntos < 0) {
@@ -150,30 +163,48 @@ router.post('/', async (req, res, next) => {
             return res.status(404).json({ error: 'Estudiante no encontrado' });
         }
 
-        // No se otorga más XP que la recompensa definida para el reto.
-        const xpNuevo = Math.min(puntos, reto.xp_recompensa);
+        // Calificación académica del intento (SPEC-015): SIEMPRE desde los
+        // datos objetivos, nunca del XP. NULL si el flujo no los envió.
+        const calificacion = hayIntento
+            ? Math.round((aciertosBody / totalBody) * 100)
+            : null;
+
+        // XP acumulable del reto según el mejor desempeño. Con aciertos/total,
+        // proporcional a la recompensa configurada (independiente de la nota:
+        // cambiar el XP del reto nunca cambia la calificación); flujo
+        // histórico: lo que reportó el cliente. Nunca más que la recompensa.
+        const xpNuevo = hayIntento
+            ? Math.min(Math.round((aciertosBody / totalBody) * reto.xp_recompensa), reto.xp_recompensa)
+            : Math.min(puntos, reto.xp_recompensa);
 
         const [[previo]] = await conn.query(
-            `SELECT xp_obtenido FROM progreso_estudiante
+            `SELECT xp_obtenido, calificacion FROM progreso_estudiante
              WHERE estudiante_id = ? AND reto_id = ? FOR UPDATE`,
             [estudianteId, retoId]
         );
 
         // Solo se abona la mejora respecto a intentos anteriores del mismo reto.
         const delta = Math.max(0, xpNuevo - (previo?.xp_obtenido ?? 0));
-        const porcentaje = reto.xp_recompensa > 0
-            ? Math.min(100, Math.round((xpNuevo / reto.xp_recompensa) * 100))
-            : 100;
+        const porcentaje = hayIntento
+            ? calificacion
+            : (reto.xp_recompensa > 0
+                ? Math.min(100, Math.round((xpNuevo / reto.xp_recompensa) * 100))
+                : 100);
 
+        // GREATEST protege el mejor intento histórico: una nota o XP peores
+        // nunca reducen lo registrado. Un envío sin calificación (juegos aún
+        // no migrados, ajuste manual de XP del docente) la deja intacta.
         await conn.query(
             `INSERT INTO progreso_estudiante
-                (estudiante_id, reto_id, porcentaje, xp_obtenido, completado)
-             VALUES (?, ?, ?, ?, ?)
+                (estudiante_id, reto_id, porcentaje, calificacion, xp_obtenido, completado)
+             VALUES (?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
-                porcentaje  = GREATEST(porcentaje, VALUES(porcentaje)),
-                xp_obtenido = GREATEST(xp_obtenido, VALUES(xp_obtenido)),
-                completado  = completado OR VALUES(completado)`,
-            [estudianteId, retoId, porcentaje, xpNuevo, porcentaje === 100]
+                porcentaje   = GREATEST(porcentaje, VALUES(porcentaje)),
+                calificacion = IF(VALUES(calificacion) IS NULL, calificacion,
+                                  GREATEST(COALESCE(calificacion, 0), VALUES(calificacion))),
+                xp_obtenido  = GREATEST(xp_obtenido, VALUES(xp_obtenido)),
+                completado   = completado OR VALUES(completado)`,
+            [estudianteId, retoId, porcentaje, calificacion, xpNuevo, porcentaje === 100]
         );
 
         if (delta > 0) {
@@ -212,13 +243,28 @@ router.post('/', async (req, res, next) => {
                 detalle: { reto: info?.titulo, tipo: info?.tipo, porcentaje, xp_ganado: delta, xp_total: estudiante.xp_total + delta }
             });
         }
+        // SPEC-015: estado consolidado del reto tras este intento.
+        const xpObtenidoTotal = Math.max(xpNuevo, previo?.xp_obtenido ?? 0);
+        const mejorCalificacion = calificacion === null
+            ? (previo?.calificacion ?? null)
+            : Math.max(calificacion, previo?.calificacion ?? 0);
+
         res.status(201).json({
             estudiante_id: estudianteId,
             reto_id: retoId,
+            // XP realmente acreditado a la cuenta EN ESTE intento (0 si no
+            // superó su mejor desempeño o ya tenía toda la recompensa).
             xp_abonado: delta,
             xp_total: xpTotalFinal,
             porcentaje,
             completado: porcentaje === 100,
+            // Calificación académica del intento actual y la mejor histórica.
+            calificacion,
+            mejor_calificacion: mejorCalificacion,
+            // XP acumulado en este reto y techo disponible (para que la UI
+            // distinga "sin mejora" de "recompensa completa").
+            xp_obtenido_total: xpObtenidoTotal,
+            xp_recompensa: reto.xp_recompensa,
             // Misiones recién completadas por esta acción (para el LogroToast).
             nuevas_misiones: nuevasMisiones
         });

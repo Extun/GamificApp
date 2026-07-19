@@ -41,10 +41,55 @@ function useContador(objetivo, activo) {
 
 // Cuerpo compartido por la tarjeta y el overlay. `animado` activa el contador
 // y la aparición escalonada (solo en el overlay).
-function CuerpoResultado({ aciertos, total, puntosGanados, detalle, animado = false }) {
+//
+// `xp` (SPEC-015, opcional) describe lo que el backend REALMENTE acreditó:
+//   { estado: 'cargando' | 'ganado' | 'sinCambio' | 'completo', ganado }
+// Sin `xp`, se muestra `puntosGanados` como chip normal (compatibilidad con
+// la tarjeta incrustada de los juegos aún no migrados).
+function ChipXP({ xp }) {
+    if (xp.estado === 'cargando') {
+        return (
+            <div className="resultado-xp resultado-xp-secundario" role="status">
+                <span className="resultado-xp-label">Guardando tu XP…</span>
+            </div>
+        );
+    }
+    if (xp.estado === 'sinConfirmar') {
+        // Falla de red/servidor: la calificación (local) sí es real, pero el
+        // XP no se confirmó — nunca se muestra una estimación como acreditada.
+        return (
+            <p className="resultado-xp-mensaje" role="status">
+                No pudimos confirmar tu XP en este momento. Inténtalo de nuevo cuando tengas conexión.
+            </p>
+        );
+    }
+    if (xp.estado === 'sinCambio') {
+        return (
+            <p className="resultado-xp-mensaje" role="status">
+                Esta vez no sumaste XP adicional. ¡Supera tu mejor resultado para conseguir más!
+            </p>
+        );
+    }
+    if (xp.estado === 'completo') {
+        return (
+            <p className="resultado-xp-mensaje resultado-xp-completo" role="status">
+                🌟 ¡Ya conseguiste todo el XP disponible en esta actividad!
+            </p>
+        );
+    }
+    return (
+        <div className="resultado-xp">
+            <span className="resultado-xp-label">XP obtenido</span>
+            <span className="resultado-xp-valor">+{xp.ganado} XP</span>
+        </div>
+    );
+}
+
+function CuerpoResultado({ aciertos, total, puntosGanados, detalle, animado = false, xp }) {
     const nota = calificacionDe(aciertos, total);
     const retro = retroalimentacionDe(nota, { aciertos, total });
     const notaMostrada = useContador(nota, animado);
+    const infoXP = xp || { estado: 'ganado', ganado: puntosGanados };
 
     return (
         <div className={`resultado-cuerpo resultado-${retro.rango} ${animado ? 'resultado-animado' : ''}`}>
@@ -65,10 +110,7 @@ function CuerpoResultado({ aciertos, total, puntosGanados, detalle, animado = fa
                 </span>
             </p>
 
-            <div className="resultado-xp">
-                <span className="resultado-xp-label">XP obtenido</span>
-                <span className="resultado-xp-valor">+{puntosGanados} XP</span>
-            </div>
+            <ChipXP xp={infoXP} />
         </div>
     );
 }
@@ -108,6 +150,7 @@ export function ResultadoOverlay({
     total,
     puntosGanados,
     detalle,
+    xp,
     onRevisar,
     etiquetaRevisar = 'Revisar respuestas',
     onContinuar,
@@ -124,9 +167,16 @@ export function ResultadoOverlay({
         return () => { document.body.style.overflow = previo; };
     }, []);
 
-    // Foco inicial en el diálogo y Escape para pasar a revisar.
+    // Foco inicial en el diálogo; al cerrar, vuelve al elemento que lo tenía
+    // (si sigue en pantalla y es enfocable — p. ej. no un botón deshabilitado).
     useEffect(() => {
+        const previo = document.activeElement;
         dialogoRef.current?.focus();
+        return () => {
+            if (previo instanceof HTMLElement && previo.isConnected && !previo.disabled) {
+                previo.focus();
+            }
+        };
     }, []);
     useEffect(() => {
         if (!onRevisar) return;
@@ -155,6 +205,7 @@ export function ResultadoOverlay({
                     total={total}
                     puntosGanados={puntosGanados}
                     detalle={detalle}
+                    xp={xp}
                     animado
                 />
 

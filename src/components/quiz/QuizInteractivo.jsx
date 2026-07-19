@@ -170,9 +170,19 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
     // haya cerrado para revisar ESTE quiz (se guarda la clave del quiz cerrado,
     // así el estado se deriva sin setState en efectos y otro quiz lo reabre).
     const [resultadoCerradoDe, setResultadoCerradoDe] = useState(null);
+    // XP realmente acreditado por el backend en ESTE intento (SPEC-015):
+    // null = respuesta pendiente. El overlay nunca muestra "+0 XP": según el
+    // estado enseña la ganancia, "sin mejora" o "recompensa completa".
+    const [xpIntento, setXpIntento] = useState(null);
+    const reabrirRef = useRef(null);
 
-    // Reinicia el marcador si cambia el set de preguntas (otro quiz seleccionado).
-    const claveQuiz = useMemo(() => preguntas.map((p) => p.pregunta).join('|'), [preguntas]);
+    // Reinicia el marcador si cambia el set de preguntas (otro quiz
+    // seleccionado). Incluye el id del reto: dos quizzes con preguntas
+    // idénticas nunca comparten el estado del resultado (C3).
+    const claveQuiz = useMemo(
+        () => `${reto?.id ?? 'sin-id'}::${preguntas.map((p) => p.pregunta).join('|')}`,
+        [preguntas, reto?.id]
+    );
 
     // Cada partida toma su muestra del pool (si el quiz guarda más preguntas de
     // las que muestra por intento) y baraja según la configuración del reto.
@@ -199,6 +209,8 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
         setAciertos(0);
         setRespondidas(0);
         setPuntosGanados(0);
+        setXpIntento(null);
+        setResultadoCerradoDe(null);
     }, [claveQuiz]);
 
     const registrar = (esCorrecta) => {
@@ -216,14 +228,18 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
         if (soloPrueba) {
             // Puntaje simulado: la pantalla final se ve igual, nada se guarda.
             setPuntosGanados(aciertos * 100);
+            setXpIntento({ estado: 'ganado', ganado: aciertos * 100 });
             setToast({ titulo: 'Modo prueba', mensaje: 'Nada se guardó: así lo verá el estudiante.' });
             return;
         }
 
+        // SPEC-015: `total` viaja al servidor, que calcula la calificación
+        // /100 y el XP proporcional con datos objetivos del intento.
         const { puntos, servidor } = gamificationService.completarReto({
             estudianteId,
             reto,
-            aciertos
+            aciertos,
+            total
         });
         setPuntosGanados(puntos);
 
@@ -233,17 +249,37 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
 
         servidor.then((data) => {
             onCompletado?.();
-            if (!data) return;
+            if (!data) {
+                // Sin respuesta del servidor (red caída o sin sesión): el XP
+                // NO se confirmó — estado neutral, nunca un "+N XP" estimado.
+                setXpIntento({ estado: 'sinConfirmar' });
+                return;
+            }
+            // El overlay refleja lo que el backend REALMENTE acreditó.
+            setXpIntento(
+                data.xp_abonado > 0
+                    ? { estado: 'ganado', ganado: data.xp_abonado }
+                    : {
+                        estado: data.xp_obtenido_total >= data.xp_recompensa ? 'completo' : 'sinCambio',
+                        ganado: 0
+                    }
+            );
             const mision = data.nuevas_misiones?.[0];
             if (mision) {
                 setToast({ titulo: '¡Misión completada!', mensaje: mision.titulo });
             } else {
                 setToast({
                     titulo: 'Progreso guardado',
-                    mensaje: `+${data.xp_abonado} XP registrados en tu cuenta`,
+                    mensaje: data.xp_abonado > 0
+                        ? `+${data.xp_abonado} XP registrados en tu cuenta`
+                        : 'Tu intento quedó registrado',
                     icono: <CloudDoneRoundedIcon />
                 });
             }
+        }).catch(() => {
+            // Defensa: cualquier fallo inesperado del post-procesado deja el
+            // chip en estado neutral en lugar de "Guardando…" indefinido.
+            setXpIntento({ estado: 'sinConfirmar' });
         });
     }, [completado, aciertos, total, estudianteId, reto, onCompletado, soloPrueba]);
 
@@ -259,14 +295,25 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
                     aciertos={aciertos}
                     total={total}
                     puntosGanados={puntosGanados}
+                    xp={xpIntento ?? { estado: 'cargando' }}
                     detalle={`${aciertos} de ${total} correctas`}
-                    onRevisar={() => setResultadoCerradoDe(claveQuiz)}
+                    onRevisar={() => {
+                        setResultadoCerradoDe(claveQuiz);
+                        // Al cerrar, el foco pasa al botón de reabrir (C2):
+                        // tras el commit en que el overlay ya se desmontó.
+                        requestAnimationFrame(() => reabrirRef.current?.focus());
+                    }}
                     onContinuar={onSalir}
                     etiquetaContinuar="Otros quizzes"
                 />
             )}
             {completado && resultadoCerradoDe === claveQuiz && (
-                <button type="button" className="resultado-reabrir" onClick={() => setResultadoCerradoDe(null)}>
+                <button
+                    type="button"
+                    ref={reabrirRef}
+                    className="resultado-reabrir"
+                    onClick={() => setResultadoCerradoDe(null)}
+                >
                     🏅 Ver mi resultado
                 </button>
             )}

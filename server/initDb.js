@@ -49,6 +49,7 @@ export const inicializarEsquema = async () => {
         await migrarBancoPreguntas(conn);
         await migrarBackfillBanco(conn);
         await migrarCargaMasiva(conn);
+        await migrarCalificacionAcademica(conn);
         console.log('✅ Esquema verificado/creado en la base de datos.');
         await asegurarAdmin(conn);
         await asegurarAdminPrincipal(conn);
@@ -585,6 +586,22 @@ const migrarCargaMasiva = async (conn) => {
             console.warn('⚠️  Migración 012: hay estudiantes duplicados (mismo curso, nombres y apellidos).');
             console.warn('   El índice uq_est_curso_nombre NO se creó; depura los duplicados y reinicia.');
         }
+    }
+};
+
+// SPEC-015 — calificación académica persistida: mejor nota /100 del estudiante
+// en el reto, calculada por el servidor desde aciertos/total del intento.
+// NULL = registrado por un flujo que aún no envía aciertos/total.
+const migrarCalificacionAcademica = async (conn) => {
+    if (await faltaColumna(conn, 'progreso_estudiante', 'calificacion')) {
+        await conn.query(`ALTER TABLE progreso_estudiante
+            ADD COLUMN calificacion TINYINT UNSIGNED NULL`);
+        // Backfill único: hasta hoy toda recompensa era jugables × 100, así
+        // que `porcentaje` coincide con la nota académica de esas filas.
+        await conn.query(
+            'UPDATE progreso_estudiante SET calificacion = porcentaje WHERE calificacion IS NULL'
+        );
+        console.log('✅ Migración: calificacion agregada a progreso_estudiante (backfill desde porcentaje).');
     }
 };
 

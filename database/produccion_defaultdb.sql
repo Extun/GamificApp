@@ -123,6 +123,9 @@ CREATE TABLE IF NOT EXISTS progreso_estudiante (
     estudiante_id  INT UNSIGNED     NOT NULL,
     reto_id        INT UNSIGNED     NOT NULL,
     porcentaje     TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    -- Mejor calificación académica /100 (SPEC-015, migración 010). NULL =
+    -- el flujo que registró el intento aún no envía aciertos/total.
+    calificacion   TINYINT UNSIGNED NULL,
     xp_obtenido    INT UNSIGNED     NOT NULL DEFAULT 0,
     completado     BOOLEAN          NOT NULL DEFAULT FALSE,
     -- Libro de Calificaciones (SPEC-006, migración 008).

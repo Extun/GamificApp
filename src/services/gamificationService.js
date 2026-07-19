@@ -78,7 +78,7 @@ export const getEstudianteId = () => {
 // nació como quiz en el panel del docente (el backend lo crea si no existe).
 // Devuelve la respuesta del servidor (incluye xp_total oficial) o null si
 // la red falló; en ese caso la UI sigue con el valor local en caché.
-export const guardarProgreso = async ({ estudianteId, retoId, materiaId, retoTitulo, xpRecompensa, puntosObtenidos }) => {
+export const guardarProgreso = async ({ estudianteId, retoId, materiaId, retoTitulo, xpRecompensa, puntosObtenidos, aciertos, total }) => {
     try {
         const res = await authFetch(`${API_URL}/api/progreso`, {
             method: 'POST',
@@ -89,7 +89,11 @@ export const guardarProgreso = async ({ estudianteId, retoId, materiaId, retoTit
                 materia_id: materiaId,
                 reto_titulo: retoTitulo,
                 xp_recompensa: xpRecompensa,
-                puntos_obtenidos: puntosObtenidos
+                puntos_obtenidos: puntosObtenidos,
+                // SPEC-015: datos objetivos del intento — el servidor calcula
+                // la calificación /100 y el XP proporcional con ellos.
+                aciertos,
+                total
             })
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -131,9 +135,13 @@ export const obtenerProgreso = async (estudianteId) => {
 //   · reto: objeto de la BD ({ id, tipo, xp_recompensa, ... }) o al menos
 //     { materiaId, titulo } para retos que aún no existen en la BD.
 //   · puntosObtenidos: si se omite, se calculan como aciertos * PUNTOS_POR_ACIERTO.
+//   · total (SPEC-015): ítems realmente evaluados en el intento. Si llega,
+//     el servidor calcula la calificación /100 y el XP proporcional al
+//     desempeño con aciertos/total (fuente de verdad); sin él, el flujo
+//     histórico (XP = min(puntos, recompensa)) sigue intacto.
 // Devuelve { puntos, servidor } — `servidor` es la promesa de guardarProgreso
 // (resuelve null si no hay sesión o la red falla).
-export const completarReto = ({ estudianteId, reto, aciertos = 0, puntosObtenidos }) => {
+export const completarReto = ({ estudianteId, reto, aciertos = 0, total, puntosObtenidos }) => {
     const puntos = Number.isFinite(puntosObtenidos)
         ? puntosObtenidos
         : aciertos * PUNTOS_POR_ACIERTO;
@@ -148,7 +156,9 @@ export const completarReto = ({ estudianteId, reto, aciertos = 0, puntosObtenido
             materiaId: reto.materiaId ?? reto.materia_id,
             retoTitulo: reto.titulo,
             xpRecompensa: reto.xpRecompensa ?? reto.xp_recompensa,
-            puntosObtenidos: puntos
+            puntosObtenidos: puntos,
+            aciertos,
+            total
         })
         : Promise.resolve(null);
 

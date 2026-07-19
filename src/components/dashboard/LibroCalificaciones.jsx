@@ -152,11 +152,12 @@ export function LibroCalificaciones({ materia }) {
                                     {f.observacion && <span title={f.observacion}> 💬</span>}
                                 </td>
                                 <td>{f.completado ? 'Completado' : 'En progreso'}</td>
-                                {/* Calificación académica (mejor resultado persistido):
-                                    `porcentaje` equivale a aciertos/total en los flujos
-                                    actuales — se presenta como nota /100, no como XP. */}
-                                <td title="Mejor resultado del estudiante en esta actividad">
-                                    {retroalimentacionDe(f.porcentaje).emoji} <strong>{f.porcentaje} / 100</strong>
+                                {/* Calificación académica real (SPEC-015): la calcula
+                                    el servidor con aciertos/total, independiente del XP.
+                                    Filas anteriores a la migración: `porcentaje`. */}
+                                <td title="Mejor calificación del estudiante en esta actividad">
+                                    {retroalimentacionDe(f.calificacion ?? f.porcentaje).emoji}{' '}
+                                    <strong>{f.calificacion ?? f.porcentaje} / 100</strong>
                                 </td>
                                 <td>{f.xp_obtenido} / {f.xp_recompensa} XP</td>
                                 <td>
@@ -191,7 +192,7 @@ export function LibroCalificaciones({ materia }) {
             {detalle && (
                 <ModalPanel
                     titulo={detalle.estudiante}
-                    subtitulo={`${detalle.reto} · Calificación ${detalle.porcentaje}/100 (mejor resultado) · ${detalle.xp_obtenido} XP`}
+                    subtitulo={`${detalle.reto} · Calificación ${detalle.calificacion ?? detalle.porcentaje}/100 (mejor resultado) · ${detalle.xp_obtenido} XP`}
                     onCerrar={() => !guardando && setDetalle(null)}
                     pie={
                         <>
