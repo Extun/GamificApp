@@ -2,7 +2,7 @@
 // presentación puros: reciben datos REALES por props y no consultan APIs.
 // La regla de la casa: si no hay datos, el contenedor muestra <EmptyState />
 // en lugar de inventar valores.
-import { useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import './dashboardWidgets.css';
 
 // Fecha corta para listas de actividad ("3 jul").
@@ -87,22 +87,104 @@ export function EmptyState({ Icon, titulo, mensaje, accion }) {
 // Modal estándar de los paneles (SPEC-002): reutiliza las clases del
 // FilePreviewModal (backdrop con blur + panel) para que todos los diálogos
 // se vean idénticos. `pie` recibe los botones de acción.
+//
+// Accesibilidad (SPEC-018 Fase 3): foco inicial en el panel, focus trap con
+// Tab/Shift+Tab, Escape = onCerrar (la MISMA función que el backdrop y la ✕,
+// así hereda las guardas tipo `!guardando && cerrar` de cada consumidor),
+// restauración del foco al elemento que abrió el modal y bloqueo del scroll
+// de fondo. El contrato de props no cambia.
+
+// Elementos enfocables dentro del panel (suficiente para los modales de la casa).
+const SELECTOR_ENFOCABLES =
+    'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
+
+// Bloqueo de scroll con contador: si se abren modales consecutivos o anidados,
+// el overflow original del body se restaura solo al cerrar el último.
+let modalesAbiertos = 0;
+let overflowPrevioBody = '';
+
 export function ModalPanel({ titulo, subtitulo, avatar, onCerrar, pie, children, className = '' }) {
+    const panelRef = useRef(null);
+    const tituloId = useId();
+    const subtituloId = useId();
+
+    // Scroll del fondo bloqueado mientras el modal está abierto.
+    useEffect(() => {
+        if (modalesAbiertos === 0) {
+            overflowPrevioBody = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+        }
+        modalesAbiertos += 1;
+        return () => {
+            modalesAbiertos -= 1;
+            if (modalesAbiertos === 0) document.body.style.overflow = overflowPrevioBody;
+        };
+    }, []);
+
+    // Mismo patrón de foco que el overlay de resultado: foco al abrir,
+    // restauración al cerrar (si el elemento sigue en pantalla y enfocable).
+    useEffect(() => {
+        const previo = document.activeElement;
+        panelRef.current?.focus();
+        return () => {
+            if (previo instanceof HTMLElement && previo.isConnected && !previo.disabled) {
+                previo.focus();
+            }
+        };
+    }, []);
+
+    // Teclado por bubbling del propio modal (no `window`): con modales
+    // consecutivos solo responde el que contiene el foco.
+    const onTecla = (e) => {
+        if (e.key === 'Escape') {
+            if (onCerrar) {
+                e.stopPropagation();
+                onCerrar();
+            }
+            return;
+        }
+        if (e.key !== 'Tab') return;
+        const panel = panelRef.current;
+        if (!panel) return;
+        const enfocables = [...panel.querySelectorAll(SELECTOR_ENFOCABLES)]
+            .filter((el) => el.offsetParent !== null);
+        if (enfocables.length === 0) {
+            e.preventDefault();
+            return;
+        }
+        const primero = enfocables[0];
+        const ultimo = enfocables[enfocables.length - 1];
+        const activo = document.activeElement;
+        if (e.shiftKey) {
+            // Desde el primero (o el propio panel recién enfocado), volver al último.
+            if (activo === primero || activo === panel || !panel.contains(activo)) {
+                e.preventDefault();
+                ultimo.focus();
+            }
+        } else if (activo === ultimo || !panel.contains(activo)) {
+            e.preventDefault();
+            primero.focus();
+        }
+    };
+
     return (
-        <div className="preview-backdrop" onClick={onCerrar}>
+        <div className="preview-backdrop" onClick={onCerrar} onKeyDown={onTecla}>
             <div
+                ref={panelRef}
                 className={`preview-panel ${className}`}
                 onClick={(e) => e.stopPropagation()}
                 role="dialog"
                 aria-modal="true"
-                aria-label={titulo}
+                aria-labelledby={tituloId}
+                aria-describedby={subtitulo ? subtituloId : undefined}
+                tabIndex={-1}
             >
                 <div className="preview-head">
                     <div className="preview-head-file">
                         {avatar}
                         <div className="preview-head-text">
-                            <h3>{titulo}</h3>
-                            {subtitulo && <span>{subtitulo}</span>}
+                            <h3 id={tituloId}>{titulo}</h3>
+                            {subtitulo && <span id={subtituloId}>{subtitulo}</span>}
                         </div>
                     </div>
                     <button type="button" className="preview-close" aria-label="Cerrar" onClick={onCerrar}>✕</button>
