@@ -164,10 +164,10 @@ export default function ModuloJuegos() {
                             ' Los estudiantes dejarán de ver estas actividades, pero quien esté jugando una ahora podrá terminarla.'}
                     </p>
                     <div className="juego-confirma-acciones">
-                        <button type="button" className="btn-secundario" onClick={() => setConfirmar(null)} disabled={guardando}>
+                        <button type="button" className="preview-action" onClick={() => setConfirmar(null)} disabled={guardando}>
                             Cancelar
                         </button>
-                        <button type="button" className="btn-primario" onClick={() => aplicar(confirmar.juego, confirmar.estado)} disabled={guardando}>
+                        <button type="button" className="preview-action preview-action-primary" onClick={() => aplicar(confirmar.juego, confirmar.estado)} disabled={guardando}>
                             {guardando ? 'Aplicando…' : `Sí, cambiar a ${ETIQUETA_ESTADO[confirmar.estado]}`}
                         </button>
                     </div>

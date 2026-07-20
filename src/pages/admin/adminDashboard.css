@@ -86,12 +86,12 @@
 }
 
 .admin-acciones button {
-    border: 1px solid #e2e8f0;
-    background: #fff;
-    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    border-radius: var(--radius-sm);
     padding: 4px 8px;
     cursor: pointer;
-    color: #475569;
+    color: var(--color-text-soft, #475569);
 }
 
 .admin-acciones button:hover {
@@ -217,7 +217,7 @@
 }
 
 .admin-hero-meta { min-width: 0; }
-.admin-hero-meta h1 { margin: 0 0 4px; font-size: 1.7rem; }
+.admin-hero-meta h1 { margin: 0 0 4px; font-size: 1.9rem; } /* mismo tamaño que los h1 del resto de módulos */
 .admin-hero-meta p { margin: 0; color: var(--color-text-muted); font-size: 0.93rem; }
 
 /* Accesos rápidos del Inicio: tarjetas-botón hacia cada módulo */

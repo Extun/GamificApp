@@ -147,11 +147,11 @@ export default function ModuloIA() {
                 )}
 
                 <div className="ia-acciones">
-                    <button type="button" className="btn-primario" onClick={guardar}
+                    <button type="button" className="preview-action preview-action-primary" onClick={guardar}
                         disabled={!configurado || guardando || sinCambios}>
                         {guardando ? 'Comprobando y guardando…' : 'Guardar configuración'}
                     </button>
-                    <button type="button" className="btn-secundario" onClick={probar} disabled={probando}>
+                    <button type="button" className="preview-action" onClick={probar} disabled={probando}>
                         <BoltRoundedIcon fontSize="small" /> {probando ? 'Probando…' : 'Probar conexión'}
                     </button>
                 </div>
