@@ -30,6 +30,7 @@ import { DIFICULTADES_UI } from '../../components/juegos/GeneradorActividadIA';
 import {
     SectionCard, EmptyState, ModalPanel, TablaPro, StatCard, formatearFecha
 } from '../../components/dashboard/DashboardWidgets';
+import { useConfirmacion } from '../../hooks/useConfirmacion';
 
 const DIFICULTAD_LABEL = { facil: 'Fácil', media: 'Media', dificil: 'Difícil' };
 
@@ -52,6 +53,7 @@ function VistaPreviaConfig({ tipo, config }) {
 }
 
 export function BibliotecaActividades({ onAviso, onError, materiaId = null }) {
+    const { pedirConfirmacion, dialogoConfirmacion } = useConfirmacion();
     const [retos, setRetos] = useState([]);
     const [cargado, setCargado] = useState(false);
     const [pestana, setPestana] = useState('todas');
@@ -350,11 +352,13 @@ export function BibliotecaActividades({ onAviso, onError, materiaId = null }) {
                                                 title="Eliminar definitivamente (solo si nadie la jugó)"
                                                 aria-label={`Eliminar definitivamente "${r.titulo}"`}
                                                 className="accion-peligro"
-                                                onClick={() => {
-                                                    if (window.confirm(`¿Eliminar DEFINITIVAMENTE "${r.titulo}"? Esta acción no se puede deshacer.`)) {
-                                                        ejecutar(() => purgarReto(r.id), `"${r.titulo}" eliminada definitivamente.`);
-                                                    }
-                                                }}
+                                                onClick={() => pedirConfirmacion({
+                                                    titulo: 'Eliminar definitivamente',
+                                                    mensaje: `¿Eliminar DEFINITIVAMENTE "${r.titulo}"? Esta acción no se puede deshacer.`,
+                                                    confirmarTexto: 'Eliminar para siempre',
+                                                    variante: 'danger',
+                                                    accion: () => ejecutar(() => purgarReto(r.id), `"${r.titulo}" eliminada definitivamente.`)
+                                                })}
                                             >
                                                 <DeleteOutlineRoundedIcon sx={{ fontSize: '1.05rem' }} />
                                             </button>
@@ -408,11 +412,13 @@ export function BibliotecaActividades({ onAviso, onError, materiaId = null }) {
                                                 <button
                                                     title="Archivar (los estudiantes dejan de verla; no se borra)"
                                                     aria-label={`Archivar "${r.titulo}"`}
-                                                    onClick={() => {
-                                                        if (window.confirm(`¿Archivar "${r.titulo}"? Tus estudiantes dejarán de verla, pero podrás restaurarla cuando quieras.`)) {
-                                                            ejecutar(() => actualizarReto(r.id, { estado: 'archivado' }), `"${r.titulo}" archivada.`);
-                                                        }
-                                                    }}
+                                                    onClick={() => pedirConfirmacion({
+                                                        titulo: 'Archivar actividad',
+                                                        mensaje: `¿Archivar "${r.titulo}"? Tus estudiantes dejarán de verla, pero podrás restaurarla cuando quieras.`,
+                                                        confirmarTexto: 'Archivar',
+                                                        variante: 'warning',
+                                                        accion: () => ejecutar(() => actualizarReto(r.id, { estado: 'archivado' }), `"${r.titulo}" archivada.`)
+                                                    })}
                                                 >
                                                     <Inventory2RoundedIcon sx={{ fontSize: '1.05rem' }} />
                                                 </button>
@@ -421,11 +427,13 @@ export function BibliotecaActividades({ onAviso, onError, materiaId = null }) {
                                                 title="Enviar a la papelera (podrás restaurarla)"
                                                 aria-label={`Enviar a la papelera "${r.titulo}"`}
                                                 className="accion-peligro"
-                                                onClick={() => {
-                                                    if (window.confirm(`¿Enviar "${r.titulo}" a la papelera? El progreso de tus estudiantes se conserva y podrás restaurarla.`)) {
-                                                        ejecutar(() => eliminarReto(r.id), `"${r.titulo}" enviada a la papelera.`);
-                                                    }
-                                                }}
+                                                onClick={() => pedirConfirmacion({
+                                                    titulo: 'Enviar a la papelera',
+                                                    mensaje: `¿Enviar "${r.titulo}" a la papelera? El progreso de tus estudiantes se conserva y podrás restaurarla.`,
+                                                    confirmarTexto: 'Enviar a la papelera',
+                                                    variante: 'danger',
+                                                    accion: () => ejecutar(() => eliminarReto(r.id), `"${r.titulo}" enviada a la papelera.`)
+                                                })}
                                             >
                                                 <DeleteOutlineRoundedIcon sx={{ fontSize: '1.05rem' }} />
                                             </button>
@@ -616,6 +624,8 @@ export function BibliotecaActividades({ onAviso, onError, materiaId = null }) {
                     </div>
                 </ModalPanel>
             )}
+
+            {dialogoConfirmacion}
         </SectionCard>
     );
 }

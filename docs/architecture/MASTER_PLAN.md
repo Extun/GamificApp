@@ -62,7 +62,7 @@ Insumos: `docs/audit/Auditoria-UX-Estudiante-v1.md`, `docs/specifications/SPEC-0
 10. `useAutoRefresh` puede solapar peticiones si una tarda más que el intervalo (sin cancelación); riesgo bajo con los intervalos actuales.
 11. Migraciones manuales 002 no idempotentes y `initDb` agrupa `color/icono/activa` bajo una sola comprobación de `color`; frágil ante migraciones parciales.
 12. Lint: quedan 29 errores frontend (`react-hooks/set-state-in-effect`, `react-refresh/only-export-components`, algunos `no-empty`/`no-unused-vars` previos); corregirlos exige reestructurar componentes (los archivos nuevos de SPEC-006 repiten el patrón registro-de-constantes + componente).
-13. Accesibilidad de modales: sin focus trap, cierre con Escape ni restauración de foco.
+13. ~~Accesibilidad de modales: sin focus trap, cierre con Escape ni restauración de foco.~~ ✅ Hecho (2026-07-20, SPEC-018 Fase 3: `ModalPanel` con foco inicial, focus trap, Escape, restauración y scroll-lock).
 14. Rendimiento menor: `TablaPro` recibe `buscar`/`renderFila` inline (memo inútil); chunks grandes de Vite (`index` ~1.44 MB, `pdf.worker` ~1.29 MB) → code-splitting post-tesis.
 
 ### Diferidos de la auditoría de actividades (2026-07-19) — anotados, NO implementar sin decisión
@@ -78,6 +78,12 @@ Insumos: `docs/audit/Auditoria-UX-Estudiante-v1.md`, `docs/specifications/SPEC-0
 25. **Mecanismo real de migraciones — documentado, no pendiente.** Ver §6 de este documento. Numeración resuelta por Fabrizio el 2026-07-19 (Opción B): SPEC-016 → `013`, SPEC-017 → `014`, sin archivo retroactivo para SPEC-015. Hueco consciente entre `012` y `013`.
 27. **Evaluar un sistema formal de migraciones versionadas** (post-tesis, NO implementar ahora). Hoy la idempotencia se deriva del estado del esquema vía `faltaColumna()`, sin bitácora de migraciones aplicadas. Un sistema formal aportaría: tabla `migraciones_aplicadas` con marca de tiempo y checksum, ejecución de los `.sql` como artefactos reales en vez de reimplementarlos en JS, orden explícito y reversibilidad verificable. Motivo de diferirlo: el mecanismo actual **funciona y es idempotente**, y reescribirlo sería un refactor grande no pedido (regla §3) sobre la pieza más delicada del despliegue, a semanas de la sustentación.
 26. ~~Séptimo juego de demostración~~ ✅ **Hecho (2026-07-19)**: Verdadero o Falso implementado solo con el contrato del registro. Evidencia medida en `docs/COMO-AGREGAR-UN-JUEGO.md` §Evidencia de extensibilidad. Pendiente de validación funcional en producción.
+
+### Diferidos de SPEC-018 Fase 4 (anotados 2026-07-20) — NO implementar sin decisión
+
+27. **Inconsistencia mensaje ↔ regla de backend al eliminar cursos (hallazgo PREEXISTENTE, detectado probando Fase 4).** El texto de confirmación dice "Solo es posible si no tiene estudiantes", pero `DELETE /api/admin/cursos/:id` responde 200 (borrado suave a papelera, restaurable) aunque el curso tenga estudiantes **activados**; el 409 de SPEC-014 §13 solo cubre estudiantes **pendientes de activación**. No está decidido cuál comportamiento es el correcto (¿endurecer el backend o corregir el mensaje?): candidato a auditoría funcional. La Fase 4 conservó deliberadamente ambos tal cual.
+28. **4 `window.confirm` no destructivos de editores siguen nativos** (`EditorClasificador` ×2, `GeneradorActividadIA`, `GeneradorMision` — avisan antes de sobrescribir contenido al generar con IA). Migrarlos a `ConfirmDialog` exige refactorizar el handler síncrono de generación a confirmación asíncrona en área estabilizada por SPEC-013; diferido.
+29. **`window.prompt` ×2 del cambio de PIN del estudiante.** Su reemplazo correcto no es un confirm sino el **modal de PIN** ya previsto en SPEC-001 (Student Shell); los `window.alert` de ese flujo ya son toasts (Fase 4).
 
 ### Diferidos de SPEC-006 (requieren migración propia)
 

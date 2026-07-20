@@ -12,6 +12,7 @@ import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded';
 import authService from '../../../services/authService';
 import adminService from '../../../services/adminService';
 import { SectionCard, EmptyState, ModalPanel, TablaPro, formatearFecha } from '../../../components/dashboard/DashboardWidgets';
+import { useConfirmacion } from '../../../hooks/useConfirmacion';
 
 // Permisos por administrador (SPEC-003), agrupados como en el sidebar.
 // El Principal los tiene todos siempre; solo el Principal puede repartirlos
@@ -27,6 +28,7 @@ const PERMISOS_OPERATIVOS = ['docentes', 'estudiantes', 'materias', 'cursos', 'i
 const FORM_VACIO = { username: '', password: '', es_principal: false, activo: true, permisos: PERMISOS_OPERATIVOS };
 
 export function ModuloAdministradores({ administradores, ejecutar }) {
+    const { pedirConfirmacion, dialogoConfirmacion } = useConfirmacion();
     // `editando`: null = cerrado, 'nuevo' = crear, objeto = editar existente.
     const [editando, setEditando] = useState(null);
     const [form, setForm] = useState(FORM_VACIO);
@@ -91,13 +93,18 @@ export function ModuloAdministradores({ administradores, ejecutar }) {
     };
 
     const eliminar = (a) => {
-        if (window.confirm(`¿Eliminar la cuenta de administrador "${a.username}"? Esta acción no se puede deshacer.`)) {
-            ejecutar(() => adminService.eliminarAdministrador(a.id), `Administrador "${a.username}" eliminado.`);
-        }
+        pedirConfirmacion({
+            titulo: 'Eliminar administrador',
+            mensaje: `¿Eliminar la cuenta de administrador "${a.username}"? Esta acción no se puede deshacer.`,
+            confirmarTexto: 'Eliminar',
+            variante: 'danger',
+            accion: () => ejecutar(() => adminService.eliminarAdministrador(a.id), `Administrador "${a.username}" eliminado.`)
+        });
     };
 
     return (
         <>
+            {dialogoConfirmacion}
             <SectionCard
                 titulo="Cuentas de administrador"
                 Icon={AdminPanelSettingsRoundedIcon}

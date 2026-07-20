@@ -11,6 +11,7 @@ import LockRoundedIcon from '@mui/icons-material/LockRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import RocketLaunchRoundedIcon from '@mui/icons-material/RocketLaunchRounded';
 import { SidebarLayout } from '../../components/dashboard/SidebarLayout';
+import { toast } from '../../components/dashboard/toastBus';
 import { FileChip, FilePreviewModal, descargarArchivo } from '../../components/archivos/ArchivoChip';
 import { QuizInteractivo } from '../../components/quiz/QuizInteractivo';
 import { JUEGOS_UI, juegoJugable } from '../../components/juegos/registroJuegos';
@@ -208,9 +209,9 @@ export function DashboardEstudiante() {
         if (!pinNuevo) return;
         try {
             const data = await authService.cambiarPin(pinActual.trim(), pinNuevo.trim());
-            window.alert(data.mensaje);
+            toast.exito(data.mensaje);
         } catch (err) {
-            window.alert(err.message);
+            toast.error(err.message);
         }
     };
 

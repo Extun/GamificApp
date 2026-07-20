@@ -8,6 +8,7 @@ import LockRoundedIcon from '@mui/icons-material/LockRounded';
 import adminService from '../../../services/adminService';
 import { oscurecerColor } from '../../../services/materiasService';
 import { SectionCard, EmptyState, ModalPanel } from '../../../components/dashboard/DashboardWidgets';
+import { useConfirmacion } from '../../../hooks/useConfirmacion';
 import './moduloMaterias.css';
 
 const COLORES_SUGERIDOS = ['#e0f2fe', '#fce7f3', '#dcfce7', '#fef3c7', '#ede9fe', '#ffe4e6', '#ccfbf1', '#fef9c3'];
@@ -49,6 +50,7 @@ function BannerMateria({ materia, className }) {
 }
 
 export function ModuloMaterias({ materias, docentes = [], ejecutar }) {
+    const { pedirConfirmacion, dialogoConfirmacion } = useConfirmacion();
     // `editando`: null = cerrado, 'nueva' = crear, objeto = editar existente.
     const [editando, setEditando] = useState(null);
     const [form, setForm] = useState(FORM_VACIO);
@@ -68,15 +70,25 @@ export function ModuloMaterias({ materias, docentes = [], ejecutar }) {
     };
 
     const abrirEdicion = (m) => {
-        if (m.protegida && !window.confirm(
-            `"${m.nombre}" es una materia protegida (estructural para la institución).\n¿Seguro que quieres modificarla?`
-        )) return;
-        setForm({
-            nombre: m.nombre, color: m.color, icono: m.icono, activa: Boolean(m.activa),
-            descripcion: m.descripcion || '', competencias: m.competencias || '',
-            nivel: m.nivel || '', banner_data: m.banner_data || null, protegida: Boolean(m.protegida)
-        });
-        setEditando(m);
+        const abrirFormulario = () => {
+            setForm({
+                nombre: m.nombre, color: m.color, icono: m.icono, activa: Boolean(m.activa),
+                descripcion: m.descripcion || '', competencias: m.competencias || '',
+                nivel: m.nivel || '', banner_data: m.banner_data || null, protegida: Boolean(m.protegida)
+            });
+            setEditando(m);
+        };
+        if (m.protegida) {
+            pedirConfirmacion({
+                titulo: 'Materia protegida',
+                mensaje: `"${m.nombre}" es una materia protegida (estructural para la institución). ¿Seguro que quieres modificarla?`,
+                confirmarTexto: 'Modificar',
+                variante: 'warning',
+                accion: abrirFormulario
+            });
+            return;
+        }
+        abrirFormulario();
     };
 
     const guardar = () => {
@@ -94,10 +106,7 @@ export function ModuloMaterias({ materias, docentes = [], ejecutar }) {
 
     const alternarEstado = (m) => {
         const activar = !m.activa;
-        if (m.protegida && !activar && !window.confirm(
-            `"${m.nombre}" es una materia protegida. ¿Seguro que quieres ocultarla?\nDejará de verse para docentes y estudiantes, pero conservará todo su contenido.`
-        )) return;
-        ejecutar(
+        const guardarEstado = () => ejecutar(
             () => adminService.actualizarMateria(m.id, {
                 nombre: m.nombre, color: m.color, icono: m.icono, activa: activar,
                 descripcion: m.descripcion, competencias: m.competencias,
@@ -105,13 +114,29 @@ export function ModuloMaterias({ materias, docentes = [], ejecutar }) {
             }),
             `Materia "${m.nombre}" ${activar ? 'activada' : 'oculta (su contenido y su historial se conservan)'}.`
         );
+        if (m.protegida && !activar) {
+            pedirConfirmacion({
+                titulo: 'Ocultar materia protegida',
+                mensaje: `"${m.nombre}" es una materia protegida. ¿Seguro que quieres ocultarla?`,
+                detalle: 'Dejará de verse para docentes y estudiantes, pero conservará todo su contenido.',
+                confirmarTexto: 'Ocultar',
+                variante: 'warning',
+                accion: guardarEstado
+            });
+            return;
+        }
+        guardarEstado();
     };
 
     const eliminar = (m) => {
         if (m.protegida) return;
-        if (window.confirm(`¿Enviar la materia "${m.nombre}" a la papelera? Podrás restaurarla desde allí.`)) {
-            ejecutar(() => adminService.eliminarMateria(m.id), `Materia "${m.nombre}" enviada a la papelera.`);
-        }
+        pedirConfirmacion({
+            titulo: 'Enviar a la papelera',
+            mensaje: `¿Enviar la materia "${m.nombre}" a la papelera? Podrás restaurarla desde allí.`,
+            confirmarTexto: 'Enviar a la papelera',
+            variante: 'danger',
+            accion: () => ejecutar(() => adminService.eliminarMateria(m.id), `Materia "${m.nombre}" enviada a la papelera.`)
+        });
     };
 
     const mover = (indice, delta) => {
@@ -158,6 +183,7 @@ export function ModuloMaterias({ materias, docentes = [], ejecutar }) {
 
     return (
         <>
+            {dialogoConfirmacion}
             <SectionCard
                 titulo="Catálogo de materias"
                 Icon={MenuBookRoundedIcon}

@@ -50,6 +50,7 @@ import {
     formatearFecha,
     TablaPro
 } from '../../components/dashboard/DashboardWidgets';
+import { useConfirmacion } from '../../hooks/useConfirmacion';
 import estudiantesService from '../../services/estudiantesService';
 
 // Selector de materias como tarjetas pastel (asistente de creación de
@@ -150,6 +151,7 @@ const ICONO_ROL = {
 // bajas) y monitoreo de los códigos de invitación de toda la institución.
 export function AdminDashboard() {
     const navigate = useNavigate();
+    const { pedirConfirmacion, dialogoConfirmacion } = useConfirmacion();
     const [pagina, setPagina] = useState('inicio');
     const [docentes, setDocentes] = useState([]);
     const [estudiantes, setEstudiantes] = useState([]);
@@ -570,11 +572,13 @@ export function AdminDashboard() {
                                                             className="docente-btn-eliminar"
                                                             title="Eliminar docente"
                                                             aria-label={`Eliminar al docente ${d.username}`}
-                                                            onClick={() => {
-                                                                if (window.confirm(`¿Eliminar al docente "${d.username}"?`)) {
-                                                                    ejecutar(() => adminService.eliminarDocente(d.id), 'Docente eliminado.');
-                                                                }
-                                                            }}
+                                                            onClick={() => pedirConfirmacion({
+                                                                titulo: 'Eliminar docente',
+                                                                mensaje: `¿Eliminar al docente "${d.username}"?`,
+                                                                confirmarTexto: 'Eliminar',
+                                                                variante: 'danger',
+                                                                accion: () => ejecutar(() => adminService.eliminarDocente(d.id), 'Docente eliminado.')
+                                                            })}
                                                         >
                                                             <DeleteOutlineRoundedIcon sx={{ fontSize: '1.1rem' }} />
                                                         </button>
@@ -678,11 +682,13 @@ export function AdminDashboard() {
                                                                         title="Eliminar estudiante"
                                                                         aria-label={`Eliminar a ${e.nombre_completo}`}
                                                                         className="accion-peligro"
-                                                                        onClick={() => {
-                                                                            if (window.confirm(`¿Eliminar a "${e.nombre_completo}" y todo su progreso?`)) {
-                                                                                ejecutar(() => adminService.eliminarEstudiante(e.usuario_id), 'Estudiante eliminado.');
-                                                                            }
-                                                                        }}
+                                                                        onClick={() => pedirConfirmacion({
+                                                                            titulo: 'Eliminar estudiante',
+                                                                            mensaje: `¿Eliminar a "${e.nombre_completo}" y todo su progreso?`,
+                                                                            confirmarTexto: 'Eliminar',
+                                                                            variante: 'danger',
+                                                                            accion: () => ejecutar(() => adminService.eliminarEstudiante(e.usuario_id), 'Estudiante eliminado.')
+                                                                        })}
                                                                     >
                                                                         <DeleteOutlineRoundedIcon sx={{ fontSize: '1.1rem' }} />
                                                                     </button>
@@ -836,11 +842,13 @@ export function AdminDashboard() {
                                                                         title="Eliminar invitación"
                                                                         aria-label={`Eliminar la invitación ${i.codigo}`}
                                                                         className="accion-peligro"
-                                                                        onClick={() => {
-                                                                            if (window.confirm(`¿Eliminar la invitación "${i.codigo}" (${i.curso})? Ya no podrá usarse para registrarse.`)) {
-                                                                                ejecutar(() => adminService.eliminarInvitacion(i.id), 'Invitación eliminada.');
-                                                                            }
-                                                                        }}
+                                                                        onClick={() => pedirConfirmacion({
+                                                                            titulo: 'Eliminar invitación',
+                                                                            mensaje: `¿Eliminar la invitación "${i.codigo}" (${i.curso})? Ya no podrá usarse para registrarse.`,
+                                                                            confirmarTexto: 'Eliminar',
+                                                                            variante: 'danger',
+                                                                            accion: () => ejecutar(() => adminService.eliminarInvitacion(i.id), 'Invitación eliminada.')
+                                                                        })}
                                                                     >
                                                                         <DeleteOutlineRoundedIcon sx={{ fontSize: '1.1rem' }} />
                                                                     </button>
@@ -1000,6 +1008,8 @@ export function AdminDashboard() {
                     </div>
                 </ModalPanel>
             )}
+
+            {dialogoConfirmacion}
         </SidebarLayout>
     );
 }

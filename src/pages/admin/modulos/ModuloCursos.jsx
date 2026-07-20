@@ -7,10 +7,12 @@ import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded';
 import adminService from '../../../services/adminService';
 import { SectionCard, EmptyState, ModalPanel, TablaPro } from '../../../components/dashboard/DashboardWidgets';
+import { useConfirmacion } from '../../../hooks/useConfirmacion';
 
 const FORM_VACIO = { nombre: '', paralelo: '', nivel: '', activo: true };
 
 export function ModuloCursos({ cursos, ejecutar }) {
+    const { pedirConfirmacion, dialogoConfirmacion } = useConfirmacion();
     // `editando`: null = cerrado, 'nuevo' = crear, objeto = editar existente.
     const [editando, setEditando] = useState(null);
     const [form, setForm] = useState(FORM_VACIO);
@@ -44,13 +46,18 @@ export function ModuloCursos({ cursos, ejecutar }) {
     };
 
     const eliminar = (c) => {
-        if (window.confirm(`¿Eliminar el curso "${c.etiqueta}"? Solo es posible si no tiene estudiantes.`)) {
-            ejecutar(() => adminService.eliminarCurso(c.id), `Curso "${c.etiqueta}" eliminado.`);
-        }
+        pedirConfirmacion({
+            titulo: 'Eliminar curso',
+            mensaje: `¿Eliminar el curso "${c.etiqueta}"? Solo es posible si no tiene estudiantes.`,
+            confirmarTexto: 'Eliminar',
+            variante: 'danger',
+            accion: () => ejecutar(() => adminService.eliminarCurso(c.id), `Curso "${c.etiqueta}" eliminado.`)
+        });
     };
 
     return (
         <>
+            {dialogoConfirmacion}
             <SectionCard
                 titulo="Cursos y paralelos"
                 Icon={Diversity3RoundedIcon}

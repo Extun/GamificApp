@@ -5,6 +5,7 @@ import {Dashboard} from './pages/admin/dashboard.jsx'
 import {DashboardEstudiante} from './pages/estudiante/DashboardEstudiante.jsx'
 import {RegistroEstudiante} from './pages/estudiante/RegistroEstudiante.jsx'
 import {AdminDashboard} from './pages/admin/AdminDashboard.jsx'
+import {ToastHost} from './components/dashboard/Toast.jsx'
 import authService from './services/authService'
 
 // Solo entra quien tiene un JWT emitido por el servidor; si el token expira,
@@ -27,19 +28,24 @@ function DashboardPorRol() {
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Login />} />
-      <Route path="/registro" element={<RegistroEstudiante />} />
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <DashboardPorRol />
-          </ProtectedRoute>
-        }
-      />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={<Login />} />
+        <Route path="/registro" element={<RegistroEstudiante />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardPorRol />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      {/* Notificaciones transitorias (SPEC-018 Fase 4): un solo host para
+          toda la app; sobrevive a la navegación interna de la SPA. */}
+      <ToastHost />
+    </>
   )
 }
 

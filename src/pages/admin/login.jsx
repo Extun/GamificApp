@@ -6,6 +6,7 @@ import SchoolRoundedIcon from '@mui/icons-material/SchoolRounded';
 import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
 import './login.css';
 import authService from '../../services/authService';
+import { toast } from '../../components/dashboard/toastBus';
 import { getInstitucionCache, obtenerInstitucion, NOMBRE_INSTITUCION_DEFECTO } from '../../services/institucionService';
 
 // El rol NUNCA se elige aquí: lo determina el servidor según la cuenta y
@@ -66,7 +67,9 @@ export function Login(){
         e.preventDefault();
         ejecutar(async () => {
             const data = await authService.loginEmergencia(nombre.trim(), codigoEmergencia.trim());
-            if (data.aviso) window.alert(data.aviso);
+            // El aviso importa (p. ej. cambiar el PIN tras la emergencia):
+            // dura más de lo normal y también puede cerrarse a mano.
+            if (data.aviso) toast.aviso(data.aviso, { duracion: 12000 });
         });
     };
 

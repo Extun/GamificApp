@@ -7,6 +7,7 @@ import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import RestoreRoundedIcon from '@mui/icons-material/RestoreRounded';
 import adminService from '../../../services/adminService';
 import { SectionCard, EmptyState, TablaPro, formatearFecha } from '../../../components/dashboard/DashboardWidgets';
+import { useConfirmacion } from '../../../hooks/useConfirmacion';
 
 const PESTANAS = [
     { id: 'todos', label: 'Todos' },
@@ -26,6 +27,7 @@ const NOMBRE_TIPO = {
 };
 
 export function ModuloPapelera({ elementos, ejecutar }) {
+    const { pedirConfirmacion, dialogoConfirmacion } = useConfirmacion();
     const [pestana, setPestana] = useState('todos');
 
     const visibles = pestana === 'todos'
@@ -40,14 +42,17 @@ export function ModuloPapelera({ elementos, ejecutar }) {
     };
 
     const purgar = (el) => {
-        if (window.confirm(
-            `¿Eliminar DEFINITIVAMENTE ${NOMBRE_TIPO[el.tipo].toLowerCase()} "${el.nombre}"?\n\nEsta acción no se puede deshacer.`
-        )) {
-            ejecutar(
+        pedirConfirmacion({
+            titulo: 'Eliminar definitivamente',
+            mensaje: `¿Eliminar DEFINITIVAMENTE ${NOMBRE_TIPO[el.tipo].toLowerCase()} "${el.nombre}"?`,
+            detalle: 'Esta acción no se puede deshacer.',
+            confirmarTexto: 'Eliminar para siempre',
+            variante: 'danger',
+            accion: () => ejecutar(
                 () => adminService.purgarDePapelera(el.tipo, el.id),
                 `${NOMBRE_TIPO[el.tipo]} "${el.nombre}" eliminado definitivamente.`
-            );
-        }
+            )
+        });
     };
 
     return (
@@ -56,6 +61,7 @@ export function ModuloPapelera({ elementos, ejecutar }) {
             Icon={DeleteOutlineRoundedIcon}
             tag={elementos.length ? `${elementos.length}` : undefined}
         >
+            {dialogoConfirmacion}
             <div className="papelera-tabs" role="tablist" aria-label="Filtrar la papelera por tipo">
                 {PESTANAS.map((p) => {
                     const total = p.id === 'todos'
