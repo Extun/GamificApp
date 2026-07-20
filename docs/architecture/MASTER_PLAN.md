@@ -6,6 +6,8 @@ Roadmap de GamificApp: fases, backlog priorizado, dependencias y riesgos. El est
 
 # Última actualización
 
+2026-07-20 (Entorno local Docker+MySQL validado y versionado; SPEC-018 —pulido integral UI/UX— redactada y aprobada como base oficial tras auditoría runtime de los 3 roles. Sin implementación iniciada.)
+
 2026-07-19 (SPEC-016 y SPEC-017 implementadas: proveedores de IA agnosticos y arquitectura extensible de juegos con septimo juego de demostracion. Ambas pendientes de validacion en produccion)
 
 # Responsable
@@ -25,6 +27,8 @@ Fabrizio Zurita (Extun)
 | 3.7 | Editor de actividades universal (SPEC-013) | Botón único "Agregar" con menú por acciones, lenguaje docente (sin "Banco"/"IA"/"manual"), toggles "Mezclar" del quiz, selección automática desde preguntas guardadas, autoguardado unificado, modal IA único | 🟡 **Parcial (estado verificado 2026-07-19): F1 ✅, F2 ✅, F3 ⚠️ parcial, F4-F7 ❌ pendientes.** La F8 queda absorbida por SPEC-017. Detalle por fase en `SPEC-013 §7` |
 | 3.8 | Proveedores de IA (SPEC-016) | Arquitectura agnóstica al proveedor: adaptadores Gemini + OpenAI, selección de proveedor/modelo desde administración, "Probar conexión". API Keys solo en variables de entorno | 🟡 Redactada 2026-07-19 — **pendiente de aprobación**, ninguna fase iniciada. Responde a observación del revisor |
 | 3.9 | Arquitectura extensible de juegos (SPEC-017) | Registro central de tipos de juego (backend + frontend), 3 estados (Activo / Solo jugar / Deshabilitado), módulo de administración, guía "Cómo añadir un juego" y séptimo juego de demostración | 🟡 **Implementada — pendiente de validación funcional en producción** (2026-07-19). Fases 1-7 en código, migración 014. Extensibilidad demostrada con Verdadero o Falso: 4 archivos propios, 4 líneas de registro, **0 módulos centrales con lógica del tipo y 0 cambios en los 6 juegos existentes** (`docs/COMO-AGREGAR-UN-JUEGO.md`). **NO cerrar** hasta validar en el despliegue |
+| 3.10 | Pulido integral UI/UX (SPEC-018) | Design system completo (tokens semánticos, z-index, breakpoints), `ModalPanel` accesible, `ConfirmDialog`/`Toast`, sidebar móvil colapsable, pulido por rol y de los 7 juegos. Solo presentación; §10 y SPEC-013/016/017 congeladas | 🟡 **Redactada y aprobada como base oficial (2026-07-20) tras auditoría runtime.** 8 fases pequeñas con verificación obligatoria por fase en el entorno local. **Sin implementación iniciada** |
+| Infra | Entorno local de desarrollo/QA (Docker + MySQL) | `docker-compose.dev.yml` + `seedDev.js` (triple barrera) + `initDb.js` real; los 3 roles y 7 juegos jugables en local. **No es SPEC** (infraestructura de dev) | 🟢 **Validado y versionado (2026-07-20).** `docs/DEV-ENTORNO-LOCAL.md` |
 | 4 | **Épica 1: Experiencia del estudiante** | Rediseño completo del lado del niño en 5 specs (ver §2) | 🟡 En curso (auditoría y SPEC-001 redactadas; nada implementado) |
 | 5 | Módulos incompletos | Libro de Calificaciones, 3 logros faltantes, UI de edición de docente | ⚪ Pendiente (antes de la defensa, si hay tiempo) |
 | 6 | Post-tesis | Multi-institución, archivos fuera de la BD, fallback de IA, memoria del asistente | ⚪ Futuro |

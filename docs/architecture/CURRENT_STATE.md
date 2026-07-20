@@ -2,6 +2,8 @@
 
 # Última actualización
 
+2026-07-20 (Entorno local de desarrollo Docker+MySQL `gamificapp_dev` validado y versionado — los 3 roles y los 7 juegos jugables/comprobables en local con `seedDev.js`. SPEC-018 (pulido integral UI/UX) redactada y aprobada como base oficial tras auditoría runtime; sin implementación iniciada.)
+
 2026-07-19 (SPEC-017 completa en codigo: registro central, migracion 014, Gestion de juegos y septimo juego Verdadero o Falso como prueba de extensibilidad. Pendiente de validacion en produccion)
 
 # Responsable
@@ -33,9 +35,11 @@ Fabrizio Zurita (Extun)
 | Asistente IA | ⚪ Retirado del menú — endpoint sigue existiendo sin entrada en la UI |
 | Navegación del estudiante (shell con rutas anidadas) | 🔴 Épica 1 / SPEC-001 — nada implementado, ver `MASTER_PLAN.md` |
 | Proveedores de IA conmutables (Gemini/OpenAI) | 🟢 SPEC-016 desplegada (2026-07-19). **Gemini validado en producción y en uso.** **OpenAI implementado y verificado estructuralmente, SIN validación funcional: no hay `OPENAI_API_KEY` disponible** — no presentarlo como probado contra su API real (ver `SPEC-016 §16`). Incluye sanitización de logs (`lib/ia/errores.js`) y validación previa al guardado |
-| Gestión de tipos de juego por el administrador | 🟡 SPEC-017 Fases 1-5 y 3b en código (2026-07-19) — registro central (backend + frontend), 3 estados, migración 014, `ModuloJuegos`. **Sin validar en navegador ni con BD real.** Séptimo juego de demostración pendiente |
+| Gestión de tipos de juego por el administrador | 🟢 SPEC-017 — registro central (backend + frontend), 3 estados, migración 014, `ModuloJuegos`. **Validado en entorno local (2026-07-20): cambiar activo/solo_jugar/deshabilitado altera la visibilidad del estudiante sin borrar retos/progreso/XP/calificaciones.** Pendiente de validación en producción |
 | Extensibilidad: añadir un juego nuevo | 🟢 **Demostrada**: Verdadero o Falso se incorporó con 4 archivos propios + 4 líneas en los 2 índices de registro, **0 archivos centrales con lógica del tipo y 0 modificaciones a los 6 juegos existentes**. Guía y evidencia en `docs/COMO-AGREGAR-UN-JUEGO.md` |
-| Verdadero o Falso (7º juego) | 🟡 En código (2026-07-19) — reproductor, IA, banco, editor genérico y Gestión de juegos. **Sin validar en navegador ni con BD real** |
+| Verdadero o Falso (7º juego) | 🟢 **Jugado a partida completa en entorno local (2026-07-20)** — reproductor, corrección diferida (selección no revela hasta finalizar), overlay, IA/banco/editor. Pendiente de validación en producción |
+| Entorno local de desarrollo/QA (Docker + MySQL `gamificapp_dev`) | 🟢 **Validado y versionado (2026-07-20, commit `local dbxd`).** `docker-compose.dev.yml` + `server/scripts/seedDev.js` (triple barrera de seguridad) + `docs/DEV-ENTORNO-LOCAL.md`. Los 3 roles y los 7 juegos jugables/comprobables en local. Hallazgo abierto: `initDb.js` no inicializa una BD vacía desde cero (deuda técnica separada, `DEV-ENTORNO-LOCAL.md §8-bis`) |
+| Pulido integral UI/UX (SPEC-018) | 🟡 **Redactada y aprobada como base oficial (2026-07-20) tras auditoría runtime de los 3 roles.** 8 fases (fundamentos → consolidación → modales → feedback → responsive → pulido por rol → juegos → auditoría final). **Sin implementación iniciada.** Solo presentación; áreas §10/SPEC-013/016/017 congeladas |
 
 ## Último sprint
 
@@ -85,6 +89,8 @@ Fabrizio Zurita (Extun)
 **SPEC-014 — Carga masiva de estudiantes: COMPLETADA (2026-07-18, e2e validado en producción por Fabrizio).** Requisito nº 3 del revisor de tesis cerrado. Modelo único de alta: el docente registra (➕ Añadir estudiante o 📥 Importar desde Excel — ambos por la misma lógica de servidor) y el estudiante activa su acceso (Curso → Nombre → Código individual de un solo uso), y desde entonces entra con Nombre + PIN. Incluye estado de acceso Pendiente/Activado en los paneles, regeneración de código, edición de nombres/apellidos y fecha de nacimiento, homónimos resueltos por `nombre_norm`, criterio único de aula del docente (`docente_curso` OR invitación legacy) y las invitaciones antiguas en modo legacy. Detalle completo en el historial más abajo. **Cerrado: no se hacen más cambios en este módulo salvo bugs; las mejoras no indispensables sobre estudiantes quedan fuera de alcance hasta terminar el resto de puntos del revisor.**
 
 ## Próximo sprint
+
+**SPEC-018 — Pulido integral de UI/UX y accesibilidad (aprobada 2026-07-20, base oficial; sin implementación iniciada).** Solo presentación: completa el design system (tokens semánticos success/danger/warning/info, escalas de z-index y breakpoints), endurece `ModalPanel` (foco/focus-trap/Escape/restauración), reemplaza `window.confirm`/`window.alert` por `ConfirmDialog`/`Toast`, hace el sidebar móvil colapsable para los 3 roles, y pule por rol + los 7 juegos. **Áreas §10 y SPEC-013/016/017 congeladas (solo se cambia su piel).** 8 fases pequeñas con verificación obligatoria por fase (build + lint vs baseline + funcional + navegación real + responsive + consola + regresiones) usando el entorno local `gamificapp_dev`; punto de parada antes de cada commit. Detalle en `docs/specifications/SPEC-018-Pulido-Integral-UI-UX.md`.
 
 **SPEC-013 — Editor de actividades universal (aprobada 2026-07-17, diseño congelado).** Rediseño UX de los editores del docente: botón único "➕ Agregar" con menú por acciones (Escribir / Generarlas automáticamente / Reutilizar / Seleccionar automáticamente), lenguaje docente sin términos técnicos, toggles "Mezclar" configurables en el quiz, selección aleatoria desde preguntas guardadas, autoguardado unificado en los 6 editores y modal de generación IA único. Solo frontend, sin migraciones. Fases 1-7 por implementar en orden; detalle en `docs/specifications/SPEC-013-Editor-Actividades-Universal.md`.
 
