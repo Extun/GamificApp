@@ -26,6 +26,48 @@
 
   --font-body: 'Inter', system-ui, -apple-system, sans-serif;
   --font-head: 'Poppins', 'Inter', system-ui, sans-serif;
+
+  /* ===== SPEC-018 Fase 1 — Fundamentos del Design System =====
+     Infraestructura AÑADIDA sin migrar los CSS existentes (eso es Fase 2).
+     Los valores REPRESENTAN los hex dominantes que ya se usan hoy en el
+     código, así que adoptarlos en Fase 2 NO cambiará la apariencia.
+     Nada consume estos tokens todavía → cero cambio visual en Fase 1. */
+
+  /* Colores semánticos. base = color principal (texto/icono/borde fuerte),
+     -soft = fondo tenue, -dark = variante intensa (texto sobre -soft). */
+  --color-success: #16a34a;        /* verde correcto — dominante (19 usos) */
+  --color-success-soft: #dcfce7;   /* fondo verde tenue (13 usos) */
+  --color-success-dark: #15803d;   /* verde intenso (10 usos) */
+
+  --color-danger: #dc2626;         /* rojo error/incorrecto — dominante (23 usos) */
+  --color-danger-soft: #fee2e2;    /* fondo rojo tenue (16 usos) */
+  --color-danger-dark: #b91c1c;    /* rojo intenso (6 usos) */
+
+  --color-warning: #d97706;        /* ámbar advertencia (= accent-dark) */
+  --color-warning-soft: #fef3c7;   /* fondo ámbar tenue (11 usos) */
+  --color-warning-dark: #b45309;   /* ámbar accesible ~5:1 sobre blanco (9 usos) */
+
+  --color-info: #2563eb;           /* azul informativo (3 usos) */
+  --color-info-soft: #dbeafe;      /* fondo azul tenue (2 usos) */
+  /* info-dark no se define: no existe un azul más oscuro en uso hoy. */
+
+  /* Escala de z-index. Representa los valores actuales (20/50/60) y reserva
+     tramos para dropdowns y toasts que hoy no existen pero llegarán en
+     Fases 4-5. Ordenar por capa evita choques entre modal y overlay. */
+  --z-base: 0;         /* contenido normal (dashboard usa 0/1/2) */
+  --z-sticky: 20;      /* barras/acciones sticky de editores (20 hoy) */
+  --z-dropdown: 30;    /* menús desplegables (reservado, sin uso aún) */
+  --z-modal: 50;       /* backdrop de ModalPanel (.preview-backdrop = 50 hoy) */
+  --z-overlay: 60;     /* overlays de resultado de juego (55/60 hoy) */
+  --z-toast: 70;       /* notificaciones toast (reservado, Fase 4) */
+
+  /* Breakpoints canónicos (documentación). CSS @media NO acepta var(), así
+     que estos custom properties son referencia para JS/container-queries y
+     para unificar los 8 cortes dispares actuales (480/520/560/640/720/760/
+     900/1024) en Fases 5-6. Canónicos: móvil ≤480, tablet ≤768, escritorio ≥1024. */
+  --bp-mobile: 480px;
+  --bp-tablet: 768px;
+  --bp-desktop: 1024px;
 }
 
 * {
