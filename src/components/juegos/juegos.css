@@ -67,8 +67,8 @@
 }
 
 .memorama-carta.is-resuelta .memorama-carta-frente {
-    background: #dcfce7;
-    border-color: #16a34a;
+    background: var(--color-success-soft);
+    border-color: var(--color-success);
 }
 
 .memorama-carta:disabled {
@@ -103,7 +103,7 @@
 }
 
 .linea-evento.is-correcto {
-    border-color: #16a34a;
+    border-color: var(--color-success);
     background: #f0fdf4;
 }
 
@@ -133,7 +133,7 @@
 }
 
 .linea-evento-check {
-    color: #16a34a;
+    color: var(--color-success);
 }
 
 .linea-evento-flechas {
@@ -223,13 +223,13 @@
 }
 
 .completar-hueco.is-correcto {
-    color: #16a34a;
-    border-color: #16a34a;
+    color: var(--color-success);
+    border-color: var(--color-success);
 }
 
 .completar-hueco.is-incorrecto {
-    color: #dc2626;
-    border-color: #dc2626;
+    color: var(--color-danger);
+    border-color: var(--color-danger);
     text-decoration: line-through;
 }
 
@@ -260,15 +260,15 @@
 }
 
 .completar-opcion.opcion-correcta {
-    background: #dcfce7;
-    border-color: #16a34a;
-    color: #166534;
+    background: var(--color-success-soft);
+    border-color: var(--color-success);
+    color: #166534; /* verde más oscuro que --color-success-dark; se conserva para no alterar el contraste actual */
 }
 
 .completar-opcion.opcion-incorrecta {
-    background: #fee2e2;
-    border-color: #dc2626;
-    color: #991b1b;
+    background: var(--color-danger-soft);
+    border-color: var(--color-danger);
+    color: #991b1b; /* rojo más oscuro que --color-danger-dark; se conserva para no alterar el contraste actual */
 }
 
 .completar-opcion.opcion-atenuada {

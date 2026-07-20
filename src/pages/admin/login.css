@@ -151,9 +151,9 @@
 .login-error {
     padding: 11px 14px;
     border-radius: var(--radius-sm);
-    background: #fef2f2;
+    background: #fef2f2; /* rojos tenues sin token; se conservan */
     border: 1px solid #fecaca;
-    color: #dc2626;
+    color: var(--color-danger);
     font-size: 0.9rem;
     font-weight: 500;
 }

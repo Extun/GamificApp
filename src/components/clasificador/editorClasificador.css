@@ -65,7 +65,7 @@
     border-radius: 8px;
     transition: background 0.2s ease, color 0.2s ease;
 }
-.clasificador-cat-eliminar:hover { background: #fee2e2; color: #dc2626; }
+.clasificador-cat-eliminar:hover { background: var(--color-danger-soft); color: var(--color-danger); }
 
 .clasificador-elementos {
     display: flex;
@@ -96,7 +96,7 @@
     padding: 2px;
     border-radius: 50%;
 }
-.clasificador-elemento-chip button:hover { color: #dc2626; background: #fee2e2; }
+.clasificador-elemento-chip button:hover { color: var(--color-danger); background: var(--color-danger-soft); }
 
 @keyframes chip-pop {
     from { opacity: 0; transform: scale(0.8); }

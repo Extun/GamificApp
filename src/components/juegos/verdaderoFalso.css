@@ -53,9 +53,9 @@
 /* Corrección DIFERIDA: la respuesta elegida se marca en ámbar neutro, nunca
    en verde, para no insinuar que acertó (mismo criterio que el Quiz). */
 .vf-opcion.is-elegida {
-    border-color: #f59e0b;
-    background: #fffbeb;
-    color: #92400e;
+    border-color: var(--color-accent);
+    background: #fffbeb; /* ámbar más tenue que --color-accent-soft; se conserva el tono actual */
+    color: #92400e; /* ámbar más oscuro que --color-accent-dark; se conserva el contraste actual */
 }
 
 .vf-opcion.is-atenuada { opacity: 0.45; }
@@ -71,8 +71,8 @@
     font-size: 0.88rem;
 }
 
-.vf-revision-respuesta.is-correcta { color: #15803d; }
-.vf-revision-respuesta.is-incorrecta { color: #b91c1c; }
+.vf-revision-respuesta.is-correcta { color: var(--color-success-dark); }
+.vf-revision-respuesta.is-incorrecta { color: var(--color-danger-dark); }
 
 .vf-revision-explicacion {
     margin: 4px 0 0;

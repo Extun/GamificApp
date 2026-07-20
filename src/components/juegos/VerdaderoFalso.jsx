@@ -164,7 +164,7 @@ export function VerdaderoFalso({ reto, estudianteId, onSalir, onCompletado, solo
                                 <div key={i} className="completar-revision-item">
                                     <span className="completar-revision-icono" aria-hidden="true">
                                         {acerto
-                                            ? <CheckCircleRoundedIcon sx={{ fontSize: '1.2rem', color: '#16a34a' }} />
+                                            ? <CheckCircleRoundedIcon sx={{ fontSize: '1.2rem', color: 'var(--color-success)' }} />
                                             : <CancelRoundedIcon sx={{ fontSize: '1.2rem', color: '#ef4444' }} />}
                                     </span>
                                     <div>

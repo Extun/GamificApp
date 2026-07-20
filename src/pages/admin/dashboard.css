@@ -867,7 +867,7 @@
     transition: background 0.2s ease, color 0.2s ease;
 }
 
-.preview-close:hover { background: #fee2e2; color: #dc2626; }
+.preview-close:hover { background: var(--color-danger-soft); color: var(--color-danger); }
 
 .preview-body { padding: 24px; background: var(--color-surface-alt); overflow-y: auto; }
 
@@ -1104,11 +1104,11 @@
 
 .preview-action-primary:hover { transform: translateY(-2px); filter: brightness(1.05); }
 
-.preview-action-danger { color: #dc2626; }
+.preview-action-danger { color: var(--color-danger); }
 
 .preview-action-danger:hover {
-    background: #fee2e2;
-    border-color: #fecaca;
+    background: var(--color-danger-soft);
+    border-color: #fecaca; /* rojo intermedio sin token; se conserva */
 }
 
 @keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
@@ -1386,15 +1386,15 @@
 .opcion-icono { flex-shrink: 0; font-size: 1.2rem; }
 
 .opcion-correcta {
-    border-color: #16a34a;
-    background: #dcfce7;
+    border-color: var(--color-success);
+    background: var(--color-success-soft);
 }
-.opcion-correcta .opcion-letra { background: #16a34a; color: #fff; }
-.opcion-correcta .opcion-icono { color: #16a34a; }
+.opcion-correcta .opcion-letra { background: var(--color-success); color: #fff; }
+.opcion-correcta .opcion-icono { color: var(--color-success); }
 
 .opcion-incorrecta {
-    border-color: #ef4444;
-    background: #fee2e2;
+    border-color: #ef4444; /* rojo más vivo que --color-danger; se conserva el tono actual del Quiz */
+    background: var(--color-danger-soft);
 }
 .opcion-incorrecta .opcion-letra { background: #ef4444; color: #fff; }
 .opcion-incorrecta .opcion-icono { color: #ef4444; }
@@ -1408,8 +1408,8 @@
     border: 2px solid var(--color-accent);
     background: var(--color-accent-soft);
 }
-/* Ámbar oscuro #b45309: contraste ≥ 4.5:1 con texto blanco (accesibilidad). */
-.opcion-elegida .opcion-letra { background: #b45309; color: #fff; }
+/* Ámbar oscuro (--color-warning-dark): contraste ≥ 4.5:1 con texto blanco (accesibilidad). */
+.opcion-elegida .opcion-letra { background: var(--color-warning-dark); color: #fff; }
 
 /* Chip textual "Tu respuesta": el estado seleccionado se entiende sin
    depender del color (accesibilidad). También se usa en la revisión. */
@@ -1420,10 +1420,10 @@
     font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0.02em;
-    background: #b45309;
+    background: var(--color-warning-dark);
     color: #fff;
 }
-.opcion-correcta .opcion-tu-respuesta { background: #16a34a; }
+.opcion-correcta .opcion-tu-respuesta { background: var(--color-success); }
 .opcion-incorrecta .opcion-tu-respuesta { background: #ef4444; }
 
 /* Revisión: la respuesta correcta que el niño NO eligió se muestra en verde
@@ -1433,7 +1433,7 @@
     border-style: dashed;
     border-width: 2px;
 }
-.opcion-correcta-no-elegida .opcion-letra { background: #dcfce7; color: #16a34a; }
+.opcion-correcta-no-elegida .opcion-letra { background: var(--color-success-soft); color: var(--color-success); }
 
 .pregunta-justificacion {
     display: flex;
@@ -1565,9 +1565,9 @@
     transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 .quiz-historial-eliminar:hover {
-    background: #fef2f2;
+    background: #fef2f2; /* rojo muy tenue sin token; se conserva */
     border-color: #fecaca;
-    color: #dc2626;
+    color: var(--color-danger);
 }
 
 /* Paginación del historial (hasta 15 entradas, 5 por página). */
@@ -2103,7 +2103,7 @@
     max-width: 40vw;
     background: transparent;
 }
-.gen-ia-opcion.is-correcta { border-color: var(--color-exito, #16a34a); background: #f0fdf4; }
+.gen-ia-opcion.is-correcta { border-color: var(--color-success); background: #f0fdf4; }
 .gen-ia-acciones { display: flex; flex-wrap: wrap; gap: 0.6rem; }
 /* Acciones dentro del acordeón de ítems (Subir/Bajar/Eliminar): con varios
    botones hace falta separación y que quepan en pantallas pequeñas. */
@@ -2136,7 +2136,7 @@
 .bib-origen-ia { font-size: 0.9rem; }
 .bib-preview-lista { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.6rem; }
 .bib-preview-lista ul { margin: 0.25rem 0 0; padding-left: 1.1rem; }
-.bib-preview-lista .is-correcta { color: var(--color-exito, #16a34a); font-weight: 600; }
+.bib-preview-lista .is-correcta { color: var(--color-success); font-weight: 600; }
 .bib-preview-texto p { margin: 0.4rem 0; }
 .bib-preview-json { overflow-x: auto; font-size: 0.8rem; }
 .bib-stats-grid {

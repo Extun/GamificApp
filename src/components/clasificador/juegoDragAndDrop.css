@@ -149,7 +149,9 @@
     100% { transform: scale(1); }
 }
 
-/* Error: la ficha rebota/tiembla y se queda en la bandeja. */
+/* Error: la ficha rebota/tiembla y se queda en la bandeja.
+   Rojos más suaves que --color-danger/-soft a propósito: el rebote es un
+   aviso amable, no una corrección dura; se conservan sin token. */
 .juego-ficha.is-rebote {
     animation: ficha-rebote 0.55s ease;
     border-color: #f87171;

@@ -256,8 +256,8 @@
     border-color: var(--color-primary-light);
 }
 
-.editor-btn-peligro { color: #dc2626; }
-.editor-btn-peligro:hover:not(:disabled) { background: #fef2f2; border-color: #fecaca; }
+.editor-btn-peligro { color: var(--color-danger); }
+.editor-btn-peligro:hover:not(:disabled) { background: #fef2f2; border-color: #fecaca; } /* rojos tenues sin token; se conservan */
 
 /* Acción IA: acento sutil, secundaria respecto a Publicar. */
 .editor-btn-ia {

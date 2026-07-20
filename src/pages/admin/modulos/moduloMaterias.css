@@ -112,7 +112,7 @@
     font-weight: 700;
 }
 
-.matcat-estado.is-activa { background: #dcfce7; color: #15803d; }
+.matcat-estado.is-activa { background: var(--color-success-soft); color: var(--color-success-dark); }
 .matcat-estado.is-oculta { background: #e2e8f0; color: #475569; }
 
 .matcat-protegida {

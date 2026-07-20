@@ -18,8 +18,8 @@
 .juegos-nota-final { margin: 16px 0 0; }
 
 .juegos-aviso { margin: 0 0 12px; font-size: 0.88rem; }
-.juegos-aviso.is-ok { color: #15803d; }
-.juegos-aviso.is-error { color: #b91c1c; }
+.juegos-aviso.is-ok { color: var(--color-success-dark); }
+.juegos-aviso.is-error { color: var(--color-danger-dark); }
 
 .juegos-lista {
     list-style: none;
@@ -37,7 +37,7 @@
     background: var(--color-surface);
 }
 
-.juego-fila.is-solo_jugar { border-left-color: #d97706; }
+.juego-fila.is-solo_jugar { border-left-color: var(--color-warning); }
 .juego-fila.is-deshabilitado { border-left-color: #9ca3af; }
 .juego-fila.is-deshabilitado .juego-identidad { opacity: 0.75; }
 
@@ -69,8 +69,8 @@
     white-space: nowrap;
 }
 
-.juego-badge.is-activo { background: #dcfce7; color: #15803d; }
-.juego-badge.is-solo_jugar { background: #fef3c7; color: #b45309; }
+.juego-badge.is-activo { background: var(--color-success-soft); color: var(--color-success-dark); }
+.juego-badge.is-solo_jugar { background: var(--color-warning-soft); color: var(--color-warning-dark); }
 .juego-badge.is-deshabilitado { background: #f3f4f6; color: #4b5563; }
 
 .juego-integracion {
@@ -90,7 +90,7 @@
     border: 1px solid var(--color-border);
 }
 
-.juego-chip.is-si { background: #f0fdf4; border-color: #86efac; color: #15803d; }
+.juego-chip.is-si { background: #f0fdf4; border-color: #86efac; color: var(--color-success-dark); } /* verdes tenues sin token; se conservan */
 .juego-chip.is-no { background: var(--color-surface-alt); color: var(--color-text-muted); }
 
 .juego-uso {

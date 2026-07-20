@@ -27,9 +27,9 @@
 }
 
 .logout-btn:hover {
-    background: #fee2e2;
+    background: var(--color-danger-soft);
     border-color: #fecaca;
-    color: #dc2626;
+    color: var(--color-danger);
 }
 
 /* ===== Home del estudiante (Sprint pulido MVP) =====

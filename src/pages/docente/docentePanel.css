@@ -46,7 +46,7 @@
 /* Aviso dentro de la tarjeta de materia sin actividades */
 .home-doc-materia-aviso {
     font-weight: 600;
-    color: #b45309;
+    color: var(--color-warning-dark);
 }
 
 /* Centro de actividad: timeline ligera */
@@ -256,8 +256,8 @@
     text-transform: capitalize;
 }
 
-.bib-estado-publicado { background: #dcfce7; color: #15803d; }
-.bib-estado-borrador { background: #fef3c7; color: #b45309; }
+.bib-estado-publicado { background: var(--color-success-soft); color: var(--color-success-dark); }
+.bib-estado-borrador { background: var(--color-warning-soft); color: var(--color-warning-dark); }
 .bib-estado-archivado { background: #e2e8f0; color: #475569; }
 
 /* ---------- Perfil docente ---------- */

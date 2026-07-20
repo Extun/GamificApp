@@ -44,8 +44,8 @@
     line-height: 1.3;
 }
 
-.ia-estado.is-ok { color: #15803d; }
-.ia-estado.is-falta { color: #b45309; }
+.ia-estado.is-ok { color: var(--color-success-dark); }
+.ia-estado.is-falta { color: var(--color-warning-dark); }
 
 .ia-badge-activo {
     position: absolute;
@@ -99,7 +99,7 @@
     color: var(--color-text-muted);
 }
 
-.ia-ayuda.is-aviso { color: #b45309; }
+.ia-ayuda.is-aviso { color: var(--color-warning-dark); }
 
 .ia-acciones {
     display: flex;
@@ -119,8 +119,8 @@
     font-size: 0.88rem;
 }
 
-.ia-resultado.is-ok { color: #15803d; }
-.ia-resultado.is-error { color: #b91c1c; }
+.ia-resultado.is-ok { color: var(--color-success-dark); }
+.ia-resultado.is-error { color: var(--color-danger-dark); }
 
 .ia-resultado-prueba {
     display: flex;
@@ -134,8 +134,8 @@
     line-height: 1.45;
 }
 
-.ia-resultado-prueba.is-ok { border-color: #86efac; background: #f0fdf4; color: #15803d; }
-.ia-resultado-prueba.is-error { border-color: #fca5a5; background: #fef2f2; color: #b91c1c; }
+.ia-resultado-prueba.is-ok { border-color: #86efac; background: #f0fdf4; color: var(--color-success-dark); } /* tonos tenues sin token; se conservan */
+.ia-resultado-prueba.is-error { border-color: #fca5a5; background: #fef2f2; color: var(--color-danger-dark); }
 
 /* Móvil/tablet: los niños y docentes usan dispositivos compartidos, pero el
    panel de admin también se abre desde tablet (regla §5). */
