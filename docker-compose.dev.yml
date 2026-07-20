@@ -1,0 +1,58 @@
+# ============================================================
+# GamificApp — MySQL LOCAL de DESARROLLO/QA (MODO A)
+#
+# SOLO para desarrollo local. NO forma parte del deploy (Render/Aiven no
+# usan este archivo). Levanta una instancia MySQL 8 aislada y efímera para
+# que el backend real (server/) corra contra ella con el MISMO initDb.js y
+# el MISMO SQL de producción — cero mocks, cero divergencia.
+#
+# Uso:
+#   docker compose -f docker-compose.dev.yml up -d      # levantar
+#   docker compose -f docker-compose.dev.yml logs -f    # ver arranque
+#   docker compose -f docker-compose.dev.yml down       # detener (conserva datos)
+#   docker compose -f docker-compose.dev.yml down -v    # detener y BORRAR datos
+#
+# Detalles y credenciales dev: docs/DEV-ENTORNO-LOCAL.md
+#
+# Seguridad: estas credenciales son EXCLUSIVAS de desarrollo local y
+# claramente ficticias. Nunca deben usarse en producción ni apuntar a Aiven.
+# ============================================================
+
+services:
+  mysql-dev:
+    image: mysql:8.0
+    container_name: gamificapp-mysql-dev
+    # Aislado: escucha solo en localhost del host, puerto 3307 (para no
+    # chocar con un MySQL 3306 nativo si algún día lo instalas).
+    ports:
+      - "127.0.0.1:3307:3306"
+    environment:
+      # Contraseña de root del contenedor (dev, ficticia).
+      MYSQL_ROOT_PASSWORD: dev_root_local
+      # El servidor MySQL crea esta base vacía en el primer arranque.
+      # produccion_defaultdb.sql NO hace CREATE DATABASE, así que la base
+      # DEBE existir antes de que initDb.js corra: esto la garantiza.
+      MYSQL_DATABASE: gamificapp_dev
+      # Usuario de aplicación dev (el que usará server/.env).
+      MYSQL_USER: gamificapp_dev
+      MYSQL_PASSWORD: dev_local_pass
+    # Colación acorde al esquema (utf8mb4_spanish_ci) para máxima fidelidad.
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_spanish_ci
+    # Espera activa: el backend solo debe intentar conectar cuando MySQL
+    # está listo para aceptar conexiones.
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # Volumen con nombre: los datos persisten entre `up`/`down`, y se borran
+    # a propósito con `down -v`. Efímero y desechable por diseño.
+    volumes:
+      - gamificapp-mysql-dev-data:/var/lib/mysql
+    restart: unless-stopped
+
+volumes:
+  gamificapp-mysql-dev-data:
+    name: gamificapp-mysql-dev-data
