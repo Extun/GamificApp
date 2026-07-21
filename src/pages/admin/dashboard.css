@@ -1325,11 +1325,15 @@
     text-align: left;
 }
 
+/* Exclusiva del Quiz. Gana la sombra suave del sistema de cards (el resto de
+   superficies —SectionCard/StatCard— ya la usan); las del Quiz eran las únicas
+   planas. Solo presentación (SPEC-018 Fase 7.1). */
 .pregunta-card {
     padding: 20px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     background: var(--color-surface);
+    box-shadow: var(--shadow-sm);
 }
 
 .pregunta-enunciado {
@@ -1383,6 +1387,14 @@
     background: var(--color-primary-soft);
 }
 
+/* Foco de teclado temático (coherente con el hover) en vez del outline gris del
+   navegador. Solo :focus-visible → no aparece al hacer clic con el ratón.
+   Compartido por Quiz y Misión (SPEC-018 Fase 7.A: infraestructura común). */
+.opcion-quiz:focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
 .opcion-quiz:disabled {
     cursor: default;
 }
@@ -1400,7 +1412,11 @@
     font-size: 0.85rem;
 }
 
-.opcion-texto { flex: 1; }
+/* min-width:0 permite que el texto encoja y envuelva dentro del flex; sin él,
+   una opción larga junto al chip "Tu respuesta" (flex-shrink:0) desbordaba el
+   botón ~51px a 320px. overflow-wrap parte palabras muy largas. Clase compartida
+   por Quiz y Misión Narrativa (SPEC-018 Fase 7.A: infraestructura común). */
+.opcion-texto { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 
 .opcion-icono { flex-shrink: 0; font-size: 1.2rem; }
 
@@ -1411,12 +1427,16 @@
 .opcion-correcta .opcion-letra { background: var(--color-success); color: #fff; }
 .opcion-correcta .opcion-icono { color: var(--color-success); }
 
+/* --color-danger (#dc2626): blanco encima da ~4.77:1 (AA) frente a 3.74:1 del
+   #ef4444 anterior — la letra y el chip "Tu respuesta" llevan texto blanco.
+   Unifica con el token dominante del design system y con Completar. Compartido
+   por Quiz y Misión Narrativa (SPEC-018 Fase 7.A: infraestructura común). */
 .opcion-incorrecta {
-    border-color: #ef4444; /* rojo más vivo que --color-danger; se conserva el tono actual del Quiz */
+    border-color: var(--color-danger);
     background: var(--color-danger-soft);
 }
-.opcion-incorrecta .opcion-letra { background: #ef4444; color: #fff; }
-.opcion-incorrecta .opcion-icono { color: #ef4444; }
+.opcion-incorrecta .opcion-letra { background: var(--color-danger); color: #fff; }
+.opcion-incorrecta .opcion-icono { color: var(--color-danger); }
 
 .opcion-atenuada { opacity: 0.55; }
 
@@ -1443,7 +1463,7 @@
     color: #fff;
 }
 .opcion-correcta .opcion-tu-respuesta { background: var(--color-success); }
-.opcion-incorrecta .opcion-tu-respuesta { background: #ef4444; }
+.opcion-incorrecta .opcion-tu-respuesta { background: var(--color-danger); }
 
 /* Revisión: la respuesta correcta que el niño NO eligió se muestra en verde
    pero "hueca" (borde discontinuo, sin relleno), distinta de la elegida. */
@@ -1452,7 +1472,11 @@
     border-style: dashed;
     border-width: 2px;
 }
-.opcion-correcta-no-elegida .opcion-letra { background: var(--color-success-soft); color: var(--color-success); }
+/* Texto en verde intenso (success-dark) sobre el fondo verde tenue: sube el
+   contraste de la letra (texto normal 13.6px/700) de 3.00:1 a 4.57:1 (pasa
+   WCAG AA ≥4.5). success-dark es el verde más oscuro del Design System.
+   Clase exclusiva del Quiz. */
+.opcion-correcta-no-elegida .opcion-letra { background: var(--color-success-soft); color: var(--color-success-dark); }
 
 .pregunta-justificacion {
     display: flex;
@@ -1473,6 +1497,16 @@
     flex-shrink: 0;
     color: var(--color-accent, #f59e0b);
     font-size: 1.3rem;
+}
+
+/* Responsive exclusivo del reproductor del Quiz (SPEC-018 Fase 7.1): en
+   pantallas pequeñas —dispositivos compartidos de la escuela— reduce el
+   padding/gap de las tarjetas Quiz-only para dar más ancho útil al texto de
+   la pregunta y las opciones. No toca ninguna clase compartida con Misión. */
+@media (max-width: 480px) {
+    .quiz-interactivo { gap: 14px; margin-top: 16px; }
+    .pregunta-card { padding: 16px; }
+    .pregunta-enunciado { margin-bottom: 12px; }
 }
 
 .quiz-historial {
