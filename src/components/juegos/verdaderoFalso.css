@@ -50,6 +50,14 @@
 
 .vf-opcion:disabled { cursor: default; }
 
+/* Foco de teclado temático (coherente con Quiz .opcion-quiz, Clasificador
+   .juego-canasta y Completar .completar-opcion) en vez del outline gris del
+   navegador. Exclusivo de V/F: .vf-opcion no lo usa ningún otro reproductor. */
+.vf-opcion:focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
 /* Corrección DIFERIDA: la respuesta elegida se marca en ámbar neutro, nunca
    en verde, para no insinuar que acertó (mismo criterio que el Quiz). */
 .vf-opcion.is-elegida {
