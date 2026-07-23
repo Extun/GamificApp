@@ -223,8 +223,11 @@
 }
 
 .completar-hueco.is-correcto {
-    color: var(--color-success);
-    border-color: var(--color-success);
+    /* success-dark (#15803d) en vez de success (#16a34a): la palabra acertada es
+       texto en negrita 0.95rem sobre blanco → 3.30:1 (falla AA) con success;
+       success-dark da 5.02:1 (pasa AA). Mismo criterio que Fase 7.1 en el Quiz. */
+    color: var(--color-success-dark);
+    border-color: var(--color-success-dark);
 }
 
 .completar-hueco.is-incorrecto {
@@ -257,6 +260,14 @@
 .completar-opcion:hover:not(:disabled) {
     transform: translateY(-2px);
     border-color: var(--color-primary, #0284c7);
+}
+
+/* Foco de teclado temático (coherente con Quiz .opcion-quiz y Clasificador
+   .juego-canasta) en vez del outline gris del navegador. Exclusivo de Completar
+   (.completar-opcion no lo usa ningún otro reproductor). */
+.completar-opcion:focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
 }
 
 .completar-opcion.opcion-correcta {
