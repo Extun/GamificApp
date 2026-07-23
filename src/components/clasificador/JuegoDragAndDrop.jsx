@@ -136,12 +136,26 @@ export function JuegoDragAndDrop({ reto, estudianteId, onSalir, onCompletado, so
                         <div
                             key={cat.nombre}
                             className={`juego-canasta juego-canasta-${color} ${canastaFeliz === cat.nombre ? 'is-feliz' : ''} ${seleccionada ? 'is-esperando' : ''}`}
+                            // Accesible por teclado: la zona de drop es un <div>, así
+                            // que se expone como botón (role + tabIndex) y Enter/Espacio
+                            // replican EXACTAMENTE el onClick (soltar la ficha elegida en
+                            // esta canasta). Completa el flujo inclusivo "tocar y soltar"
+                            // para quien navega con teclado. No cambia la mecánica.
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Canasta ${cat.nombre}`}
                             onDragOver={(e) => e.preventDefault()}
                             onDrop={(e) => {
                                 e.preventDefault();
                                 intentar(e.dataTransfer.getData('text/plain'), cat.nombre);
                             }}
                             onClick={() => seleccionada && intentar(seleccionada, cat.nombre)}
+                            onKeyDown={(e) => {
+                                if ((e.key === 'Enter' || e.key === ' ') && seleccionada) {
+                                    e.preventDefault();
+                                    intentar(seleccionada, cat.nombre);
+                                }
+                            }}
                         >
                             <h4 className="juego-canasta-titulo">{cat.nombre}</h4>
                             <div className="juego-canasta-contenido">

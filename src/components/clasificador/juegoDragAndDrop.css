@@ -30,7 +30,9 @@
 /* --- Canastas (drop zones) --- */
 .juego-dnd-canastas {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    /* min(100%, 220px): en contenedores más estrechos que 220px la columna
+       encoge al 100% en vez de forzar overflow horizontal. */
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
     gap: 16px;
 }
 
@@ -44,6 +46,12 @@
 }
 .juego-canasta.is-esperando { cursor: pointer; border-style: solid; }
 .juego-canasta.is-esperando:hover { transform: scale(1.02); }
+
+/* Foco de teclado visible en la zona de drop (accesible como botón). */
+.juego-canasta:focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 3px;
+}
 
 .juego-canasta-teal   { border-color: var(--color-primary-light); }
 .juego-canasta-amber  { border-color: var(--color-accent); }
