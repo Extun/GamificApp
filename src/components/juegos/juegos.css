@@ -75,6 +75,15 @@
     cursor: default;
 }
 
+/* Foco de teclado temático (coherente con Quiz .opcion-quiz, Clasificador
+   .juego-canasta, Completar .completar-opcion y V/F .vf-opcion) en vez del
+   outline por defecto del navegador. Exclusivo de Memorama: .memorama-carta
+   no lo usa ningún otro reproductor. */
+.memorama-carta:focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
 /* ---------- Línea del tiempo ---------- */
 .linea-titulo-secuencia {
     margin: 0.25rem 0 0;
