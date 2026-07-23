@@ -71,8 +71,13 @@
     gap: 10px;
 }
 
-/* --- Progreso por capítulos --- */
-.mision-progreso {
+/* --- Progreso por capítulos ---
+   Nombre EXCLUSIVO del reproductor. Antes usaba `.mision-progreso`, que
+   colisiona con `.mision-progreso` del panel de misiones
+   (src/pages/estudiante/misionesPanel.css: flex-direction:column), cuya regla
+   ganaba la cascada y apilaba los pasos en vertical. Renombrado a
+   `.mision-capitulos` para eliminar la colisión sin tocar el panel. */
+.mision-capitulos {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -89,7 +94,7 @@
 .mision-paso.is-activo { background: var(--color-accent); }
 .mision-paso.is-hecho { background: var(--color-primary); }
 
-.mision-progreso-label {
+.mision-capitulos-label {
     margin-left: auto;
     font-size: 0.82rem;
     font-weight: 600;

@@ -105,14 +105,14 @@ export function MisionNarrativa({ reto, estudianteId, onSalir, onCompletado, sol
             {/* ---- Capítulos / desafíos ---- */}
             {fase === 'jugando' && desafio && (
                 <div className="mision-escena">
-                    <div className="mision-progreso">
+                    <div className="mision-capitulos">
                         {desafios.map((_, i) => (
                             <span
                                 key={i}
                                 className={`mision-paso ${i < capitulo ? 'is-hecho' : ''} ${i === capitulo ? 'is-activo' : ''}`}
                             />
                         ))}
-                        <span className="mision-progreso-label">Capítulo {capitulo + 1} de {total}</span>
+                        <span className="mision-capitulos-label">Capítulo {capitulo + 1} de {total}</span>
                     </div>
 
                     <p className="mision-texto mision-narrativa">{desafio.narrativa}</p>
