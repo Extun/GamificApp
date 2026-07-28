@@ -171,6 +171,16 @@
     cursor: default;
 }
 
+/* Foco de teclado temático (coherente con Quiz .opcion-quiz, Clasificador
+   .juego-canasta, Completar .completar-opcion, V/F .vf-opcion y Memorama
+   .memorama-carta) en vez del outline por defecto del navegador. Exclusivo
+   de Línea del tiempo: estos selectores no los usa ningún otro reproductor. */
+.linea-evento-flechas button:focus-visible,
+.linea-btn-comprobar:focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
 .linea-lista.is-sacudida {
     animation: linea-sacudida 0.5s ease;
 }
