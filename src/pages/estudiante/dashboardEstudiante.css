@@ -75,6 +75,11 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    /* Sin wrap, al faltar espacio la barra de XP era el único hijo que podía
+       encoger y se quedaba en 0px (medido a 320px): el niño perdía justo el
+       indicador de avance. Ahora la fila salta de línea antes de aplastarla. */
+    flex-wrap: wrap;
+    row-gap: 8px;
 }
 
 .home-nivel-badge {
@@ -87,7 +92,7 @@
     font-weight: 700;
 }
 
-.home-nivel-track { height: 14px; }
+.home-nivel-track { height: 14px; flex: 1 1 120px; min-width: 120px; }
 
 .home-nivel-xp {
     flex-shrink: 0;
@@ -126,6 +131,13 @@
 
 .home-hero:hover { transform: translateY(-3px) scale(1.01); }
 .home-hero:active { transform: scale(0.99); }
+
+/* Foco de teclado temático, igual que los 7 reproductores (Fase 7): el
+   outline gris/naranja del navegador se pierde sobre el degradado. */
+.home-hero:focus-visible {
+    outline: 3px solid var(--color-primary-dark);
+    outline-offset: 3px;
+}
 
 .home-hero-emoji { font-size: 2.6rem; }
 
@@ -175,6 +187,10 @@
 }
 
 .home-mundo:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
+.home-mundo:focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+}
 .home-mundo-emoji { font-size: 2.2rem; }
 
 .home-mundo-2 { background: #fce7f3; border-color: #fbcfe8; }
@@ -198,6 +214,10 @@
 }
 
 .home-logros:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.home-logros:focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+}
 .home-logros-emoji { font-size: 2rem; }
 
 .home-logros-texto {
@@ -268,6 +288,11 @@
     transform: translateY(-3px);
     box-shadow: var(--shadow-md);
     border-color: var(--color-primary-light);
+}
+
+.quiz-disponible-item:focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
 }
 
 .quiz-disponible-icon {
@@ -361,6 +386,24 @@
     background: var(--color-surface-alt);
 }
 .logro-bloqueado .logro-icon { background: var(--color-border) !important; color: var(--color-text-muted) !important; }
+
+/* ===== Móvil pequeño (≤480px, breakpoint del Design System) =====
+   El Home del estudiante no tenía ninguna media query propia (el del docente
+   sí, a 720px), así que en pantallas de ~320px conservaba el tamaño de
+   escritorio. Todas las clases de este bloque son exclusivas del estudiante. */
+@media (max-width: 480px) {
+    /* Mismo ajuste de escala que ya usa el Home del docente. */
+    .home-avatar { width: 52px; height: 52px; font-size: 1.4rem; }
+    .home-saludo-meta h1 { font-size: 1.3rem; }
+    .home-hero { padding: 18px; gap: 12px; }
+    .home-hero-texto strong { font-size: 1.15rem; }
+
+    /* Lista de quizzes/juegos/misiones: el chip "Empezar/Jugar" no encoge y
+       dejaba el título en una columna de ~45px. Baja a su propia línea. */
+    .quiz-disponible-item { flex-wrap: wrap; row-gap: 10px; }
+    .quiz-disponible-meta { flex-basis: calc(100% - 58px); }
+    .quiz-disponible-cta { margin-left: auto; }
+}
 
 /* Ancho de lectura consistente con los Home: el detalle de materia del
    estudiante se centra igual que .home-nino y .materia-doc del docente. */

@@ -25,7 +25,7 @@ function MisionCard({ mision }) {
                 <span className="mision-tier" style={{ '--tier-color': tier.color }}>
                     {tier.emoji} {tier.label}
                 </span>
-                {completada && <span className="mision-check" aria-label="Completada">✓</span>}
+                {completada && <span className="mision-check" role="img" aria-label="Completada">✓</span>}
                 {bloqueada && <span className="mision-lock" aria-hidden="true">🔒</span>}
             </header>
 
@@ -99,15 +99,17 @@ export function PanelMisiones() {
                 <div className="misiones-resumen">
                     <div className="misiones-stat"><span>Nivel</span><strong>{resumen.nivel}</strong></div>
                     <div className="misiones-stat"><span>XP</span><strong>⭐ {resumen.xp}</strong></div>
-                    <div className="misiones-stat"><span>Racha</span><strong>🔥 {resumen.racha_actual} días</strong></div>
+                    <div className="misiones-stat"><span>Racha</span><strong>🔥 {resumen.racha_actual} {resumen.racha_actual === 1 ? 'día' : 'días'}</strong></div>
                     <div className="misiones-stat"><span>Misiones</span><strong>{resumen.completadas} / {resumen.total}</strong></div>
                 </div>
             )}
 
             {!cargando && categorias.length > 0 && (
                 <div className="misiones-filtros">
+                    {/* aria-pressed: el chip activo se distinguía SOLO por color. */}
                     <button
                         className={`mision-chip ${filtro === 'todas' ? 'is-activo' : ''}`}
+                        aria-pressed={filtro === 'todas'}
                         onClick={() => setFiltro('todas')}
                     >
                         Todas
@@ -118,6 +120,7 @@ export function PanelMisiones() {
                             <button
                                 key={c}
                                 className={`mision-chip ${filtro === c ? 'is-activo' : ''}`}
+                                aria-pressed={filtro === c}
                                 style={{ '--cat-color': cat.color }}
                                 onClick={() => setFiltro(c)}
                             >

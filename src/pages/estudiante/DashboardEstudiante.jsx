@@ -369,26 +369,32 @@ export function DashboardEstudiante() {
                             })()}
 
                             <div className="materia-panel materia-panel-est">
+                                {/* aria-pressed: la pestaña activa se distinguía SOLO por color
+                                    (.opcion-activa), invisible para lectores de pantalla. */}
                                 <button
                                     className={`opcion ${subVista === 'material' ? 'opcion-activa' : ''}`}
+                                    aria-pressed={subVista === 'material'}
                                     onClick={proteger(() => { setSubVista('material'); setQuizActivo(null); })}
                                 >
                                     📚 Material de estudio
                                 </button>
                                 <button
                                     className={`opcion ${subVista === 'quizzes' ? 'opcion-activa' : ''}`}
+                                    aria-pressed={subVista === 'quizzes'}
                                     onClick={proteger(() => { setSubVista('quizzes'); setJuegoActivo(null); })}
                                 >
                                     ✨ Quizzes
                                 </button>
                                 <button
                                     className={`opcion ${subVista === 'juegos' ? 'opcion-activa' : ''}`}
+                                    aria-pressed={subVista === 'juegos'}
                                     onClick={proteger(() => { setSubVista('juegos'); setQuizActivo(null); setMisionActiva(null); })}
                                 >
                                     🧩 Juegos
                                 </button>
                                 <button
                                     className={`opcion ${subVista === 'misiones' ? 'opcion-activa' : ''}`}
+                                    aria-pressed={subVista === 'misiones'}
                                     onClick={proteger(() => { setSubVista('misiones'); setQuizActivo(null); setJuegoActivo(null); })}
                                 >
                                     🗺️ Misiones
