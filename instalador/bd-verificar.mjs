@@ -59,6 +59,17 @@ try {
     const conn = await mysql.createConnection(config);
     const [[version]] = await conn.query('SELECT VERSION() AS v');
     const [[usuario]] = await conn.query('SELECT CURRENT_USER() AS u');
+    // `datadir` y `puerto` los usa instalador/mysql.ps1 para saber si la
+    // instancia que atiende un puerto es LA NUESTRA: comparar @@datadir con
+    // el nuestro es una prueba que no depende de PID ni de procesos, y por
+    // eso es inmune al desdoblamiento padre/hijo de mysqld en Windows.
+    let datadir = '';
+    let puerto = 0;
+    try {
+        const [[ajustes]] = await conn.query('SELECT @@datadir AS d, @@port AS p');
+        datadir = ajustes.d || '';
+        puerto = Number(ajustes.p) || 0;
+    } catch { /* un usuario sin permiso para leerlas no invalida el resto */ }
 
     let tablas = null;
     let faltan = [];
@@ -101,7 +112,7 @@ try {
     const completo = (faltan.length === 0) && adminListo;
     responder({
         ok: completo, version: version.v, mayor, usuario: usuario.u,
-        tablas, faltan, adminListo
+        tablas, faltan, adminListo, datadir, puerto
     });
 } catch (err) {
     // err.message de mysql2 nunca incluye la contraseña (sí el usuario/host).
