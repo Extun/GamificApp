@@ -120,18 +120,22 @@ function Terminar-Con-Error {
 }
 
 # ---- Requisitos: Node y npm --------------------------------------------
-function Obtener-VersionNode {
-    $cmd = Get-Command node -ErrorAction SilentlyContinue
-    if (-not $cmd) { return $null }
-    try {
-        $texto = (& node -v) | Select-Object -First 1
-        return [pscustomobject]@{
-            Texto   = $texto
-            Version = [version]($texto -replace '^v', '')
-            Ruta    = $cmd.Source
-        }
-    } catch { return $null }
-}
+# Resolución de Node con prioridad FIJA y deliberada:
+#   1. runtime\node\node.exe  — el portable que se distribuye con GamificApp.
+#      Gana siempre: así el revisor ejecuta exactamente el Node que se probó.
+#   2. el Node instalado en el equipo, si cumple el requisito de Vite.
+#   3. error con instrucciones (instalar.ps1 puede descargar el portable
+#      antes de llegar aquí; ver instalador\runtime.ps1).
+#
+# Ninguna de las tres opciones depende del PATH para EJECUTAR node: siempre
+# se invoca por ruta absoluta. El PATH solo se toca —y de forma temporal, en
+# este proceso— para los lanzadores de node_modules\.bin (ver Anteponer-NodeAlPath).
+$script:CarpetaRuntime  = Join-Path $script:Raiz 'runtime'
+$script:CarpetaNode     = Join-Path $script:CarpetaRuntime 'node'
+$script:NodePortableExe = Join-Path $script:CarpetaNode 'node.exe'
+
+# Caché: evita relanzar `node -v` en cada consulta dentro de una ejecución.
+$script:NodeResuelto = $null
 
 # ^20.19.0 || >=22.12.0 — exactamente lo que exige Vite 8.
 # La rama 21 y las 22.0–22.11 NO sirven, aunque sean "más nuevas" que la 20.
@@ -143,60 +147,170 @@ function Test-NodeCompatible {
     return $false
 }
 
-function Obtener-RutaNode {
-    $cmd = Get-Command node -ErrorAction SilentlyContinue
-    if (-not $cmd) { return $null }
-    return $cmd.Source
+# Pregunta la versión a un node.exe concreto. Devuelve $null si no existe o
+# no responde (binario corrupto, arquitectura equivocada...).
+function Obtener-VersionDeNodeExe {
+    param([string]$Ruta)
+    if (-not $Ruta -or -not (Test-Path $Ruta)) { return $null }
+    try {
+        $texto = (& $Ruta -v) | Select-Object -First 1
+        if (-not $texto) { return $null }
+        return [pscustomobject]@{
+            Texto   = $texto
+            Version = [version]($texto -replace '^v', '')
+            Ruta    = $Ruta
+        }
+    } catch { return $null }
 }
 
-function Obtener-RutaNpm {
-    $cmd = Get-Command npm.cmd -ErrorAction SilentlyContinue
-    if (-not $cmd) { $cmd = Get-Command npm -ErrorAction SilentlyContinue }
-    if (-not $cmd) { return $null }
-    return $cmd.Source
+# Devuelve el Node elegido con su origen: 'portable', 'global' o
+# 'global-incompatible' (existe pero su versión no sirve, y quien llama
+# necesita saberlo para dar un mensaje útil).
+function Obtener-Node {
+    param([switch]$Refrescar)
+    if ($script:NodeResuelto -and -not $Refrescar) { return $script:NodeResuelto }
+    $script:NodeResuelto = $null
+
+    $portable = Obtener-VersionDeNodeExe -Ruta $script:NodePortableExe
+    if ($portable -and (Test-NodeCompatible $portable.Version)) {
+        $script:NodeResuelto = [pscustomobject]@{
+            Ruta = $portable.Ruta; Texto = $portable.Texto
+            Version = $portable.Version; Origen = 'portable'
+        }
+        return $script:NodeResuelto
+    }
+
+    $cmd = Get-Command node -ErrorAction SilentlyContinue
+    if ($cmd) {
+        $global = Obtener-VersionDeNodeExe -Ruta $cmd.Source
+        if ($global) {
+            $origen = 'global-incompatible'
+            if (Test-NodeCompatible $global.Version) { $origen = 'global' }
+            $script:NodeResuelto = [pscustomobject]@{
+                Ruta = $global.Ruta; Texto = $global.Texto
+                Version = $global.Version; Origen = $origen
+            }
+            return $script:NodeResuelto
+        }
+    }
+    return $null
+}
+
+# Se conserva el nombre porque lo usan iniciar.ps1 y instalar.ps1.
+function Obtener-VersionNode { return (Obtener-Node) }
+
+function Obtener-RutaNode {
+    $n = Obtener-Node
+    if (-not $n) { return $null }
+    return $n.Ruta
+}
+
+# npm del Node elegido. A propósito se localiza npm-cli.js y NO npm.cmd:
+# ese .cmd resuelve `node` por PATH, que es justo la dependencia que esta
+# fase elimina. Se invoca siempre como `node.exe npm-cli.js <args>`.
+function Obtener-RutaNpmCli {
+    $n = Obtener-Node
+    if (-not $n) { return $null }
+    $cli = Join-Path (Split-Path -Parent $n.Ruta) 'node_modules\npm\bin\npm-cli.js'
+    if (Test-Path $cli) { return $cli }
+    return $null
+}
+
+# Antepone la carpeta del Node elegido al PATH del PROCESO ACTUAL (que los
+# procesos hijo heredan) y devuelve el valor anterior para restaurarlo.
+#
+# NUNCA toca el PATH de usuario ni el de máquina: no usa setx, ni el
+# registro, ni [Environment]::SetEnvironmentVariable con ámbito User/Machine.
+# Al terminar el script, el cambio desaparece con el proceso.
+#
+# Hace falta porque los lanzadores de node_modules\.bin —por ejemplo
+# vite.cmd, que ejecuta `npm run build`— buscan node.exe junto al lanzador
+# y, si no está, caen a `node` a secas resuelto por PATH.
+function Anteponer-NodeAlPath {
+    $anterior = $env:Path
+    $n = Obtener-Node
+    if ($n) { $env:Path = "$(Split-Path -Parent $n.Ruta);$anterior" }
+    return $anterior
+}
+
+function Restaurar-Path {
+    param([string]$Anterior)
+    if ($null -ne $Anterior) { $env:Path = $Anterior }
+}
+
+# Ejecuta npm con el Node elegido y devuelve su código de salida.
+# Devuelve -1 si ni siquiera se pudo localizar npm.
+function Invocar-Npm {
+    param(
+        [string[]]$Argumentos,
+        [string]$Carpeta,
+        [string]$LogSalida,
+        [string]$LogErrores
+    )
+    $node = Obtener-RutaNode
+    $cli  = Obtener-RutaNpmCli
+    if (-not $node -or -not $cli) { return -1 }
+    $lista = @("`"$cli`"") + $Argumentos
+    $pathPrevio = Anteponer-NodeAlPath
+    try {
+        $proceso = Start-Process -FilePath $node -ArgumentList $lista `
+            -WorkingDirectory $Carpeta -NoNewWindow -Wait -PassThru `
+            -RedirectStandardOutput $LogSalida -RedirectStandardError $LogErrores
+        return $proceso.ExitCode
+    } finally {
+        Restaurar-Path $pathPrevio
+    }
 }
 
 # Comprueba Node + npm y aborta con instrucciones si algo falta o no sirve.
 function Comprobar-Requisitos-Node {
     Escribir-Paso 'Comprobando Node.js y npm'
-    $node = Obtener-VersionNode
+    $node = Obtener-Node -Refrescar
     if (-not $node) {
         Terminar-Con-Error 'No se encontro Node.js en este equipo.' @(
             "GamificApp necesita $script:NodeRequisitoTexto.",
             '',
             'Que hacer:',
-            '  1. Descarga Node.js LTS desde  https://nodejs.org/es',
-            '  2. Instalalo con las opciones por defecto.',
-            '  3. Cierra esta ventana, abre otra y vuelve a ejecutar este archivo.'
+            '  1. Comprueba que este equipo tiene conexion a internet: el instalador',
+            '     puede descargar Node.js por su cuenta, sin instalarlo en el sistema.',
+            '  2. Vuelve a ejecutar este archivo.',
+            '  3. Si no hay internet, descarga Node.js LTS desde https://nodejs.org/es',
+            '     e instalalo con las opciones por defecto.'
         )
     }
-    if (-not (Test-NodeCompatible $node.Version)) {
+    if ($node.Origen -eq 'global-incompatible') {
         Terminar-Con-Error "La version de Node.js instalada ($($node.Texto)) no es compatible." @(
             "GamificApp necesita $script:NodeRequisitoTexto.",
             'Lo exige Vite 8, la herramienta que construye la pagina web.',
             '',
             'Que hacer:',
-            '  1. Descarga la version LTS desde  https://nodejs.org/es',
-            '  2. Instalala encima de la actual (el instalador la reemplaza).',
-            '  3. Cierra esta ventana, abre otra y vuelve a ejecutar este archivo.'
+            '  1. Comprueba que este equipo tiene conexion a internet: el instalador',
+            '     puede descargar una version compatible sin tocar la que ya tienes.',
+            '  2. Vuelve a ejecutar este archivo.',
+            '  3. Si no hay internet, descarga la version LTS desde https://nodejs.org/es'
         )
     }
-    Escribir-Ok "Node.js $($node.Texto) es compatible."
+    if ($node.Origen -eq 'portable') {
+        Escribir-Ok "Node.js $($node.Texto) portable (incluido con GamificApp)."
+    } else {
+        Escribir-Ok "Node.js $($node.Texto) de este equipo es compatible."
+    }
     Escribir-Detalle $node.Ruta
 
-    $npm = Obtener-RutaNpm
-    if (-not $npm) {
+    $cli = Obtener-RutaNpmCli
+    if (-not $cli) {
         Terminar-Con-Error 'Se encontro Node.js pero no npm.' @(
             'npm se instala junto con Node.js. Reinstala Node.js desde https://nodejs.org/es',
             'y asegurate de no desmarcar el componente "npm package manager".'
         )
     }
     try {
-        $versionNpm = (& $npm -v) | Select-Object -First 1
+        $versionNpm = (& $node.Ruta $cli -v) | Select-Object -First 1
         Escribir-Ok "npm $versionNpm disponible."
     } catch {
         Escribir-Ok 'npm disponible.'
     }
+    Escribir-Detalle $cli
 }
 
 # ---- Puertos ------------------------------------------------------------
@@ -431,12 +545,19 @@ function Obtener-EstadoServicio {
 function Iniciar-Backend {
     $salida  = Join-Path $script:CarpetaLogs 'backend.log'
     $errores = Join-Path $script:CarpetaLogs 'backend-errores.log'
-    $proceso = Start-Process -FilePath (Obtener-RutaNode) `
-        -ArgumentList 'server.js' `
-        -WorkingDirectory $script:CarpetaServer `
-        -RedirectStandardOutput $salida `
-        -RedirectStandardError $errores `
-        -WindowStyle Hidden -PassThru
+    # PATH con el Node elegido al frente: el backend no lanza sub-procesos
+    # hoy, pero así el proceso hijo queda coherente con el runtime elegido.
+    $pathPrevio = Anteponer-NodeAlPath
+    try {
+        $proceso = Start-Process -FilePath (Obtener-RutaNode) `
+            -ArgumentList 'server.js' `
+            -WorkingDirectory $script:CarpetaServer `
+            -RedirectStandardOutput $salida `
+            -RedirectStandardError $errores `
+            -WindowStyle Hidden -PassThru
+    } finally {
+        Restaurar-Path $pathPrevio
+    }
     Guardar-Proceso -Nombre 'backend' -ProcesoId $proceso.Id -Puerto $script:PuertoBackend -Patron 'server.js'
     return $proceso
 }
@@ -453,12 +574,19 @@ function Iniciar-Frontend {
     # --strictPort es obligatorio: si Vite saltara solo al 5174, el backend
     # rechazaria las peticiones por CORS (CORS_ORIGIN apunta al 5173).
     $argumentos = @("`"$vite`"", 'preview', '--port', "$script:PuertoFrontend", '--strictPort')
-    $proceso = Start-Process -FilePath (Obtener-RutaNode) `
-        -ArgumentList $argumentos `
-        -WorkingDirectory $script:Raiz `
-        -RedirectStandardOutput $salida `
-        -RedirectStandardError $errores `
-        -WindowStyle Hidden -PassThru
+    # Vite se invoca por su .js con el Node elegido (nunca por el lanzador
+    # vite.cmd), y ademas se le deja ese Node al frente del PATH heredado.
+    $pathPrevio = Anteponer-NodeAlPath
+    try {
+        $proceso = Start-Process -FilePath (Obtener-RutaNode) `
+            -ArgumentList $argumentos `
+            -WorkingDirectory $script:Raiz `
+            -RedirectStandardOutput $salida `
+            -RedirectStandardError $errores `
+            -WindowStyle Hidden -PassThru
+    } finally {
+        Restaurar-Path $pathPrevio
+    }
     Guardar-Proceso -Nombre 'frontend' -ProcesoId $proceso.Id -Puerto $script:PuertoFrontend -Patron 'vite.js'
     return $proceso
 }

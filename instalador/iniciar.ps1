@@ -14,11 +14,14 @@ Escribir-Titulo 'GamificApp — Iniciar'
 # ------------------------------------------------------------
 # 1. Requisitos minimos
 # ------------------------------------------------------------
-$node = Obtener-VersionNode
+# Nota: este script NO carga runtime.ps1 a proposito. El arranque diario
+# jamas debe depender de la red: si falta el runtime, manda a Instalar.
+$node = Obtener-Node
 if (-not $node -or -not (Test-NodeCompatible $node.Version)) {
     Terminar-Con-Error 'Node.js no esta disponible o no es compatible.' @(
         "GamificApp necesita $script:NodeRequisitoTexto.",
-        'Ejecuta "Instalar GamificApp.cmd" para ver el diagnostico completo.'
+        'Ejecuta "Instalar GamificApp.cmd": si hace falta, descarga una copia',
+        'portable sin instalar nada en el sistema.'
     )
 }
 
@@ -35,7 +38,9 @@ if ($faltantes.Count -gt 0) {
         '  Ejecuta primero "Instalar GamificApp.cmd" (doble clic).'
     )
 }
-Escribir-Ok "Node.js $($node.Texto) y la instalacion previa estan en orden."
+$origenNode = $(if ($node.Origen -eq 'portable') { 'portable' } else { 'del equipo' })
+Escribir-Ok "Node.js $($node.Texto) ($origenNode) y la instalacion previa estan en orden."
+Escribir-Detalle $node.Ruta
 
 # ------------------------------------------------------------
 # 2. MySQL en marcha

@@ -2,22 +2,29 @@
 # GamificApp — Instalación local guiada para Windows.
 # Punto de entrada real: "Instalar GamificApp.cmd" (doble clic).
 #
-# Da por hecho que YA están instalados Node.js y MySQL 8 (Fase Local 1).
-# No descarga ni instala ninguno de los dos.
+# Node.js ya NO es un requisito previo (Fase Local 2.1): si el equipo no lo
+# tiene, o el que tiene no sirve, se descarga una copia portable verificada
+# dentro de runtime\node\ sin instalar nada en el sistema.
+# MySQL 8 SÍ sigue siendo un requisito previo (pendiente: Fase Local 2.2).
 #
 # Es SEGURO ejecutarlo varias veces: no regenera credenciales existentes,
 # no borra la base de datos y no vuelve a sembrar nada sin permiso.
 #
-# Parámetro avanzado (no se usa en el doble clic):
-#   -BaseDatos <nombre>   apunta a otra base local; solo tiene efecto cuando
-#                         todavía no existe server/.env. Sirve para probar la
-#                         instalación desde cero sin tocar una base con datos.
+# Parámetros avanzados (no se usan en el doble clic):
+#   -BaseDatos <nombre>     apunta a otra base local; solo tiene efecto cuando
+#                           todavía no existe server/.env. Sirve para probar la
+#                           instalación desde cero sin tocar una base con datos.
+#   -PrepararRuntimeNode    fuerza la descarga del Node portable aunque el
+#                           equipo ya tenga uno compatible. Sirve para armar
+#                           la distribución y para probar el camino portable.
 # ============================================================
 param(
-    [string]$BaseDatos = ''
+    [string]$BaseDatos = '',
+    [switch]$PrepararRuntimeNode
 )
 
 . (Join-Path $PSScriptRoot 'comun.ps1')
+. (Join-Path $PSScriptRoot 'runtime.ps1')
 
 Iniciar-Registro 'instalador'
 Escribir-Titulo 'GamificApp — Instalacion local'
@@ -87,10 +94,11 @@ function Instalar-Dependencias {
     Escribir-Detalle "Instalando dependencias de $Etiqueta con 'npm ci'. Puede tardar varios minutos..."
     $salida  = Join-Path $script:CarpetaLogs "npm-$Etiqueta.log"
     $errores = Join-Path $script:CarpetaLogs "npm-$Etiqueta-errores.log"
-    $proceso = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'npm', 'ci' `
-        -WorkingDirectory $Carpeta -NoNewWindow -Wait -PassThru `
-        -RedirectStandardOutput $salida -RedirectStandardError $errores
-    if ($proceso.ExitCode -ne 0) {
+    # Se invoca npm-cli.js con el Node elegido (portable o global): asi no
+    # dependemos de que exista un `npm` en el PATH del sistema.
+    $codigo = Invocar-Npm -Argumentos @('ci') -Carpeta $Carpeta `
+        -LogSalida $salida -LogErrores $errores
+    if ($codigo -ne 0) {
         Mostrar-ColaLog -Ruta $errores -Lineas 20
         Terminar-Con-Error "Fallo la instalacion de dependencias de $Etiqueta (npm ci)." @(
             'Causas habituales: no hay conexion a internet, o un antivirus bloquea la escritura.',
@@ -103,8 +111,9 @@ function Instalar-Dependencias {
 }
 
 # ------------------------------------------------------------
-# 1. Node.js y npm
+# 1. Node.js y npm  (portable si hace falta)
 # ------------------------------------------------------------
+Preparar-RuntimeNode -Forzar:$PrepararRuntimeNode
 Comprobar-Requisitos-Node
 
 # ------------------------------------------------------------
@@ -426,10 +435,12 @@ if ($esBaseDemo -and $esServidorLocal) {
 Escribir-Paso 'Construyendo la pagina web (npm run build)'
 $salidaBuild  = Join-Path $script:CarpetaLogs 'build.log'
 $erroresBuild = Join-Path $script:CarpetaLogs 'build-errores.log'
-$build = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'npm', 'run', 'build' `
-    -WorkingDirectory $script:Raiz -NoNewWindow -Wait -PassThru `
-    -RedirectStandardOutput $salidaBuild -RedirectStandardError $erroresBuild
-if ($build.ExitCode -ne 0) {
+# Invocar-Npm antepone la carpeta del Node elegido al PATH del proceso: el
+# lanzador node_modules\.bin\vite.cmd busca `node` ahi cuando no encuentra
+# un node.exe junto a el, y sin eso el build fallaria sin Node global.
+$codigoBuild = Invocar-Npm -Argumentos @('run', 'build') -Carpeta $script:Raiz `
+    -LogSalida $salidaBuild -LogErrores $erroresBuild
+if ($codigoBuild -ne 0) {
     Mostrar-ColaLog -Ruta $erroresBuild -Lineas 20
     Terminar-Con-Error 'Fallo la construccion de la pagina web.' @(
         "Detalle completo en: $erroresBuild"

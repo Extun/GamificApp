@@ -53,7 +53,7 @@ Tres archivos en la raíz del repositorio, pensados para doble clic:
 
 Detalles importantes:
 
-- **No instala Node ni MySQL**: si falta alguno, se detiene y explica qué descargar.
+- **No instala nada en el sistema.** Si falta Node.js (o el instalado no cumple el requisito de Vite), descarga una copia portable **verificada por SHA-256** contra el `SHASUMS256.txt` oficial de nodejs.org y la deja en `runtime/node/` — sin `setx`, sin registro de Windows, sin servicios y sin permisos de administrador. La prioridad es siempre `runtime/node/node.exe` → Node del equipo si es compatible → descarga. **MySQL 8 sí sigue siendo requisito previo**: si falta, se detiene y explica qué descargar.
 - **Es seguro repetirlo**: en la segunda ejecución conserva `server/.env` tal cual (no regenera `JWT_SECRET` ni `ADMIN_PASSWORD`) y no toca los datos.
 - Las credenciales generadas quedan en `CREDENCIALES.txt` (ignorado por Git). El `JWT_SECRET` no se muestra nunca.
 - Los **datos de demostración son opcionales**: pregunta explícitamente y el valor por defecto es *No*. Solo se permiten sobre la base local `gamificapp_dev`, usando `server/scripts/seedDev.js` con sus barreras intactas.
