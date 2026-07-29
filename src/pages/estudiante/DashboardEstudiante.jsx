@@ -131,15 +131,21 @@ export function DashboardEstudiante() {
         const materia = catalogoMaterias.find((m) => m.nombre === materiaSeleccionada);
         if (!materia) return;
         let vigente = true;
-        obtenerRetosPublicados({ materiaId: materia.id, tipo: 'quiz' })
-            .then((retos) => { if (vigente) setQuizzes(retos.filter((r) => r.configuracion?.preguntas?.length)); });
-        // Juegos = todo reto publicado cuyo tipo esté en el registro JUEGOS_UI
+        // UNA sola petición para las tres pestañas: GET /api/retos?materia_id=N
+        // ya devuelve todos los tipos publicados de la materia, así que pedir
+        // además ?tipo=quiz y ?tipo=mision era pedir dos subconjuntos de lo
+        // mismo (y pagar sus preflight). Los filtros de abajo son idénticos a
+        // los de antes, con el `tipo` que antes ponía la query.
+        // Juegos = todo reto cuyo tipo esté en el registro JUEGOS_UI
         // (clasificador, memorama, línea del tiempo, completar…): un solo
-        // listado y un solo despacho por tipo, sin pedir tipo por tipo.
+        // despacho por tipo, sin pedir tipo por tipo.
         obtenerRetosPublicados({ materiaId: materia.id })
-            .then((retos) => { if (vigente) setJuegos(retos.filter((r) => JUEGOS_UI[r.tipo] && juegoJugable(r))); });
-        obtenerRetosPublicados({ materiaId: materia.id, tipo: 'mision' })
-            .then((retos) => { if (vigente) setMisionesRetos(retos.filter((r) => r.configuracion?.desafios?.length)); });
+            .then((retos) => {
+                if (!vigente) return;
+                setQuizzes(retos.filter((r) => r.tipo === 'quiz' && r.configuracion?.preguntas?.length));
+                setJuegos(retos.filter((r) => JUEGOS_UI[r.tipo] && juegoJugable(r)));
+                setMisionesRetos(retos.filter((r) => r.tipo === 'mision' && r.configuracion?.desafios?.length));
+            });
         obtenerMaterial(materia.id)
             .then((lista) => { if (vigente) setArchivos(lista); });
         return () => { vigente = false; };

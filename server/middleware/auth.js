@@ -28,7 +28,37 @@ export const firmarToken = (usuario) =>
         { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
     );
 
-export const autenticar = (req, res, next) => {
+// SPEC-019 — Mensaje único para las dos formas de perder el acceso (cuenta
+// desactivada o en la Papelera): al cliente no se le dice cuál de las dos es,
+// misma política de mensajes indistinguibles que ya usa el login.
+const SIN_ACCESO = 'Tu cuenta ya no tiene acceso. Vuelve a iniciar sesión.';
+
+// SPEC-019 — ÚNICA incompatibilidad de esquema tolerada: falta alguna de las
+// columnas `activo` (migración 003) o `eliminado_en` (migración 004), que NO
+// están en el esquema base. La ventana existe de verdad: `inicializarEsquema()`
+// corre dentro del callback de `app.listen`, así que puede llegar tráfico antes
+// de que termine, y si falla el servidor sigue vivo a propósito para poder
+// diagnosticarlo. Es la misma tolerancia que ya tienen `conPermiso` y
+// `soloAdminPrincipal`. Cualquier OTRO fallo (MySQL caído, timeout, conexión
+// perdida, error SQL inesperado) NO se tolera: sin poder comprobar el acceso,
+// la petición no continúa.
+const esEsquemaSinMigrar = (err) => err?.code === 'ER_BAD_FIELD_ERROR';
+
+// El paso degradado nunca es silencioso, pero tampoco puede inundar el log:
+// se avisa como mucho una vez por minuto.
+let ultimoAvisoEsquema = 0;
+const avisarEsquemaSinMigrar = () => {
+    const ahora = Date.now();
+    if (ahora - ultimoAvisoEsquema < 60000) return;
+    ultimoAvisoEsquema = ahora;
+    console.warn(
+        '⚠️  [SPEC-019] `usuarios` no tiene activo/eliminado_en: no se puede ' +
+        'revocar el acceso de cuentas desactivadas. Faltan las migraciones ' +
+        '003/004; se sigue con el comportamiento anterior hasta que se apliquen.'
+    );
+};
+
+export const autenticar = async (req, res, next) => {
     const header = req.headers.authorization || '';
     const [esquema, token] = header.split(' ');
 
@@ -36,11 +66,46 @@ export const autenticar = (req, res, next) => {
         return res.status(401).json({ error: 'Token requerido' });
     }
 
+    let carga;
     try {
-        req.user = jwt.verify(token, JWT_SECRET);
-        next();
+        carga = jwt.verify(token, JWT_SECRET);
     } catch {
         return res.status(401).json({ error: 'Token inválido o expirado' });
+    }
+
+    // SPEC-019 — La firma solo dice quién eras al INICIAR SESIÓN. Aquí se le
+    // pregunta a la BD si esa persona sigue teniendo acceso HOY, que es lo que
+    // ya hacían `conPermiso` y `soloAdminPrincipal` para los administradores:
+    // sin esto, desactivar a un docente o a un estudiante no surtía efecto
+    // hasta que caducaba su token (≤8h).
+    try {
+        const [[fila]] = await pool.query(
+            'SELECT rol, activo, eliminado_en FROM usuarios WHERE id = ?',
+            [carga.id]
+        );
+        // Cuenta borrada, en la Papelera o desactivada → fuera. 401 (y no 403)
+        // porque es el código que `authFetch` ya traduce a cerrar sesión.
+        if (!fila || fila.eliminado_en !== null || !fila.activo) {
+            return res.status(401).json({ error: SIN_ACCESO });
+        }
+        // La BD manda también sobre el rol: a quien degraden, su token viejo
+        // no le conserva el rol viejo.
+        req.user = { ...carga, rol: fila.rol };
+        return next();
+    } catch (err) {
+        if (esEsquemaSinMigrar(err)) {
+            avisarEsquemaSinMigrar();
+            req.user = carga;
+            return next();
+        }
+        // Fail-closed: si no se puede comprobar el acceso, no se atiende.
+        // 503 y no 500 para distinguir "ahora mismo no puedo verificarte" de
+        // un fallo de la lógica; y no 401, porque una caída de la base de
+        // datos no debe cerrarle la sesión a nadie.
+        console.error('[SPEC-019] No se pudo verificar el acceso:', err?.code || err?.message);
+        return res.status(503).json({
+            error: 'No se puede verificar tu acceso en este momento. Inténtalo de nuevo en unos segundos.'
+        });
     }
 };
 

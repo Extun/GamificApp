@@ -76,7 +76,11 @@ const origenesPermitidos = (process.env.CORS_ORIGIN || 'http://localhost:5173')
   .split(',')
   .map((o) => o.trim().replace(/\/$/, ''))
   .filter(Boolean);
-app.use(cors({ origin: origenesPermitidos }));
+// maxAge: sin él el navegador solo reutiliza el preflight unos 5 s, así que
+// casi cada URL distinta paga un OPTIONS extra antes de su GET. Con 24 h
+// (el techo que respeta Chrome) el preflight se pide una vez por sesión.
+// No cambia qué orígenes se aceptan: solo cuánto dura la respuesta cacheada.
+app.use(cors({ origin: origenesPermitidos, maxAge: 86400 }));
 // Límite amplio: el material de estudio viaja como dataURL (base64).
 app.use(express.json({ limit: '25mb' }));
 

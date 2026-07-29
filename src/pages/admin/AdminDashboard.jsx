@@ -146,6 +146,29 @@ const ICONO_ROL = {
     admin: AdminPanelSettingsRoundedIcon
 };
 
+// Qué datos necesita CADA sección del panel para estar al día. Lo usa SOLO el
+// refresco automático de cada 20 s, para no sondear listas que no se están
+// mirando; el montaje y toda escritura siguen recargándolo todo.
+// Institución, Inteligencia Artificial y Gestión de juegos no aparecen porque
+// sus módulos leen sus propios datos: el panel no tiene nada que refrescarles.
+// Una sección que no esté aquí cae en la carga completa (valor por defecto
+// seguro: como mucho pide de más, nunca de menos).
+const DATOS_POR_SECCION = {
+    inicio: ['docentes', 'estudiantes', 'invitaciones', 'reciente'],
+    docentes: ['docentes', 'materias', 'cursos'],
+    estudiantes: ['estudiantes', 'cursos'],
+    materias: ['materias', 'docentes'],
+    misiones: ['misiones'],
+    cursos: ['cursos'],
+    invitaciones: ['invitaciones'],
+    administradores: ['administradores'],
+    auditoria: ['auditoria'],
+    papelera: ['papelera'],
+    institucion: [],
+    ia: [],
+    juegos: []
+};
+
 // Panel exclusivo del rol 'admin': alta/baja de docentes con sus materias
 // asignadas (ahora también editables), gestión de estudiantes (reset de PIN,
 // bajas) y monitoreo de los códigos de invitación de toda la institución.
@@ -194,33 +217,48 @@ export function AdminDashboard() {
     const [cursosEdicion, setCursosEdicion] = useState([]);
     const [guardandoMaterias, setGuardandoMaterias] = useState(false);
 
-    const cargar = async () => {
+    // `claves` = null → carga COMPLETA (montaje y después de cada escritura).
+    // Con una lista de claves solo se piden esos datos: es lo que usa el
+    // refresco automático para no sondear secciones que nadie está mirando.
+    // Solo filtra si llega un array; cualquier otra cosa (los callbacks que
+    // pasan `cargar` como manejador y lo llaman con argumentos) recarga todo.
+    const cargar = async (claves = null) => {
+        const filtro = Array.isArray(claves) ? claves : null;
+        const toca = (clave) => filtro === null || filtro.includes(clave);
+        // Cada lista se pide solo si la sesión tiene ese permiso (la UI
+        // oculta; el servidor rechazaría igual las peticiones de más).
+        // `undefined` significa "no tocada en esta pasada": su estado se
+        // queda exactamente como estaba, sin vaciarse.
+        const pedir = (clave, permitido, fn, sinPermiso = []) => {
+            if (!toca(clave)) return Promise.resolve(undefined);
+            return permitido ? fn() : Promise.resolve(sinPermiso);
+        };
         try {
             setError('');
-            // Cada lista se pide solo si la sesión tiene ese permiso (la UI
-            // oculta; el servidor rechazaría igual las peticiones de más).
             const [d, e, i, m, c, a, au, p, rec, ms] = await Promise.all([
-                puede('docentes') ? adminService.listarDocentes() : Promise.resolve([]),
-                puede('estudiantes') ? adminService.listarEstudiantes() : Promise.resolve([]),
-                puede('invitaciones') ? adminService.listarInvitaciones() : Promise.resolve([]),
-                listarMaterias(),
-                puede('cursos') ? adminService.listarCursos() : Promise.resolve([]),
-                puede('administradores') ? adminService.listarAdministradores() : Promise.resolve([]),
-                puede('auditoria') ? adminService.listarAuditoria() : Promise.resolve([]),
-                puede('papelera') ? adminService.listarPapelera() : Promise.resolve([]),
-                adminService.auditoriaReciente().catch(() => []),
-                // Misiones se gestionan con el permiso 'materias' (contenido académico).
-                puede('materias') ? adminService.listarMisiones().catch(() => null) : Promise.resolve(null)
+                pedir('docentes', puede('docentes'), adminService.listarDocentes),
+                pedir('estudiantes', puede('estudiantes'), adminService.listarEstudiantes),
+                pedir('invitaciones', puede('invitaciones'), adminService.listarInvitaciones),
+                pedir('materias', true, listarMaterias),
+                pedir('cursos', puede('cursos'), adminService.listarCursos),
+                pedir('administradores', puede('administradores'), adminService.listarAdministradores),
+                pedir('auditoria', puede('auditoria'), adminService.listarAuditoria),
+                pedir('papelera', puede('papelera'), adminService.listarPapelera),
+                pedir('reciente', true, () => adminService.auditoriaReciente().catch(() => [])),
+                // Misiones se gestionan con el permiso 'materias' (contenido
+                // académico). Sin permiso vale `null`, no `[]`: el módulo
+                // espera un objeto con sus catálogos.
+                pedir('misiones', puede('materias'), () => adminService.listarMisiones().catch(() => null), null)
             ]);
-            setDocentes(d);
-            setEstudiantes(e);
-            setInvitaciones(i);
-            setMaterias(m);
-            setCursos(c);
-            setAdministradores(a);
-            setAuditoria(au);
-            setPapelera(p);
-            setActividadReciente(rec);
+            if (d !== undefined) setDocentes(d);
+            if (e !== undefined) setEstudiantes(e);
+            if (i !== undefined) setInvitaciones(i);
+            if (m !== undefined) setMaterias(m);
+            if (c !== undefined) setCursos(c);
+            if (a !== undefined) setAdministradores(a);
+            if (au !== undefined) setAuditoria(au);
+            if (p !== undefined) setPapelera(p);
+            if (rec !== undefined) setActividadReciente(rec);
             if (ms) setMisionesData(ms);
         } catch (err) {
             setError(err.message);
@@ -230,9 +268,17 @@ export function AdminDashboard() {
     useEffect(() => { cargar(); }, []);
 
     // Refresco automático (SPEC-002): el panel se mantiene al día sin F5.
+    // Acotado a la sección visible: antes cada oleada recargaba las 10 listas
+    // aunque se estuviera mirando otra cosa (hasta ~30 peticiones/min con un
+    // Administrador Principal). El montaje y cada escritura siguen recargando
+    // todo, así que ninguna sección puede quedarse con datos viejos al volver.
     // Se pausa con el modal de materias del docente abierto para no pisar
     // la edición en curso.
-    useAutoRefresh(cargar, 20000, Boolean(docenteEditando) || importando);
+    useAutoRefresh(
+        () => cargar(DATOS_POR_SECCION[pagina] ?? null),
+        20000,
+        Boolean(docenteEditando) || importando
+    );
 
     const ejecutar = async (accion, mensajeOk) => {
         try {
