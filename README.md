@@ -16,7 +16,7 @@ docs/           documentación viva (arquitectura, specs, auditorías)
 ## Requisitos
 
 - **Node.js 20.19+ (rama 20) o 22.12+ (rama 22 o superior)** y npm. Lo impone Vite 8 (`engines.node = "^20.19.0 || >=22.12.0"`): Node 18 y 21 no sirven. *En Windows con `Instalar GamificApp.cmd` no hace falta tenerlo instalado: si no está, se descarga una copia portable verificada.*
-- **MySQL 8+** accesible (local o remoto).
+- **MySQL 8+** accesible (local o remoto). *En Windows con `Instalar GamificApp.cmd` tampoco hace falta instalarlo: la distribución trae su propio MySQL 8 en `runtime/mysql`.*
 
 ## Arranque rápido
 
@@ -28,7 +28,7 @@ docs/           documentación viva (arquitectura, specs, auditorías)
 | `Iniciar GamificApp.cmd` | Arranque diario (no duplica procesos si ya está en marcha) |
 | `Detener GamificApp.cmd` | Cierra solo los procesos de GamificApp |
 
-**No instala nada en el sistema.** Si falta Node.js —o el instalado no sirve— descarga una copia portable verificada por SHA-256 en `runtime/node/`, sin tocar el PATH de Windows, el registro ni pedir permisos de administrador. **MySQL 8 sí debe estar disponible**: si falta, se detiene y explica cómo obtenerlo. Es seguro repetirlo — nunca regenera credenciales existentes ni toca los datos. Detalle en `START_HERE.md`.
+**No instala nada en el sistema.** Si falta Node.js —o el instalado no sirve— descarga una copia portable verificada por SHA-256 en `runtime/node/`, sin tocar el PATH de Windows, el registro ni pedir permisos de administrador. **La base de datos también la pone GamificApp**: arranca el MySQL 8 de `runtime/mysql` como un proceso de usuario más (sin servicio de Windows, sin Docker y sin permisos de administrador), escuchando solo en `127.0.0.1:3308` —con reserva 3309-3315 si ese puerto está ocupado— y **guardando los datos en `%LOCALAPPDATA%\GamificApp\`, fuera de la carpeta del proyecto**, para que sobrevivan a mover o reemplazar GamificApp. Si esa carpeta `runtime/mysql` no viene incluida, se usa un MySQL 8 ya instalado en el equipo. Es seguro repetirlo — nunca regenera credenciales existentes ni toca los datos. Detalle en `START_HERE.md`.
 
 ### Manual (cualquier sistema)
 

@@ -39,7 +39,7 @@ Si un documento contradice al código, **el código es la fuente de verdad** —
 |---|---|---|
 | Node.js | **20.19+ (rama 20) o 22.12+ (rama 22 o superior)** | Lo impone Vite 8: `node_modules/vite/package.json` declara `engines.node = "^20.19.0 \|\| >=22.12.0"`. **Node 18 y 21 NO sirven**, ni las 22.0–22.11 |
 | npm | el que trae Node | |
-| MySQL | **8+** | El esquema usa índices funcionales (`uq_materia_nombre_activa`) que exigen MySQL 8 |
+| MySQL | **8+** | El esquema usa índices funcionales (`uq_materia_nombre_activa`) que exigen MySQL 8. **En Windows con `Instalar GamificApp.cmd` no hace falta instalarlo**: la distribución trae MySQL 8.0.44 en `runtime/mysql` |
 
 ### Opción A (recomendada en Windows): instalación guiada
 
@@ -53,7 +53,21 @@ Tres archivos en la raíz del repositorio, pensados para doble clic:
 
 Detalles importantes:
 
-- **No instala nada en el sistema.** Si falta Node.js (o el instalado no cumple el requisito de Vite), descarga una copia portable **verificada por SHA-256** contra el `SHASUMS256.txt` oficial de nodejs.org y la deja en `runtime/node/` — sin `setx`, sin registro de Windows, sin servicios y sin permisos de administrador. La prioridad es siempre `runtime/node/node.exe` → Node del equipo si es compatible → descarga. **MySQL 8 sí sigue siendo requisito previo**: si falta, se detiene y explica qué descargar.
+- **No instala nada en el sistema.** Si falta Node.js (o el instalado no cumple el requisito de Vite), descarga una copia portable **verificada por SHA-256** contra el `SHASUMS256.txt` oficial de nodejs.org y la deja en `runtime/node/` — sin `setx`, sin registro de Windows, sin servicios y sin permisos de administrador. La prioridad es siempre `runtime/node/node.exe` → Node del equipo si es compatible → descarga.
+- **La base de datos también viene incluida** (Fase Local 2.2). Si existe `runtime/mysql`, el instalador arranca ese MySQL 8 como un **proceso de usuario** —sin servicio de Windows, sin Docker, sin MSI y sin permisos de administrador— con `bind-address=127.0.0.1`, `mysqlx=0` y `utf8mb4_spanish_ci`. **Puerto 3308**, con reserva **3309-3315** si está ocupado; **3306 y 3307 no se tocan nunca** (son los de un MySQL instalado y el del contenedor Docker de desarrollo), y un puerto ocupado por otro programa se salta sin cerrarlo. Si `runtime/mysql` **no** viene, se usa un MySQL 8 ya instalado en el equipo, como en la Fase Local 1.
+- **Dónde viven los datos: `%LOCALAPPDATA%\GamificApp\`**, nunca dentro del proyecto.
+
+  ```text
+  %LOCALAPPDATA%\GamificApp\
+    instancia.json          puerto, base y usuario — sin contraseñas ni JWT_SECRET
+    mysql\datos\            el datadir: aquí está el trabajo de la escuela
+    mysql\my.ini            lo regenera el instalador; no editar a mano
+    mysql\error.log         diagnóstico de MySQL
+    secretos\root.txt       credencial administrativa, con permisos restringidos
+  ```
+
+  `runtime/mysql` son **binarios reemplazables**; `%LOCALAPPDATA%\GamificApp\mysql\datos` es **permanente**. Por eso los datos sobreviven a `Detener`, a reinstalar y a **mover o reemplazar la carpeta de GamificApp**: si se pierde `server/.env`, el instalador reconstruye la conexión desde `instancia.json` + la credencial de root, **sin inicializar nada y sin borrar datos**. Para una copia de seguridad, copia esa carpeta con GamificApp cerrada.
+- `Detener GamificApp.cmd` cierra la base de datos **en último lugar** y de forma ordenada (`mysqladmin shutdown`); nunca cierra un MySQL que no haya arrancado él.
 - **Es seguro repetirlo**: en la segunda ejecución conserva `server/.env` tal cual (no regenera `JWT_SECRET` ni `ADMIN_PASSWORD`) y no toca los datos.
 - Las credenciales generadas quedan en `CREDENCIALES.txt` (ignorado por Git). El `JWT_SECRET` no se muestra nunca.
 - Los **datos de demostración son opcionales**: pregunta explícitamente y el valor por defecto es *No*. Solo se permiten sobre la base local `gamificapp_dev`, usando `server/scripts/seedDev.js` con sus barreras intactas.
@@ -122,7 +136,15 @@ El frontend usa `VITE_API_URL` (ver `.env.example` en la raíz) para saber dónd
 
 En este proyecto normalmente **no hay MySQL local disponible** durante el desarrollo asistido por IA: los cambios de backend/BD se verifican con `npm run build` + revisión de código, y la verificación end-to-end contra datos reales (permisos, migraciones, IA) se confirma después del deploy a producción (Vercel + Render + Aiven). Si tu entorno sí tiene MySQL, puedes verificar localmente antes de esperar al deploy.
 
-Hay dos formas documentadas de tener MySQL local: **MySQL 8 instalado en Windows** (lo que espera `Instalar GamificApp.cmd`) o el **contenedor Docker** de `docker-compose.dev.yml` (puerto 3307, base `gamificapp_dev`; ver `docs/DEV-ENTORNO-LOCAL.md`). El instalador funciona con cualquiera de las dos: detecta el puerto y pregunta.
+Hay **tres** formas documentadas de tener MySQL local:
+
+| Forma | Puerto | Cuándo se usa |
+|---|---|---|
+| **MySQL portable de GamificApp** | **3308** (reserva 3309-3315) | Lo que usa `Instalar GamificApp.cmd` cuando existe `runtime/mysql`. Datos en `%LOCALAPPDATA%\GamificApp\`. Es el camino del revisor: no exige instalar nada |
+| **Contenedor Docker** | 3307 | Entorno de desarrollo/QA de `docker-compose.dev.yml`, base `gamificapp_dev` (ver `docs/DEV-ENTORNO-LOCAL.md`) |
+| **MySQL 8 instalado en Windows** | 3306 | Respaldo: solo si no viene `runtime/mysql`. El instalador lo detecta y pide credenciales |
+
+**Las tres pueden convivir a la vez**: el instalador portable nunca toca los puertos 3306 ni 3307, y la conexión que use manda siempre desde `server/.env`.
 
 ## docs/archive/
 
