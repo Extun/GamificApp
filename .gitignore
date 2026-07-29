@@ -16,6 +16,11 @@ dist-ssr
 # Respaldos del sistema RESET (SPEC-008): datos reales, nunca al repositorio.
 server/backups/
 
+# Instalador local para Windows: estado de ejecución y credenciales generadas
+# en cada equipo. Los logs ya están cubiertos por la regla `logs` de arriba.
+.run/
+CREDENCIALES.txt
+
 # Claude Code
 .claude/
 

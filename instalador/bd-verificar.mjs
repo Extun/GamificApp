@@ -1,0 +1,110 @@
+// ============================================================
+// Comprobación SOLO LECTURA del MySQL local.
+//
+// El instalador lo llama para saber si la instancia responde de verdad
+// (handshake completo, no solo un puerto abierto), qué versión es y —si se
+// indica una base— cuántas tablas tiene ya.
+//
+// Modo espera (GA_ESPERAR_TABLAS / GA_ESPERAR_ADMIN): repite la consulta
+// hasta que el esquema esté COMPLETO. Hace falta porque `server.js` empieza
+// a escuchar ANTES de terminar `inicializarEsquema()`: que /api/health
+// responda no significa que las migraciones hayan acabado.
+//
+// Las credenciales llegan por variables de entorno (GA_DB_*), nunca por
+// argumentos de línea de comandos: los argumentos son visibles en la lista
+// de procesos del sistema.
+//
+// Salida: una única línea JSON por stdout. Siempre termina con código 0;
+// quien decide es el instalador leyendo el campo `ok`.
+// ============================================================
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const aqui = dirname(fileURLToPath(import.meta.url));
+// mysql2 vive en server/node_modules (es dependencia del backend, no del
+// frontend): resolvemos desde ahí en vez de asumir una instalación global.
+const requerir = createRequire(join(aqui, '..', 'server', 'package.json'));
+
+const responder = (obj) => {
+    process.stdout.write(JSON.stringify(obj));
+    process.exit(0);
+};
+
+let mysql;
+try {
+    mysql = requerir('mysql2/promise');
+} catch {
+    responder({ ok: false, codigo: 'FALTA_MYSQL2', error: 'mysql2 no está instalado en server/node_modules' });
+}
+
+const config = {
+    host: process.env.GA_DB_HOST || 'localhost',
+    port: Number(process.env.GA_DB_PORT) || 3306,
+    user: process.env.GA_DB_USER || 'root',
+    password: process.env.GA_DB_PASSWORD || '',
+    connectTimeout: 8000
+};
+const base = process.env.GA_DB_NAME || '';
+if (base) config.database = base;
+
+const esperarTablas = (process.env.GA_ESPERAR_TABLAS || '')
+    .split(',').map((t) => t.trim()).filter(Boolean);
+const esperarAdmin = process.env.GA_ESPERAR_ADMIN === '1';
+const segundosMax = Number(process.env.GA_ESPERAR_SEGUNDOS) || 60;
+
+const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
+
+try {
+    const conn = await mysql.createConnection(config);
+    const [[version]] = await conn.query('SELECT VERSION() AS v');
+    const [[usuario]] = await conn.query('SELECT CURRENT_USER() AS u');
+
+    let tablas = null;
+    let faltan = [];
+    let adminListo = !esperarAdmin;
+
+    if (base) {
+        const limite = Date.now() + segundosMax * 1000;
+        // Con la lista vacía esto es una única pasada: mismo código para
+        // "cuéntame las tablas" y para "espera a que el esquema esté listo".
+        for (;;) {
+            const [[fila]] = await conn.query(
+                'SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_schema = ?',
+                [base]
+            );
+            tablas = fila.n;
+
+            if (esperarTablas.length) {
+                const [presentes] = await conn.query(
+                    'SELECT table_name AS t FROM information_schema.tables WHERE table_schema = ? AND table_name IN (?)',
+                    [base, esperarTablas]
+                );
+                const encontradas = presentes.map((f) => String(f.t || f.TABLE_NAME));
+                faltan = esperarTablas.filter((t) => !encontradas.includes(t));
+            }
+            if (esperarAdmin && !faltan.length) {
+                const [[admin]] = await conn.query(
+                    "SELECT COUNT(*) AS n FROM usuarios WHERE username = 'admin'"
+                );
+                adminListo = admin.n > 0;
+            }
+
+            if (!faltan.length && adminListo) break;
+            if (Date.now() >= limite) break;
+            await dormir(700);
+        }
+    }
+    await conn.end();
+
+    const mayor = Number(String(version.v).split('.')[0]) || 0;
+    const completo = (faltan.length === 0) && adminListo;
+    responder({
+        ok: completo, version: version.v, mayor, usuario: usuario.u,
+        tablas, faltan, adminListo
+    });
+} catch (err) {
+    // err.message de mysql2 nunca incluye la contraseña (sí el usuario/host).
+    // Algunos fallos de red llegan con message vacío: caemos al código.
+    responder({ ok: false, codigo: err.code || '', error: err.message || err.code || 'No se pudo conectar.' });
+}

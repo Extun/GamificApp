@@ -1,0 +1,11 @@
+# Los archivos del instalador local SIEMPRE deben llegar a Windows con
+# finales de línea CRLF, sin depender de la configuración `core.autocrlf`
+# de cada equipo:
+#
+#   · cmd.exe puede fallar al interpretar bloques `if (...)` de varias
+#     líneas si el .cmd viene con finales LF.
+#   · Los .ps1 van además en UTF-8 con BOM (Windows PowerShell 5.1 lee como
+#     ANSI los archivos sin BOM y rompería todos los acentos). El BOM es
+#     contenido del archivo, así que Git lo conserva tal cual.
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

@@ -33,9 +33,36 @@ Si un documento contradice al código, **el código es la fuente de verdad** —
 
 ## Cómo correr el proyecto en local
 
-Requisitos: Node.js 18+, npm, y acceso a un servidor MySQL 8+ (local o remoto — no es necesario tener MySQL instalado en la misma máquina si apuntas a uno remoto).
+**Requisitos reales** (verificados contra el código, no estimados):
 
-### 1. Backend (`server/`)
+| Requisito | Versión | Por qué |
+|---|---|---|
+| Node.js | **20.19+ (rama 20) o 22.12+ (rama 22 o superior)** | Lo impone Vite 8: `node_modules/vite/package.json` declara `engines.node = "^20.19.0 \|\| >=22.12.0"`. **Node 18 y 21 NO sirven**, ni las 22.0–22.11 |
+| npm | el que trae Node | |
+| MySQL | **8+** | El esquema usa índices funcionales (`uq_materia_nombre_activa`) que exigen MySQL 8 |
+
+### Opción A (recomendada en Windows): instalación guiada
+
+Tres archivos en la raíz del repositorio, pensados para doble clic:
+
+| Archivo | Qué hace |
+|---|---|
+| `Instalar GamificApp.cmd` | Comprueba Node/npm/MySQL y los puertos, instala dependencias (`npm ci`), crea la base y carga el esquema, genera `server/.env` con credenciales aleatorias, construye el frontend, arranca todo y abre el navegador |
+| `Iniciar GamificApp.cmd` | Arranque diario. Si ya está en marcha, no duplica procesos |
+| `Detener GamificApp.cmd` | Cierra **solo** los procesos de GamificApp (por PID registrado, nunca `taskkill /IM node.exe`) |
+
+Detalles importantes:
+
+- **No instala Node ni MySQL**: si falta alguno, se detiene y explica qué descargar.
+- **Es seguro repetirlo**: en la segunda ejecución conserva `server/.env` tal cual (no regenera `JWT_SECRET` ni `ADMIN_PASSWORD`) y no toca los datos.
+- Las credenciales generadas quedan en `CREDENCIALES.txt` (ignorado por Git). El `JWT_SECRET` no se muestra nunca.
+- Los **datos de demostración son opcionales**: pregunta explícitamente y el valor por defecto es *No*. Solo se permiten sobre la base local `gamificapp_dev`, usando `server/scripts/seedDev.js` con sus barreras intactas.
+- Registro de lo ocurrido en `logs/` (`instalador.log`, `iniciar.log`, `detener.log`, `backend.log`, `frontend.log`). Ningún log contiene credenciales.
+- El frontend se sirve con `vite preview --strictPort` en el 5173: **no puede saltar al 5174**, porque el backend solo acepta `CORS_ORIGIN=http://localhost:5173`.
+
+### Opción B: arranque manual (desarrollo)
+
+#### 1. Backend (`server/`)
 
 ```bash
 cd server
@@ -56,24 +83,33 @@ Completar `server/.env` (nunca se sube al repo, está en `.gitignore`):
 | `GEMINI_API_KEY` | API key de Google Gemini (solo servidor; el frontend nunca la ve) |
 | `RESET_HABILITADO` | Deja en `false` salvo que necesites el botón "Restablecer aplicación" (SPEC-008, borra casi toda la BD) |
 
-Crear la base de datos vacía en MySQL (`CREATE DATABASE gamificapp;` o el nombre que pongas en `DB_NAME`) y luego arrancar:
+**Inicializar la base de datos (dos pasos, en este orden).** `initDb.js` **NO puede** inicializar una base vacía por sí solo: ejecuta `migrarColumnasMaterias` (un `ALTER TABLE materias`) **antes** de crear las tablas (`initDb.js:36-37`), así que sobre una base recién creada falla con `Table 'materias' doesn't exist`. En producción funciona porque el esquema se cargó primero a mano.
 
 ```bash
+# 1. Crear la base vacía (el .sql de producción no hace CREATE DATABASE)
+mysql -u root -p -e "CREATE DATABASE gamificapp_dev CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci;"
+
+# 2. Cargar el esquema base: 11 tablas + materias e institución semilla
+mysql -u root -p gamificapp_dev < database/produccion_defaultdb.sql
+
+# 3. Arrancar: initDb.js añade las 7 tablas restantes (auditoría, misiones,
+#    mision_estudiante, docente_curso, banco_preguntas, configuracion_ia,
+#    tipos_juego) y sincroniza la cuenta admin. Total: 18 tablas.
 npm run dev     # server/package.json → node --watch server.js
 ```
 
-`initDb.js` crea/actualiza tablas y aplica migraciones automáticamente al arrancar — no hace falta correr los `.sql` de `database/` a mano.
+Ojo al arrancar: `server.js` empieza a escuchar **antes** de terminar `inicializarEsquema()`, así que ver `/api/health` respondiendo no significa que las migraciones hayan acabado. La señal fiable es `✅ Esquema verificado/creado en la base de datos.` en la consola del backend.
 
-### 2. Frontend (raíz del repo)
+#### 2. Frontend (raíz del repo)
 
 ```bash
 npm install
 npm run dev     # vite, sirve en http://localhost:5173
 ```
 
-El frontend usa `VITE_API_URL` (ver `.env.example` en la raíz) para saber dónde está el backend; en local por defecto `http://localhost:3001`.
+El frontend usa `VITE_API_URL` (ver `.env.example` en la raíz) para saber dónde está el backend. El `.env` de la raíz es **opcional en local**: sin él, todos los servicios de `src/services/` caen al valor por defecto `http://localhost:3001`.
 
-### 3. Comandos útiles
+### Comandos útiles
 
 | Comando | Dónde | Qué hace |
 |---|---|---|
@@ -85,6 +121,8 @@ El frontend usa `VITE_API_URL` (ver `.env.example` en la raíz) para saber dónd
 ### Nota sobre MySQL local
 
 En este proyecto normalmente **no hay MySQL local disponible** durante el desarrollo asistido por IA: los cambios de backend/BD se verifican con `npm run build` + revisión de código, y la verificación end-to-end contra datos reales (permisos, migraciones, IA) se confirma después del deploy a producción (Vercel + Render + Aiven). Si tu entorno sí tiene MySQL, puedes verificar localmente antes de esperar al deploy.
+
+Hay dos formas documentadas de tener MySQL local: **MySQL 8 instalado en Windows** (lo que espera `Instalar GamificApp.cmd`) o el **contenedor Docker** de `docker-compose.dev.yml` (puerto 3307, base `gamificapp_dev`; ver `docs/DEV-ENTORNO-LOCAL.md`). El instalador funciona con cualquiera de las dos: detecta el puerto y pregunta.
 
 ## docs/archive/
 
