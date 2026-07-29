@@ -334,7 +334,8 @@
 }
 
 .asistente-campo input,
-.asistente-campo select {
+.asistente-campo select,
+.asistente-campo textarea {
     padding: 11px 14px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
@@ -345,8 +346,19 @@
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
+/* El textarea quedaba fuera de la regla de arriba y caía al estilo del
+   navegador (borde 3D, radio 0, fuente monoespaciada): mismo lenguaje que
+   los inputs + lo propio de un campo multilínea. */
+.asistente-campo textarea {
+    width: 100%;
+    line-height: 1.45;
+    min-height: 88px;
+    resize: vertical;
+}
+
 .asistente-campo input:focus,
-.asistente-campo select:focus {
+.asistente-campo select:focus,
+.asistente-campo textarea:focus {
     outline: none;
     border-color: var(--color-primary);
     box-shadow: 0 0 0 3px var(--color-primary-soft);

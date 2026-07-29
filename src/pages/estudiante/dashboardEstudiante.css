@@ -47,6 +47,40 @@
     margin: 0 auto;
 }
 
+/* --- Microinteracción 1 (SPEC-018 Fase 8): entrada del contenido ---
+   Los bloques del Home suben a su sitio en cascada al pintarse la vista.
+   Termina sola: nada queda en movimiento permanente que distraiga al niño
+   mientras lee o juega. Exclusiva del estudiante (`.home-nino` solo la
+   emiten el Home y Mis Mundos).
+
+   Dos decisiones deliberadas, ambas para que el PEOR caso sea inofensivo —
+   se midió que con la pestaña en segundo plano el reloj de animaciones se
+   congela (`document.visibilityState = 'hidden'` → `currentTime` clavado en
+   0; es la misma causa del falso «0/100» de los overlays):
+
+   1. Solo se anima `transform`, NO `opacity`. Un fade congelado dejaría el
+      Home invisible; un desplazamiento congelado lo deja 10px más abajo,
+      completo y legible. Nunca se puede perder contenido.
+   2. La cascada usa DURACIONES distintas en vez de `animation-delay` +
+      `fill-mode: both` (la forma habitual): sin retardo no hace falta
+      `fill-mode`, así que fuera de la animación cada bloque usa su estilo
+      normal y no hay ningún fotograma que pueda quedarse pegado.
+
+   Con `prefers-reduced-motion` el bloque global de index.css la completa al
+   instante y el resultado es el layout normal. */
+@keyframes home-entra {
+    from { transform: translateY(10px); }
+    to { transform: translateY(0); }
+}
+
+.home-nino > * {
+    animation: home-entra 0.3s ease-out;
+}
+
+.home-nino > *:nth-child(2) { animation-duration: 0.4s; }
+.home-nino > *:nth-child(3) { animation-duration: 0.5s; }
+.home-nino > *:nth-child(4) { animation-duration: 0.6s; }
+
 /* --- Saludo + nivel --- */
 .home-saludo {
     display: flex;
@@ -93,6 +127,16 @@
 }
 
 .home-nivel-track { height: 14px; flex: 1 1 120px; min-width: 120px; }
+
+/* --- Microinteracción 2 (SPEC-018 Fase 8): la barra de XP se llena ---
+   El Home pinta primero el respaldo local y luego el XP real del servidor;
+   sin transición el ancho daba un salto seco. Ahora crece. Es SOLO
+   presentación: el ancho lo sigue calculando el mismo `porcentajeNivel` de
+   siempre — cero cambios en XP, progreso ni backend. Va acotada a
+   `.home-nivel-track` porque `.progress-fill` la comparten los juegos. */
+.home-nivel-track .progress-fill {
+    transition: width 0.6s ease;
+}
 
 .home-nivel-xp {
     flex-shrink: 0;

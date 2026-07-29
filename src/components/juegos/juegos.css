@@ -379,6 +379,16 @@
     cursor: pointer;
 }
 
+/* Infraestructura COMPARTIDA por Completar Espacios y Verdadero o Falso: era
+   el único control de los reproductores sin foco temático tras las Fases
+   7.1-7.7. El anillo va en --color-primary-dark (no en --color-primary como
+   el resto) porque el relleno del botón ya ES --color-primary: con el mismo
+   tono, anillo y botón se leerían como una sola mancha. */
+.completar-btn-siguiente:focus-visible {
+    outline: 3px solid var(--color-primary-dark);
+    outline-offset: 3px;
+}
+
 /* Responsive: tableros compactos en móvil */
 @media (max-width: 480px) {
     .memorama-tablero {

@@ -86,3 +86,41 @@ h1, h2, h3 {
   font-family: var(--font-head);
   letter-spacing: -0.01em;
 }
+
+/* ===== SPEC-018 Fase 8 — Menos movimiento, global =====
+   Cuatro archivos ya respetaban `prefers-reduced-motion` (login, Toast, los
+   overlays de resultado y parte de juegos.css), pero el resto de animaciones
+   y transiciones —modales, entradas de editores, rebotes del Clasificador,
+   hover de tarjetas, sidebar— no lo hacían. Esta red de seguridad las cubre
+   TODAS de una vez, sin reescribir cada archivo.
+
+   Qué hace exactamente: las animaciones no se cancelan, se COMPLETAN al
+   instante. Por eso lo que aparece con una entrada animada (overlay de fin
+   de partida, modales, toasts, tarjetas del Home) sigue apareciendo y se
+   queda en su estado final visible; lo que se pierde es solo el recorrido.
+   Colores, estados, foco y feedback de los juegos no dependen de animación,
+   así que la interfaz sigue comunicando lo mismo.
+
+   `!important` es necesario aquí: hay que ganarle a reglas de animación ya
+   declaradas en 10 archivos y a los estilos en línea de MUI. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* EXCEPCIÓN deliberada: los spinners no son decoración, son la única señal
+     de "estoy generando con IA / cargando". Congelarlos borraría información,
+     así que siguen girando (a menor velocidad). */
+  .quiz-spinner,
+  .editor-ia-spinner {
+    animation-duration: 1.4s !important;
+    animation-iteration-count: infinite !important;
+  }
+}

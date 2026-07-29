@@ -1,6 +1,6 @@
 # SPEC-018 — Pulido integral de UI/UX y accesibilidad
 
-**Estado:** 🟡 **Aprobada — auditoría cerrada, sin implementación iniciada.** Documento base para la etapa de pulido. Ninguna fase comenzada.
+**Estado:** 🟢 **COMPLETA — las 8 fases implementadas, verificadas y pusheadas (2026-07-29).** Bitácora fase por fase, con hashes y evidencia, en `docs/architecture/CURRENT_STATE.md`.
 **Fecha:** 2026-07-20
 **Origen:** Etapa de pulido posterior al cierre de los requerimientos funcionales y a la validación del entorno local. Objetivo de defensa de tesis: que la aplicación se sienta como **un solo producto** —visualmente coherente, profesional, accesible e intuitivo— en los tres roles.
 **Alcance:** **Solo presentación (UI/UX y accesibilidad).** Consolidar el design system existente, unificar componentes ya duplicados y corregir problemas de accesibilidad y responsive **confirmados navegando en vivo** el entorno local (Docker + MySQL `gamificapp_dev` + `seedDev.js`). **No** cambia comportamiento funcional de ninguna área estabilizada (ver §3).
@@ -95,8 +95,10 @@ Con el sistema ya creado, auditar y mejorar visualmente **1) Administrador, 2) D
 ### Fase 7 — Juegos y experiencia educativa
 Revisión **visual** de los 7 juegos **sin tocar reglas**: selección, estados activos, corrección diferida, feedback final, overlays, legibilidad, táctil, responsive, accesibilidad, `prefers-reduced-motion`. **Fórmulas de calificación y XP: fuera de alcance.**
 
-### Fase 8 — Auditoría visual final
+### Fase 8 — Auditoría visual final ✅ (2026-07-29)
 Navegar de nuevo los 3 roles completos con Docker/MySQL local; verificar regresiones funcionales y visuales; cerrar la spec.
+
+**Resultado.** Ejecutada en dos etapas. *Etapa 1 (solo lectura):* el P0 heredado del triage —overlay con **«0/100»**— quedó **descartado como falso positivo**: no hay fallo de calificación, es el contador visual de `ResultadoActividad.jsx` (`useContador`, `requestAnimationFrame`) congelado porque el preview mantiene la pestaña con `visibilityState = 'hidden'`; backend, BD y Libro de Calificaciones son correctos. También se auditaron los requests (el `×2` es React StrictMode, solo desarrollo) y JWT/validación, sin vulnerabilidad → **no se introdujo Zod ni ninguna librería nueva**. *Etapa 2:* se implementaron los cuatro hallazgos accionables — textareas con estilo del navegador tematizados, fuga de caché entre usuarios cerrada en el flujo central de sesión, **sidebar colapsable en tablet/escritorio** con raíl de restauración, y el cierre de accesibilidad (`aria-current="page"`, `:focus-visible` en `.completar-btn-siguiente` compartido por Completar y V/F, y **`prefers-reduced-motion` global** con excepción para los spinners de carga) — más **2 microinteracciones** CSS en el Home del estudiante. Cierra el hallazgo §2 de esta spec sobre `prefers-reduced-motion` («solo en 4 archivos») y el P2 de la tabla §4.
 
 ## 6. Regla de implementación (obligatoria por fase)
 
@@ -181,4 +183,5 @@ Local valida UI/UX, flujos, permisos por-request y XP/calificación de **una** i
 
 ## Registro de cambios
 
+- **2026-07-29** — **Spec CERRADA.** Fase 8 completada en dos etapas (auditoría + ajustes finales). **Corrección al §6.2:** el baseline de lint documentado aquí como «28 problemas (25 errores + 3 warnings)» es el correcto al día de hoy; algunas entradas intermedias de `CURRENT_STATE.md` anotaron 29 y el número osciló entre ambos a lo largo de las fases — verificado con `git stash` sobre `83708b0`: **28 (25 + 3)**.
 - **2026-07-20** — Redacción inicial. Consolida la auditoría de código + la auditoría runtime (navegación real de los 3 roles con Docker/MySQL local). Aprobada como base oficial. Sin implementación iniciada.

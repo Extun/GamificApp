@@ -26,14 +26,98 @@
     border-right: 1px solid var(--color-border);
     display: flex;
     flex-direction: column;
+    transition: width 0.18s ease;
 }
 
 /* Zona 1 · Header del sidebar (logo + nombre institucional) */
 .sidebar-header {
+    position: relative;
     flex-shrink: 0;
     padding: 22px 20px 14px;
     border-bottom: 1px solid var(--color-border);
     background: var(--color-surface-alt);
+}
+
+/* ===== Colapso del sidebar en tablet/escritorio (SPEC-018 Fase 8) =====
+   Recomendación de dos revisores: poder ganar el ancho del sidebar (264px,
+   decisivos a 768px). Oculto el sidebar queda un raíl estrecho con el botón
+   para traerlo de vuelta: la navegación nunca se pierde. En ≤760px manda el
+   menú móvil de la Fase 5 y todo esto se desactiva. */
+.sidebar-colapsar {
+    position: absolute;
+    top: 14px;
+    right: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-colapsar:hover {
+    background: var(--color-primary-soft);
+    color: var(--color-primary-dark);
+}
+
+/* El raíl solo existe con el sidebar oculto. */
+.sidebar-rail { display: none; }
+
+.sidebar-container.is-colapsado > .sidebar-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 14px 8px;
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-border);
+}
+
+.sidebar-mostrar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-mostrar:hover {
+    background: var(--color-primary-soft);
+    color: var(--color-primary-dark);
+}
+
+/* Mismo anillo de foco temático que el resto de la app (Fases 6.3 y 7). */
+.sidebar-colapsar:focus-visible,
+.sidebar-mostrar:focus-visible,
+.sidebar-hamburguesa:focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+/* Oculto: el ancho se va a 0 con una transición corta y `visibility` lo saca
+   del orden de tabulación y del árbol de accesibilidad (a diferencia de una
+   opacidad, que dejaría los ítems enfocables sin verse). `overflow` se acota
+   AQUÍ y no en `.sidebar` porque en móvil el panel desplegable se posiciona
+   fuera de la caja del aside y se recortaría. */
+.sidebar-container.is-colapsado > .sidebar {
+    width: 0;
+    min-width: 0;
+    overflow: hidden;
+    visibility: hidden;
+    /* Sin esto el borde de 1px sobrevive a `width: 0` (no se puede comprimir)
+       y deja una columna de 1px entre el raíl y el contenido. */
+    border-right-width: 0;
 }
 
 /* Botón de menú móvil (SPEC-018 Fase 5): oculto en escritorio. */
@@ -106,6 +190,10 @@
     border-bottom: none;
     overflow-wrap: break-word;
 }
+
+/* Hueco para el botón de ocultar, que va absoluto arriba a la derecha: sin
+   esto un nombre institucional largo pasa por debajo del icono. */
+.sidebar-header h2 { padding-right: 34px; }
 
 /* Grupos del sidebar (SPEC-003): rótulo discreto sobre el primer ítem de
    cada categoría. El <li> pasa a columna para apilar rótulo y botón. */
@@ -1164,9 +1252,21 @@
         padding: 10px 14px;
         border-bottom: none;
     }
-    .sidebar-header h2 { flex: 1; margin: 0; font-size: 0.85rem; }
+    .sidebar-header h2 { flex: 1; margin: 0; font-size: 0.85rem; padding-right: 0; }
     .sidebar-logo { margin: 0; max-height: 34px; max-width: 48px; }
     .sidebar-hamburguesa { display: inline-flex; }
+
+    /* El colapso de escritorio (Fase 8) no aplica en móvil: aquí la barra
+       superior + panel desplegable de la Fase 5 siguen mandando, aunque el
+       usuario hubiera dejado el sidebar oculto antes de reducir la ventana. */
+    .sidebar-colapsar { display: none; }
+    .sidebar-container.is-colapsado > .sidebar-rail { display: none; }
+    .sidebar-container.is-colapsado > .sidebar {
+        width: 100%;
+        overflow: visible;
+        visibility: visible;
+        border-right-width: 0;
+    }
 
     /* Menú cerrado por defecto; abierto = panel bajo la barra, con su
        propio scroll y sombra, por encima del contenido (--z-dropdown). */
@@ -1228,9 +1328,13 @@
     color: var(--color-text-muted);
 }
 
+/* `textarea` a secas (antes solo entraba `textarea.campo-tema`): la
+   Introducción y el Final de la Misión Narrativa caían al estilo del
+   navegador — borde 3D, radio 0, fuente monoespaciada — junto a inputs
+   ya tematizados. El campo Tema conserva sus overrides más abajo. */
 .quiz-field input,
 .quiz-field select,
-.quiz-field textarea.campo-tema {
+.quiz-field textarea {
     padding: 11px 14px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
@@ -1241,9 +1345,15 @@
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
+.quiz-field textarea {
+    width: 100%;
+    line-height: 1.45;
+    resize: vertical;
+}
+
 .quiz-field input:focus,
 .quiz-field select:focus,
-.quiz-field textarea.campo-tema:focus {
+.quiz-field textarea:focus {
     outline: none;
     border-color: var(--color-primary);
     box-shadow: 0 0 0 3px var(--color-primary-soft);

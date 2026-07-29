@@ -10,24 +10,49 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 const KEY_TOKEN = 'auth_token';
 const KEY_USUARIO = 'auth_usuario';
 
+// Caché LOCAL que pertenece a UNA persona (regla §6.11: localStorage es
+// caché, nunca fuente de verdad). En los dispositivos compartidos de la
+// escuela un estudiante entra justo después de otro, así que estas claves
+// se borran al cerrar sesión Y al abrir una nueva: si sobreviven, el primer
+// render del siguiente niño pinta el XP/nivel del anterior hasta que
+// responde la API.
+//   · edu_xpTotal        — XP acumulado (gamificationService), alimenta la
+//                          barra de nivel del Home mientras llega el servidor.
+//   · edu_estudianteId   — identidad del estudiante para POST /api/progreso.
+//   · edu_historialRetos — borradores recientes de los editores del docente
+//                          (SPEC-011: solo respaldo offline, la API lo pisa).
+// NO se tocan `institucion_cache` ni `materias_cache`: son catálogo público
+// e institucional, iguales para todos, y el Login los necesita ANTES de que
+// exista sesión.
+const CLAVES_DE_USUARIO = ['edu_estudianteId', 'edu_xpTotal', 'edu_historialRetos'];
+
+// Claves de sistemas ya retirados (SPEC-011: logros viejos e historiales
+// locales de borradores). Limpieza única al iniciar sesión.
+const CLAVES_RETIRADAS = [
+    'edu_logrosObtenidos', 'edu_actividades', 'edu_historialQuizzes',
+    'edu_historialActividades_mision', 'edu_historialActividades_clasificador',
+    'edu_historialActividades_memorama', 'edu_historialActividades_linea-tiempo',
+    'edu_historialActividades_completar'
+];
+
+const limpiarCacheDeUsuario = () =>
+    CLAVES_DE_USUARIO.forEach((clave) => localStorage.removeItem(clave));
+
 // Guarda la sesión que devuelve cualquier ruta de /api/auth y vincula la
 // sesión de estudiante con su fila en la BD central para el guardado de
 // progreso (gamificationService.getEstudianteId()).
 const guardarSesion = (data) => {
+    // Primero se descarta la caché de quien usó antes este navegador: si el
+    // anterior no cerró sesión (cerrar la pestaña no pasa por logout), su XP
+    // seguiría ahí y lo vería el siguiente durante el primer render.
+    limpiarCacheDeUsuario();
+    CLAVES_RETIRADAS.forEach((clave) => localStorage.removeItem(clave));
+
     localStorage.setItem(KEY_TOKEN, data.token);
     localStorage.setItem(KEY_USUARIO, JSON.stringify(data.usuario));
     if (data.usuario.rol === 'estudiante' && data.usuario.estudiante_id) {
         localStorage.setItem('edu_estudianteId', String(data.usuario.estudiante_id));
-    } else {
-        localStorage.removeItem('edu_estudianteId');
     }
-    // SPEC-011: claves de sistemas retirados (logros viejos y historiales
-    // locales de borradores, hoy respaldados en la BD). Limpieza única.
-    ['edu_logrosObtenidos', 'edu_actividades', 'edu_historialQuizzes',
-        'edu_historialActividades_mision', 'edu_historialActividades_clasificador',
-        'edu_historialActividades_memorama', 'edu_historialActividades_linea-tiempo',
-        'edu_historialActividades_completar'
-    ].forEach((clave) => localStorage.removeItem(clave));
     return data;
 };
 
@@ -117,7 +142,7 @@ export const cambiarPin = async (pinActual, pinNuevo) => {
 export const logout = () => {
     localStorage.removeItem(KEY_TOKEN);
     localStorage.removeItem(KEY_USUARIO);
-    localStorage.removeItem('edu_estudianteId');
+    limpiarCacheDeUsuario();
 };
 
 export const getToken = () => localStorage.getItem(KEY_TOKEN);

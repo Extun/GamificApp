@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { List, ListItem, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import MenuOpenRoundedIcon from '@mui/icons-material/MenuOpenRounded';
 import { getInstitucionCache } from '../../services/institucionService';
 
 // Punto donde el sidebar pasa a barra superior (= @media (max-width: 760px)
@@ -21,6 +22,13 @@ const ANCHO_BARRA_MOVIL = 760;
  * sección, con Escape (foco de vuelta al botón), con clic fuera o al
  * agrandar la ventana a escritorio.
  *
+ * Tablet/escritorio (≥761px, SPEC-018 Fase 8): el sidebar se puede ocultar
+ * para ganar ancho útil (a 768px se recuperan los 264px de la columna). Al
+ * ocultarlo queda un raíl estrecho con el botón para traerlo de vuelta, así
+ * la navegación NUNCA es irrecuperable. Es un estado puramente visual: no
+ * cambia permisos, ítems del menú ni el menú móvil, que sigue mandando por
+ * media query en ≤760px.
+ *
  * - titulo: texto bajo el logo institucional.
  * - items: [{ id, label, Icon, activo, onClick, grupo? }] para la navegación.
  *   `grupo` (SPEC-003) es opcional: los ítems consecutivos con el mismo
@@ -35,10 +43,15 @@ const ANCHO_BARRA_MOVIL = 760;
 export function SidebarLayout({ titulo, items, usuario, accionesFooter = [], children, extra = null }) {
     const logo = getInstitucionCache()?.logo_data;
     const [menuAbierto, setMenuAbierto] = useState(false);
+    // Sidebar oculto en tablet/escritorio (Fase 8). Arranca visible siempre.
+    const [colapsado, setColapsado] = useState(false);
     const asideRef = useRef(null);
     const botonMenuRef = useRef(null);
+    const botonOcultarRef = useRef(null);
+    const botonMostrarRef = useRef(null);
     const menuRef = useRef(null);
     const menuId = useId();
+    const asideId = `${menuId}-aside`;
 
     // Escape cierra el menú móvil y devuelve el foco al botón que lo abrió.
     useEffect(() => {
@@ -95,13 +108,23 @@ export function SidebarLayout({ titulo, items, usuario, accionesFooter = [], chi
         if (menuAbierto) menuRef.current?.focus();
     }, [menuAbierto]);
 
+    // Al ocultar o restaurar el sidebar, el botón pulsado desaparece de la
+    // pantalla: el foco pasa a su relevo para que el teclado no lo pierda.
+    // El primer render no mueve el foco (nadie ha pulsado nada todavía).
+    const yaMontado = useRef(false);
+    useEffect(() => {
+        if (!yaMontado.current) { yaMontado.current = true; return; }
+        if (colapsado) botonMostrarRef.current?.focus();
+        else botonOcultarRef.current?.focus();
+    }, [colapsado]);
+
     const alternarMenu = () => setMenuAbierto((v) => !v);
     const cerrarMenu = () => setMenuAbierto(false);
 
     return (
         <div className="dashboard">
-            <div className="sidebar-container">
-                <aside className="sidebar" ref={asideRef}>
+            <div className={`sidebar-container ${colapsado ? 'is-colapsado' : ''}`}>
+                <aside className="sidebar" id={asideId} ref={asideRef}>
                     <div className="sidebar-header">
                         {logo && <img className="sidebar-logo" src={logo} alt="" />}
                         <h2 style={{ pointerEvents: 'none' }}>{titulo}</h2>
@@ -117,6 +140,21 @@ export function SidebarLayout({ titulo, items, usuario, accionesFooter = [], chi
                             {menuAbierto
                                 ? <CloseRoundedIcon sx={{ fontSize: '1.4rem' }} />
                                 : <MenuRoundedIcon sx={{ fontSize: '1.4rem' }} />}
+                        </button>
+
+                        {/* Ocultar el sidebar (solo tablet/escritorio; en móvil
+                            manda la hamburguesa de arriba y este botón no se
+                            muestra). Su relevo es .sidebar-mostrar del raíl. */}
+                        <button
+                            type="button"
+                            ref={botonOcultarRef}
+                            className="sidebar-colapsar"
+                            aria-label="Ocultar el menú de navegación"
+                            aria-expanded={true}
+                            aria-controls={asideId}
+                            onClick={() => setColapsado(true)}
+                        >
+                            <MenuOpenRoundedIcon sx={{ fontSize: '1.25rem' }} />
                         </button>
                     </div>
 
@@ -137,6 +175,10 @@ export function SidebarLayout({ titulo, items, usuario, accionesFooter = [], chi
                                             )}
                                             <ListItemButton
                                                 className={`nav-item ${activo ? 'nav-item-activo' : ''}`}
+                                                // La sección abierta se distinguía SOLO por color; ahora
+                                                // también la anuncian los lectores de pantalla. Es
+                                                // navegación entre las vistas del panel → "page".
+                                                aria-current={activo ? 'page' : undefined}
                                                 onClick={() => {
                                                     // En móvil, elegir una sección cierra el menú;
                                                     // en escritorio el estado ya está cerrado.
@@ -179,6 +221,22 @@ export function SidebarLayout({ titulo, items, usuario, accionesFooter = [], chi
                         </div>
                     </div>
                 </aside>
+
+                {/* Raíl de restauración: aparece solo con el sidebar oculto en
+                    tablet/escritorio, así la navegación siempre se recupera. */}
+                <div className="sidebar-rail">
+                    <button
+                        type="button"
+                        ref={botonMostrarRef}
+                        className="sidebar-mostrar"
+                        aria-label="Mostrar el menú de navegación"
+                        aria-expanded={false}
+                        aria-controls={asideId}
+                        onClick={() => setColapsado(false)}
+                    >
+                        <MenuRoundedIcon sx={{ fontSize: '1.35rem' }} />
+                    </button>
+                </div>
 
                 <main className="contenido">
                     {children}
