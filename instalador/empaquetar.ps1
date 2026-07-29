@@ -46,6 +46,8 @@
 #     · runtime\descargas\ (los ZIP de origen, 233 MB de redundancia)
 #     · .git\, .claude\, docs\ internos y CLAUDE.md/START_HERE.md
 #       (contienen rutas y detalles del equipo de desarrollo)
+#     · README.md — documentación del repositorio; sus enlaces apuntan a
+#       archivos que no viajan. Para el revisor está LEEME.txt.
 # ============================================================
 param(
     [string]$Salida = '',
@@ -85,6 +87,13 @@ $CarpetasDelPaquete = @(
 )
 
 # Archivos sueltos de la raíz.
+#
+# README.md NO viaja a propósito: es documentación del REPOSITORIO, escrita
+# para quien desarrolla. Remite a `CLAUDE.md`, `START_HERE.md` y `docs/`, que
+# se excluyen deliberadamente del paquete, así que dentro de la distribución
+# sus enlaces quedarían rotos y explicaría un flujo (build manual, npm,
+# Docker) que el revisor no necesita. Su equivalente para quien recibe el
+# paquete es `LEEME.txt`, que se genera más abajo y es autosuficiente.
 $ArchivosDelPaquete = @(
     'Instalar GamificApp.cmd',
     'Iniciar GamificApp.cmd',
@@ -94,8 +103,7 @@ $ArchivosDelPaquete = @(
     'package.json',
     'package-lock.json',
     'eslint.config.js',
-    '.env.example',
-    'README.md'
+    '.env.example'
 )
 
 # ------------------------------------------------------------
@@ -437,18 +445,38 @@ PASOS
      Descomprímela ENTERA: no abras los archivos desde dentro del ZIP.
 
   2. Haz doble clic en   Instalar GamificApp.cmd
-     Tarda unos minutos la primera vez. Al terminar se abre sola en el
-     navegador. Es normal que Windows pregunte si permites la ejecución.
+     Tarda unos minutos la primera vez. Es normal que Windows pregunte si
+     permites la ejecución.
 
-  3. Los días siguientes, para usarla:   Iniciar GamificApp.cmd
+     Solo te hará una pregunta:
+
+         ¿Deseas cargar datos de demostración?  [s/N]
+
+     Responde  s  y GamificApp creará un docente, cuatro estudiantes y una
+     actividad de cada juego para que puedas probarla enseguida. Son datos
+     FICTICIOS: no pertenecen a ninguna escuela real. Responde  n  (o pulsa
+     Enter) para empezar con la aplicación vacía. Solo se pregunta la primera
+     vez, y en ningún caso se escribe encima de datos que ya existan.
+
+  3. Al terminar, GamificApp se abre sola en el navegador.
+     Si no se abriera, entra tú a:   http://localhost:5173
+
+  4. Los días siguientes, para usarla:   Iniciar GamificApp.cmd
      Para cerrarla:                      Detener GamificApp.cmd
 
 
-TU CONTRASEÑA
--------------
-Al instalar se genera un archivo CREDENCIALES.txt en esta misma carpeta con
-la contraseña de la cuenta "admin". Esa contraseña es única de tu equipo:
-nadie más la tiene, ni siquiera quien te entregó GamificApp.
+CÓMO ENTRAR
+-----------
+Al instalar se genera un archivo CREDENCIALES.txt en esta misma carpeta. Ahí
+está la contraseña de la cuenta de administrador:
+
+     Dirección   http://localhost:5173
+     Usuario     admin
+     Contraseña  la que aparece en CREDENCIALES.txt
+
+Esa contraseña es única de tu equipo: nadie más la tiene, ni siquiera quien te
+entregó GamificApp. Si cargaste los datos de demostración, ese mismo archivo
+lista además el usuario del docente y el PIN del estudiante de prueba.
 
 
 DÓNDE QUEDAN TUS DATOS

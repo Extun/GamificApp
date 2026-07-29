@@ -617,6 +617,78 @@ if ($sembrarDemo) {
             foreach ($linea in $contenidoSeed) {
                 if ($linea -match '^\s+•\s') { $lineasDemo += $linea.Trim() }
             }
+            # Se deja constancia de que ESTA instalacion sembro datos demo, para
+            # que una segunda ejecucion —que a proposito NO vuelve a sembrar—
+            # pueda seguir listando esas cuentas en CREDENCIALES.txt.
+            # Vive en .run\ (estado de ejecucion de este equipo, ignorado por
+            # Git y fuera del paquete), nunca en el repositorio.
+            if ($lineasDemo.Count -gt 0) {
+                if (-not (Test-Path $script:CarpetaRun)) {
+                    New-Item -ItemType Directory -Path $script:CarpetaRun -Force | Out-Null
+                }
+                Escribir-TextoSinBom -Ruta $script:ArchivoDatosDemo -Contenido (($lineasDemo -join "`r`n") + "`r`n")
+            }
+        }
+    }
+}
+
+# ------------------------------------------------------------
+# 11-bis. Cuentas de demostracion de una instalacion ANTERIOR
+# ------------------------------------------------------------
+# Si esta ejecucion no ha sembrado (segunda pasada), el bloque de cuentas de
+# demostracion se recupera del marcador, NUNCA del CREDENCIALES.txt anterior:
+# ese archivo es una SALIDA para el usuario, no una fuente de verdad, y puede
+# haberse editado a mano.
+#
+# Y no se copia a ciegas: antes se pregunta a la base de datos cuales de esas
+# cuentas permiten entrar HOY, con el mismo criterio que usa el login (existe,
+# no esta en la papelera y no esta desactivada). Asi nunca se anuncia una
+# credencial que el usuario ya borro.
+if ($lineasDemo.Count -eq 0 -and (Test-Path $script:ArchivoDatosDemo)) {
+    Escribir-Paso 'Comprobando las cuentas de demostracion de la instalacion anterior'
+    $lineasPrevias = @(Get-Content -Path $script:ArchivoDatosDemo -Encoding UTF8 |
+        Where-Object { $_.Trim() -ne '' })
+
+    # De "• Docente:  docente.demo / clave" se extrae 'docente.demo'; de
+    # '• Estudiante: "Estudiante Prueba Uno" / PIN 111111', el nombre sin
+    # comillas. Si una linea no encaja, se descarta: mejor omitir que mentir.
+    $identificadores = @()
+    $porIdentificador = @{}
+    foreach ($linea in $lineasPrevias) {
+        if ($linea -match '^\s*•\s*[^:]+:\s*(.+?)\s*/') {
+            $id = $Matches[1].Trim().Trim('"')
+            if ($id -and -not $porIdentificador.ContainsKey($id)) {
+                $identificadores += $id
+                $porIdentificador[$id] = $linea.Trim()
+            }
+        }
+    }
+
+    if ($identificadores.Count -eq 0) {
+        Escribir-Detalle 'El registro anterior no tenia cuentas reconocibles: no se anuncia ninguna.'
+    } else {
+        $vigentes = Invocar-ScriptBD -Script 'bd-verificar.mjs' -Variables @{
+            GA_DB_HOST     = $conexion.Servidor
+            GA_DB_PORT     = "$($conexion.Puerto)"
+            GA_DB_USER     = $usuarioFinal
+            GA_DB_PASSWORD = $claveFinal
+            GA_DB_NAME     = $conexion.Base
+            GA_CUENTAS     = ($identificadores -join "`n")
+        }
+        $vivas = @()
+        if ($vigentes -and $vigentes.cuentasVivas) { $vivas = @($vigentes.cuentasVivas) }
+
+        # Se conserva el ORDEN original del registro, no el que devuelva la BD.
+        foreach ($id in $identificadores) {
+            if ($vivas -contains $id) { $lineasDemo += $porIdentificador[$id] }
+        }
+
+        $descartadas = $identificadores.Count - $lineasDemo.Count
+        if ($lineasDemo.Count -gt 0) {
+            Escribir-Ok "Se conservan $($lineasDemo.Count) cuentas de demostracion que siguen activas."
+        }
+        if ($descartadas -gt 0) {
+            Escribir-Aviso "$descartadas cuenta(s) de demostracion ya no existen o estan desactivadas: no se vuelven a anunciar."
         }
     }
 }

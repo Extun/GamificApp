@@ -10,6 +10,11 @@
 // a escuchar ANTES de terminar `inicializarEsquema()`: que /api/health
 // responda no significa que las migraciones hayan acabado.
 //
+// Modo cuentas (GA_CUENTAS): dice cuáles de los identificadores indicados
+// siguen correspondiendo a una cuenta con la que se puede entrar HOY. Lo usa
+// el instalador para no reescribir en CREDENCIALES.txt cuentas de
+// demostración que el usuario ya borró. Solo lee; nunca crea ni modifica.
+//
 // Las credenciales llegan por variables de entorno (GA_DB_*), nunca por
 // argumentos de línea de comandos: los argumentos son visibles en la lista
 // de procesos del sistema.
@@ -53,7 +58,50 @@ const esperarTablas = (process.env.GA_ESPERAR_TABLAS || '')
 const esperarAdmin = process.env.GA_ESPERAR_ADMIN === '1';
 const segundosMax = Number(process.env.GA_ESPERAR_SEGUNDOS) || 60;
 
+// Identificadores a comprobar, uno por línea. Pueden ser un `username`
+// (admin, docente) o el nombre visible de un estudiante.
+const cuentasPedidas = (process.env.GA_CUENTAS || '')
+    .split('\n').map((c) => c.trim()).filter(Boolean);
+
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Misma normalización que `normalizarNombre` de server/routes/auth.js: es la
+// que decide si el nombre que teclea un niño encuentra su cuenta.
+const normalizar = (n) => String(n || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+const existeColumna = async (conn, base, tabla, columna) => {
+    const [[fila]] = await conn.query(
+        `SELECT COUNT(*) AS n FROM information_schema.columns
+         WHERE table_schema = ? AND table_name = ? AND column_name = ?`,
+        [base, tabla, columna]
+    );
+    return fila.n > 0;
+};
+
+// Devuelve los identificadores que HOY permiten iniciar sesión, aplicando el
+// mismo criterio que el login: la cuenta existe, no está en la papelera
+// (`eliminado_en`) y no está desactivada (`activo`). Las dos columnas se
+// consultan solo si existen, para no romper en un esquema a medio migrar.
+const comprobarCuentas = async (conn, base, identificadores) => {
+    const vivas = [];
+    const tieneEliminado = await existeColumna(conn, base, 'usuarios', 'eliminado_en');
+    const tieneActivo = await existeColumna(conn, base, 'usuarios', 'activo');
+    const tieneNombreNorm = await existeColumna(conn, base, 'usuarios', 'nombre_norm');
+
+    const condiciones = ['(username = ?' + (tieneNombreNorm ? ' OR nombre_norm = ?)' : ')')];
+    if (tieneEliminado) condiciones.push('eliminado_en IS NULL');
+    if (tieneActivo) condiciones.push('activo = 1');
+    const sql = `SELECT COUNT(*) AS n FROM usuarios WHERE ${condiciones.join(' AND ')}`;
+
+    for (const id of identificadores) {
+        const args = tieneNombreNorm ? [id, normalizar(id)] : [id];
+        try {
+            const [[fila]] = await conn.query(sql, args);
+            if (fila.n > 0) vivas.push(id);
+        } catch { /* un identificador problemático no invalida el resto */ }
+    }
+    return vivas;
+};
 
 try {
     const conn = await mysql.createConnection(config);
@@ -106,13 +154,20 @@ try {
             await dormir(700);
         }
     }
+    // Vigencia de cuentas: no altera `ok`, que sigue significando "el esquema
+    // está completo". Es una respuesta informativa aparte.
+    let cuentasVivas = [];
+    if (base && cuentasPedidas.length) {
+        cuentasVivas = await comprobarCuentas(conn, base, cuentasPedidas);
+    }
+
     await conn.end();
 
     const mayor = Number(String(version.v).split('.')[0]) || 0;
     const completo = (faltan.length === 0) && adminListo;
     responder({
         ok: completo, version: version.v, mayor, usuario: usuario.u,
-        tablas, faltan, adminListo, datadir, puerto
+        tablas, faltan, adminListo, datadir, puerto, cuentasVivas
     });
 } catch (err) {
     // err.message de mysql2 nunca incluye la contraseña (sí el usuario/host).

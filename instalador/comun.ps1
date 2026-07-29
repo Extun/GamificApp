@@ -25,6 +25,14 @@ $script:CarpetaServer = Join-Path $script:Raiz 'server'
 $script:ArchivoEnv    = Join-Path $script:CarpetaServer '.env'
 $script:ArchivoLog    = $null
 
+# Registro de que esta instalacion sembro datos de demostracion, con las
+# lineas de cuentas que imprimio el seed. Permite que una segunda ejecucion
+# del instalador —que NO vuelve a sembrar— siga listandolas en
+# CREDENCIALES.txt. Es estado de ejecucion de este equipo: vive en .run\
+# (ignorado por Git), nunca viaja en el paquete y no contiene nada que no
+# imprimiera ya el propio seed en pantalla.
+$script:ArchivoDatosDemo = Join-Path $script:CarpetaRun 'datos-demo.txt'
+
 # Requisito REAL de Node: lo impone Vite 8 (node_modules/vite/package.json →
 # engines.node = "^20.19.0 || >=22.12.0"). No es un número inventado.
 $script:NodeRequisitoTexto = 'Node.js 20.19+ (rama 20) o 22.12+ (rama 22 o superior)'

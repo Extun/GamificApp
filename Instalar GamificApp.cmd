@@ -3,7 +3,9 @@ rem ============================================================
 rem  GamificApp - Instalacion local (Windows)
 rem  Haz doble clic en este archivo.
 rem
-rem  Requisitos previos: Node.js y MySQL 8 ya instalados.
+rem  No hace falta instalar nada antes: GamificApp trae y prepara sus propios
+rem  Node.js y MySQL portables, sin tocar Windows ni pedir permisos de
+rem  administrador.
 rem  El detalle de todo lo que ocurre queda en logs\instalador.log
 rem ============================================================
 chcp 65001 >nul
