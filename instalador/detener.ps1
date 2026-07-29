@@ -8,9 +8,13 @@
 # NUNCA usa "taskkill /IM node.exe": eso cerraria de golpe cualquier otra
 # aplicacion Node que el usuario tuviera abierta.
 #
-# No toca la base de datos: los datos siguen ahi para la proxima vez.
+# La base de datos portable se cierra en ULTIMO lugar y de forma ordenada
+# (mysqladmin shutdown), cuando ya nadie la esta usando. NO se borra nada:
+# los datos siguen en %LOCALAPPDATA%\GamificApp\ para la proxima vez.
+# Un MySQL que no sea el nuestro (uno instalado, o el de Docker) no se toca.
 # ============================================================
 . (Join-Path $PSScriptRoot 'comun.ps1')
+. (Join-Path $PSScriptRoot 'mysql.ps1')
 
 Iniciar-Registro 'detener'
 Escribir-Titulo 'GamificApp — Detener'
@@ -49,6 +53,30 @@ foreach ($servicio in $servicios) {
     $dueno = Obtener-DuenoPuerto -Puerto $servicio.Puerto
     if ($dueno) {
         $ajenos += [pscustomobject]@{ Puerto = $servicio.Puerto; Dueno = $dueno }
+    }
+}
+
+# ------------------------------------------------------------
+# La base de datos, al final: primero se van los que la usan.
+# ------------------------------------------------------------
+if (Test-MySqlPortableDisponible) {
+    Escribir-Paso 'Deteniendo: Base de datos'
+    $resultadoBd = Detener-MySqlPortable
+    switch ($resultadoBd) {
+        'detenido' {
+            $detenidos++
+            Escribir-Ok 'Base de datos detenida (cierre ordenado).'
+        }
+        'detenido-forzado' {
+            $detenidos++
+            Escribir-Aviso 'Base de datos detenida, pero hizo falta cerrarla a la fuerza.'
+        }
+        'no-estaba' {
+            Escribir-Detalle 'Base de datos: no estaba en ejecucion.'
+        }
+        default {
+            Escribir-Aviso 'No se pudo detener la base de datos. Ejecuta este archivo otra vez.'
+        }
     }
 }
 

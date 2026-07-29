@@ -7,6 +7,7 @@
 # NO la duplica: solo abre el navegador.
 # ============================================================
 . (Join-Path $PSScriptRoot 'comun.ps1')
+. (Join-Path $PSScriptRoot 'mysql.ps1')
 
 Iniciar-Registro 'iniciar'
 Escribir-Titulo 'GamificApp — Iniciar'
@@ -43,7 +44,8 @@ Escribir-Ok "Node.js $($node.Texto) ($origenNode) y la instalacion previa estan 
 Escribir-Detalle $node.Ruta
 
 # ------------------------------------------------------------
-# 2. MySQL en marcha
+# 2. MySQL en marcha  (SIEMPRE lo primero: sin base de datos no tiene
+#    sentido levantar el servidor ni la pagina web)
 # ------------------------------------------------------------
 $configuracion = Leer-Env $script:ArchivoEnv
 $servidorBd = $configuracion['DB_HOST']; if (-not $servidorBd) { $servidorBd = 'localhost' }
@@ -52,7 +54,30 @@ if ($configuracion['DB_PASSWORD']) { Registrar-Secreto $configuracion['DB_PASSWO
 if ($configuracion['JWT_SECRET'])  { Registrar-Secreto $configuracion['JWT_SECRET'] }
 if ($configuracion['ADMIN_PASSWORD']) { Registrar-Secreto $configuracion['ADMIN_PASSWORD'] }
 
+# Si la base es la portable de GamificApp, la encendemos nosotros. Si ya
+# estaba en marcha, Asegurar-MySqlPortableEnMarcha lo detecta y NO lanza una
+# segunda instancia.
+$bdPortable = (Test-MySqlPortableDisponible) -and
+              (Test-EnvEsInstanciaPortable -Servidor $servidorBd -Puerto ([int]$puertoBd))
+if ($bdPortable) {
+    Escribir-Paso 'Comprobando la base de datos de GamificApp'
+    [void](Asegurar-MySqlPortableEnMarcha -Puerto ([int]$puertoBd))
+}
+
 if (-not (Test-PuertoTcpAbierto -Servidor $servidorBd -Puerto ([int]$puertoBd))) {
+    if ($bdPortable) {
+        Mostrar-DiagnosticoMySql
+        Terminar-Con-Error "La base de datos de GamificApp no responde en ${servidorBd}:${puertoBd}." @(
+            'Se intento iniciarla y no llego a responder, asi que NO se ha arrancado',
+            'el resto de la aplicacion.',
+            '',
+            "Registro completo en: $script:MySqlErrorLog",
+            '',
+            'Que hacer:',
+            '  1. Ejecuta "Detener GamificApp.cmd".',
+            '  2. Vuelve a ejecutar este archivo.'
+        )
+    }
     Terminar-Con-Error "MySQL no responde en ${servidorBd}:${puertoBd}." @(
         'La base de datos esta apagada.',
         '',

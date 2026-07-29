@@ -5,7 +5,13 @@
 # Node.js ya NO es un requisito previo (Fase Local 2.1): si el equipo no lo
 # tiene, o el que tiene no sirve, se descarga una copia portable verificada
 # dentro de runtime\node\ sin instalar nada en el sistema.
-# MySQL 8 SÍ sigue siendo un requisito previo (pendiente: Fase Local 2.2).
+#
+# MySQL tampoco lo es (Fase Local 2.2) cuando la distribución trae
+# runtime\mysql: se arranca una instancia propia en el puerto 3308 (con
+# reserva 3309-3315), con los datos en %LOCALAPPDATA%\GamificApp\, sin
+# servicio de Windows y sin permisos de administrador. Si NO viene ese
+# runtime, se conserva intacto el camino de la Fase Local 1: detectar un
+# MySQL 8 ya instalado y pedir sus credenciales.
 #
 # Es SEGURO ejecutarlo varias veces: no regenera credenciales existentes,
 # no borra la base de datos y no vuelve a sembrar nada sin permiso.
@@ -25,6 +31,7 @@ param(
 
 . (Join-Path $PSScriptRoot 'comun.ps1')
 . (Join-Path $PSScriptRoot 'runtime.ps1')
+. (Join-Path $PSScriptRoot 'mysql.ps1')
 
 Iniciar-Registro 'instalador'
 Escribir-Titulo 'GamificApp — Instalacion local'
@@ -124,6 +131,11 @@ Escribir-Paso 'Preparando la conexion con MySQL'
 $envExistia = Test-Path $script:ArchivoEnv
 $conexion = $null
 $crearUsuarioApp = $false
+# ¿La base de datos la pone GamificApp (portable) o es una del equipo?
+$usaPortable = $false
+# Solo se ofrecen datos de demostración sobre una base RECIÉN creada: si ya
+# había datos, nunca se propone escribir encima de ellos.
+$datosRecienCreados = $false
 
 if ($envExistia) {
     # Ya hay una instalacion previa: se respeta tal cual. NO se pregunta
@@ -142,8 +154,41 @@ if ($envExistia) {
     if ($BaseDatos -ne '' -and $BaseDatos -ne $conexion.Base) {
         Escribir-Aviso "Se ignora -BaseDatos '$BaseDatos': manda el DB_NAME de server/.env."
     }
+
+    # Si ese server/.env describe NUESTRA instancia portable, hay que
+    # encenderla antes de sondear el puerto: si no, la sonda de mas abajo
+    # diria que "MySQL esta apagado" cuando en realidad solo hacia falta
+    # arrancarlo.
+    if ((Test-MySqlPortableDisponible) -and (Test-EnvEsInstanciaPortable -Servidor $conexion.Servidor -Puerto $conexion.Puerto)) {
+        $usaPortable = $true
+        [void](Asegurar-MySqlPortableEnMarcha -Puerto $conexion.Puerto)
+    }
+} elseif (Test-MySqlPortableDisponible) {
+    # GamificApp trae su propia base de datos: no se pregunta nada y no se
+    # necesita ningun MySQL instalado en el equipo.
+    #
+    # Este mismo camino cubre la RECONSTRUCCION: si el usuario reemplazo la
+    # carpeta del proyecto y perdio server/.env pero conserva sus datos en
+    # %LOCALAPPDATA%, Preparar-MySqlPortable los reutiliza tal cual (no
+    # inicializa nada) y mas abajo se regeneran las credenciales de la
+    # aplicacion a partir de la credencial de administracion guardada.
+    $base = $script:BaseDatosPredeterminada
+    if ($BaseDatos -ne '') { $base = $BaseDatos }
+
+    $usaPortable = $true
+    $portable = Preparar-MySqlPortable -Base $base
+    $datosRecienCreados = $portable.EsNueva
+    $conexion = [pscustomobject]@{
+        Servidor = $portable.Servidor
+        Puerto   = $portable.Puerto
+        Usuario  = $portable.Usuario
+        Clave    = $portable.Clave
+        Base     = $portable.Base
+    }
+    $crearUsuarioApp = $true
 } else {
-    # Instalacion nueva: detectamos donde puede estar MySQL y preguntamos.
+    # Sin runtime portable: camino de la Fase Local 1, intacto. Detectamos
+    # donde puede estar un MySQL ya instalado y preguntamos.
     $base = $script:BaseDatosPredeterminada
     if ($BaseDatos -ne '') { $base = $BaseDatos }
 
@@ -153,8 +198,13 @@ if ($envExistia) {
     }
     if ($puertoSugerido -eq 0) {
         Terminar-Con-Error 'No se encontro ningun servidor MySQL escuchando en este equipo.' @(
-            'GamificApp necesita MySQL 8 en marcha (puerto 3306 normalmente).',
+            'Esta copia de GamificApp no incluye su propia base de datos (falta la',
+            'carpeta runtime\mysql), asi que necesita MySQL 8 ya instalado.',
             '',
+            'Lo mas comodo es volver a descargar GamificApp completa: la version',
+            'completa trae la base de datos incluida y no hace falta instalar nada.',
+            '',
+            'Si prefieres usar un MySQL propio:',
             'Que hacer:',
             '  1. Instala MySQL 8 Community Server desde  https://dev.mysql.com/downloads/mysql/',
             '     (durante la instalacion se te pedira una contrasena para el usuario root: anotala).',
@@ -415,7 +465,10 @@ $esBaseDemo = ($conexion.Base -eq $script:BaseDatosPredeterminada)
 $esServidorLocal = ($conexion.Servidor -eq 'localhost' -or $conexion.Servidor -eq '127.0.0.1' -or $conexion.Servidor -eq '::1')
 
 Escribir-Paso 'Datos de demostracion (opcional)'
-if ($esBaseDemo -and $esServidorLocal) {
+# Con base portable solo se ofrecen si la base se acaba de crear: sobre datos
+# que ya existian no se propone escribir nada.
+$puedeOfrecerDemo = $esBaseDemo -and $esServidorLocal -and ((-not $usaPortable) -or $datosRecienCreados)
+if ($puedeOfrecerDemo) {
     Write-Host '   Puedo crear cuentas y actividades FICTICIAS para que puedas probar la' -ForegroundColor White
     Write-Host '   aplicacion enseguida: un docente, cuatro estudiantes y una actividad de' -ForegroundColor White
     Write-Host '   cada uno de los 7 juegos. No son datos reales de ninguna escuela.' -ForegroundColor White
@@ -425,6 +478,8 @@ if ($esBaseDemo -and $esServidorLocal) {
     $sembrarDemo = Preguntar-SiNo -Pregunta 'Deseas cargar datos de demostracion?'
     if ($sembrarDemo) { Escribir-Log '   Respuesta: SI, se sembraran datos de demostracion.' 'INFO' $true 'Yellow' }
     else { Escribir-Ok 'No se cargaran datos de demostracion.' }
+} elseif ($usaPortable -and -not $datosRecienCreados) {
+    Escribir-Detalle 'Omitido: ya tienes datos guardados y no se escribe encima de ellos.'
 } else {
     Escribir-Detalle "Omitido: los datos de demostracion solo se permiten sobre la base local '$($script:BaseDatosPredeterminada)'."
 }
@@ -522,7 +577,7 @@ if ($sembrarDemo) {
     Escribir-Paso 'Cargando datos de demostracion'
     # Barreras propias, ademas de la triple barrera del propio seedDev.js
     # (NODE_ENV, DEV_SEED y DB_HOST local), que NO se han tocado.
-    if (-not $esBaseDemo -or -not $esServidorLocal) {
+    if (-not $puedeOfrecerDemo) {
         Escribir-Aviso 'Cancelado: la base de destino no es la base local de demostracion.'
     } else {
         $salidaSeed  = Join-Path $script:CarpetaLogs 'datos-demo.log'
@@ -589,6 +644,18 @@ Base de datos MySQL
   Usuario  : $usuarioFinal
   Clave    : $claveFinal
 "@
+if ($usaPortable) {
+    $textoCredenciales += @"
+
+Dónde se guardan tus datos
+  $($script:MySqlDatadir)
+
+  Esa carpeta es la que contiene el trabajo de la escuela. NO está dentro de
+  la carpeta de GamificApp a propósito: puedes borrar, mover o reemplazar la
+  carpeta de GamificApp y tus datos seguirán ahí.
+  Para hacer una copia de seguridad, copia esa carpeta con GamificApp cerrada.
+"@
+}
 if ($lineasDemo.Count -gt 0) {
     $textoCredenciales += "`r`n`r`nCuentas de DEMOSTRACIÓN (datos ficticios, cargados en esta instalación)`r`n"
     foreach ($linea in $lineasDemo) { $textoCredenciales += "  $linea`r`n" }
