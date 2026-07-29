@@ -130,6 +130,58 @@ function Test-MySqlPortableDisponible {
     return ((Test-Path $script:MySqldExe) -and (Test-Path $script:MySqlAdminExe))
 }
 
+# ------------------------------------------------------------
+# Runtime de Visual C++ (app-local) — comprobación previa
+# ------------------------------------------------------------
+# mysqld.exe, mysql.exe, mysqladmin.exe y mysqldump.exe importan de forma
+# ESTÁTICA vcruntime140.dll, vcruntime140_1.dll y msvcp140.dll. Windows no
+# las trae de fábrica: en un equipo recién instalado faltan y el proceso ni
+# siquiera llega a arrancar (no son delay-load, así que no hay mensaje de
+# error de MySQL: falla el cargador de Windows).
+#
+# Por eso la distribución las lleva JUNTO a los ejecutables, dentro de
+# runtime\mysql\bin: Windows busca primero en el directorio del ejecutable.
+# Las prepara instalador\runtime.ps1 al armar el paquete; aquí solo se
+# comprueba que llegaron, ANTES de intentar arrancar nada.
+$script:VcRuntimeDlls = @('vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll')
+
+function Test-VcRuntimeMySql {
+    $carpetaBin = Split-Path -Parent $script:MySqldExe
+    $faltanLocal = @()
+    foreach ($dll in $script:VcRuntimeDlls) {
+        if (-not (Test-Path (Join-Path $carpetaBin $dll))) { $faltanLocal += $dll }
+    }
+    if ($faltanLocal.Count -eq 0) { return }
+
+    # No están junto al ejecutable. ¿Las tiene instaladas el equipo? Si sí,
+    # MySQL funcionará igual AQUÍ, pero esta copia está incompleta para
+    # llevarla a otro sitio: se avisa sin bloquear el trabajo.
+    $faltanSistema = @()
+    foreach ($dll in $faltanLocal) {
+        if (-not (Test-Path (Join-Path $env:WINDIR "System32\$dll"))) { $faltanSistema += $dll }
+    }
+    if ($faltanSistema.Count -eq 0) {
+        Escribir-Aviso "Faltan junto a MySQL: $($faltanLocal -join ', '). Este equipo las tiene instaladas, asi que funcionara aqui, pero esta copia NO serviria en un equipo sin Visual C++."
+        return
+    }
+
+    Terminar-Con-Error 'Faltan componentes que necesita la base de datos para arrancar.' @(
+        "No se encontraron: $($faltanSistema -join ', ')",
+        '',
+        'Forman parte del "Microsoft Visual C++ Redistributable (x64)". GamificApp',
+        'los distribuye junto a su base de datos precisamente para que no haga',
+        'falta instalarlos, pero en esta copia no estan.',
+        '',
+        'Que hacer:',
+        '  1. Vuelve a descargar GamificApp completa (sin extraer a medias).',
+        '  2. Ejecuta otra vez "Instalar GamificApp.cmd".',
+        '',
+        'Alternativa: instalar "Microsoft Visual C++ Redistributable (x64)" desde',
+        'https://aka.ms/vs/17/release/vc_redist.x64.exe  (pide permisos de',
+        'administrador; con la copia completa de GamificApp no hace falta).'
+    )
+}
+
 function Obtener-VersionMySqlPortable {
     if (-not (Test-Path $script:MySqldExe)) { return $null }
     try {
@@ -539,6 +591,9 @@ function Preparar-MySqlPortable {
     param([string]$Base)
 
     Escribir-Paso 'Preparando la base de datos portable de GamificApp'
+    # Antes de nada: sin el runtime de Visual C++ mysqld ni arranca, y el
+    # fallo del cargador de Windows no deja rastro en ningun log de MySQL.
+    Test-VcRuntimeMySql
     $version = Obtener-VersionMySqlPortable
     Escribir-Ok "MySQL $version portable (incluido con GamificApp)."
     Escribir-Detalle $script:CarpetaMySqlRuntime
@@ -626,6 +681,7 @@ function Asegurar-MySqlPortableEnMarcha {
             '  Vuelve a descargar GamificApp completa y ejecuta "Instalar GamificApp.cmd".'
         )
     }
+    Test-VcRuntimeMySql
 
     $estado = Obtener-EstadoPuertoMySql -Puerto $Puerto
     if ($estado.Estado -eq 'Nuestro') {

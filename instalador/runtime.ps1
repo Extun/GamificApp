@@ -211,3 +211,147 @@ function Preparar-RuntimeNode {
     Escribir-Ok "Node portable $($nuevo.Texto) listo (no se instalo nada en el sistema)."
     Escribir-Detalle $nuevo.Ruta
 }
+
+# ============================================================
+# Runtime de Visual C++ para MySQL portable — despliegue APP-LOCAL
+# (Fase Local 2.3)
+# ============================================================
+# POR QUÉ EXISTE ESTO. El análisis de la tabla de importaciones PE de
+# runtime\mysql\bin\*.exe da un resultado inequívoco:
+#
+#   mysqld.exe      -> vcruntime140.dll, vcruntime140_1.dll, msvcp140.dll
+#   mysql.exe       -> las mismas tres
+#   mysqladmin.exe  -> las mismas tres
+#   mysqldump.exe   -> las mismas tres
+#
+# Son importaciones ESTÁTICAS (no delay-load): si faltan, el proceso no
+# arranca siquiera. Y esas tres DLL **no forman parte de Windows**: las
+# instala el "Microsoft Visual C++ Redistributable". Las api-ms-win-crt-*
+# que también importa MySQL sí vienen con Windows (Universal CRT).
+#
+# Node.js NO tiene este problema: node.exe solo importa DLL del sistema
+# (kernel32, ws2_32, crypt32, advapi32, user32, ole32, iphlpapi, shell32,
+# userenv, winmm, dbghelp) y los binarios nativos de node_modules
+# (rolldown, lightningcss, skia) están compilados con CRT estático.
+#
+# SOLUCIÓN ELEGIDA: despliegue app-local. Las tres DLL viajan JUNTO a los
+# ejecutables, en runtime\mysql\bin. Windows resuelve las importaciones
+# buscando primero en el directorio del ejecutable, así que mysqld carga
+# esas copias y no necesita nada del sistema:
+#   · no se toca System32, ni el PATH global, ni el registro de Windows;
+#   · no se instala ningún redistribuible;
+#   · no hacen falta privilegios de administrador.
+#
+# CONTRAPARTIDA, DICHA CLARAMENTE: una copia app-local NO la actualiza
+# Windows Update. Si Microsoft publica un parche de seguridad del runtime de
+# Visual C++, hay que reemplazar estos archivos a mano y volver a empaquetar.
+# Forman parte del runtime distribuido y se actualizan con él.
+#
+# ESTA FUNCIÓN SOLO SE USA AL ARMAR LA DISTRIBUCIÓN (instalador\empaquetar.ps1).
+# El equipo del revisor nunca la ejecuta: allí las DLL ya vienen en su sitio,
+# y quien las comprueba es Test-VcRuntimeMySql (instalador\mysql.ps1).
+$script:VcRuntimeArchivos = @('vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll')
+
+# Lee el campo Machine de la cabecera PE. 0x8664 = x64. Se comprueba de
+# verdad en vez de fiarse del nombre de la carpeta de origen.
+function Obtener-ArquitecturaPE {
+    param([string]$Ruta)
+    $flujo = $null
+    $lector = $null
+    try {
+        $flujo = [System.IO.File]::OpenRead($Ruta)
+        $lector = New-Object System.IO.BinaryReader($flujo)
+        $flujo.Position = 0x3C
+        $peOffset = $lector.ReadUInt32()
+        $flujo.Position = $peOffset + 4
+        switch ($lector.ReadUInt16()) {
+            0x8664  { return 'x64' }
+            0x014c  { return 'x86' }
+            0xAA64  { return 'ARM64' }
+            default { return 'desconocida' }
+        }
+    } catch {
+        return 'ilegible'
+    } finally {
+        if ($lector) { $lector.Close() }
+        if ($flujo)  { $flujo.Close() }
+    }
+}
+
+# Copia el runtime de Visual C++ junto a los ejecutables de MySQL.
+#
+# ORIGEN: %WINDIR%\System32 de este equipo, que es donde el propio
+# instalador de Microsoft dejó los archivos. No se descarga nada de
+# terceros. Antes de copiar se exige, archivo por archivo:
+#   1. firma Authenticode válida y emitida por Microsoft;
+#   2. arquitectura x64 leída de la cabecera PE;
+#   3. que el archivo exista y se pueda leer entero.
+# Si algo no cuadra, no se copia nada y se aborta.
+function Preparar-VcRuntimeParaMySql {
+    param([string]$CarpetaBinMySql, [switch]$Forzar)
+
+    Escribir-Paso 'Preparando el runtime de Visual C++ junto a MySQL (app-local)'
+
+    if (-not (Test-Path $CarpetaBinMySql)) {
+        Terminar-Con-Error 'No se encontro la carpeta de programas de MySQL.' @(
+            "Se esperaba: $CarpetaBinMySql"
+        )
+    }
+
+    $copiados = @()
+    $yaEstaban = @()
+    foreach ($dll in $script:VcRuntimeArchivos) {
+        $destino = Join-Path $CarpetaBinMySql $dll
+        if ((Test-Path $destino) -and -not $Forzar) {
+            $yaEstaban += $dll
+            continue
+        }
+        $origen = Join-Path $env:WINDIR "System32\$dll"
+        if (-not (Test-Path $origen)) {
+            Terminar-Con-Error "No se encontro $dll en este equipo." @(
+                "Se buscaba en: $origen",
+                '',
+                'Ese archivo forma parte del "Microsoft Visual C++ Redistributable (x64)".',
+                'Instalalo en el equipo donde se arma la distribucion y vuelve a intentarlo.',
+                'El equipo del revisor NO lo necesita: por eso se empaqueta.'
+            )
+        }
+
+        $arquitectura = Obtener-ArquitecturaPE -Ruta $origen
+        if ($arquitectura -ne 'x64') {
+            Terminar-Con-Error "$dll no es de 64 bits (se leyo '$arquitectura')." @(
+                "Archivo: $origen",
+                'MySQL portable es x64: mezclar arquitecturas dejaria la base de datos inservible.'
+            )
+        }
+
+        $firma = Get-AuthenticodeSignature -FilePath $origen
+        $firmante = ''
+        if ($firma.SignerCertificate) { $firmante = $firma.SignerCertificate.Subject }
+        if ($firma.Status -ne 'Valid' -or $firmante -notlike '*Microsoft*') {
+            Terminar-Con-Error "La firma digital de $dll no es una firma valida de Microsoft." @(
+                "Archivo : $origen",
+                "Estado  : $($firma.Status)",
+                "Firmante: $firmante",
+                '',
+                'No se copia nada: GamificApp solo distribuye binarios firmados por Microsoft.'
+            )
+        }
+
+        Copy-Item -Path $origen -Destination $destino -Force
+        $version = (Get-Item $destino).VersionInfo.FileVersion
+        $huella  = (Get-FileHash -Path $destino -Algorithm SHA256).Hash
+        Escribir-Detalle "$dll  v$version  x64  firmado por Microsoft"
+        Escribir-Log "   SHA-256 $dll = $huella" 'INFO' $false
+        $copiados += $dll
+    }
+
+    if ($yaEstaban.Count -gt 0) {
+        Escribir-Detalle "Ya estaban: $($yaEstaban -join ', ')"
+    }
+    if ($copiados.Count -gt 0) {
+        Escribir-Ok "Runtime de Visual C++ incorporado ($($copiados.Count) archivos): MySQL no dependera del sistema."
+    } else {
+        Escribir-Ok 'Runtime de Visual C++ ya presente junto a MySQL.'
+    }
+}
