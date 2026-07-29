@@ -83,6 +83,11 @@ function Instalar-Dependencias {
     $lock    = Join-Path $Carpeta 'package-lock.json'
     $modulos = Join-Path $Carpeta 'node_modules'
     $marcador = Join-Path $script:CarpetaRun "dependencias-$Etiqueta.txt"
+    # Marcador que escribe el EMPAQUETADOR cuando node_modules ya viaja dentro
+    # de la distribucion. Se guarda en instalador\ (no en .run\, que es estado
+    # de ejecucion de cada equipo) y contiene el SHA-256 del package-lock.json
+    # con el que se instalaron esas dependencias.
+    $marcadorPaquete = Join-Path $PSScriptRoot "dependencias-$Etiqueta.sha256"
 
     if (-not (Test-Path $lock)) {
         Terminar-Con-Error "Falta package-lock.json en $Carpeta." @(
@@ -96,6 +101,19 @@ function Instalar-Dependencias {
             Escribir-Ok "Dependencias de $Etiqueta ya instaladas y al dia."
             return
         }
+    }
+    # Dependencias incluidas en el paquete: se evita 'npm ci' —y con el la
+    # necesidad de internet— solo si el package-lock.json es exactamente el
+    # mismo con el que se prepararon.
+    if ((Test-Path $modulos) -and (Test-Path $marcadorPaquete)) {
+        $delPaquete = (Get-Content -Path $marcadorPaquete -Raw -ErrorAction SilentlyContinue)
+        if ($delPaquete -and $delPaquete.Trim() -eq $huella) {
+            if (-not (Test-Path $script:CarpetaRun)) { New-Item -ItemType Directory -Path $script:CarpetaRun -Force | Out-Null }
+            $huella | Out-File -FilePath $marcador -Encoding utf8
+            Escribir-Ok "Dependencias de $Etiqueta incluidas en el paquete: no hace falta descargar nada."
+            return
+        }
+        Escribir-Aviso "Las dependencias de $Etiqueta que trae el paquete no corresponden a este package-lock.json: se reinstalan."
     }
 
     Escribir-Detalle "Instalando dependencias de $Etiqueta con 'npm ci'. Puede tardar varios minutos..."

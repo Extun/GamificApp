@@ -26,6 +26,15 @@ CREDENCIALES.txt
 # entran al repositorio.
 runtime/
 
+# Paquetes de distribución que genera instalador/empaquetar.ps1. Contienen
+# los runtimes portables completos (cientos de MB) y son artefactos
+# reproducibles: se regeneran, no se versionan.
+release/
+
+# Marcadores que el empaquetador deja junto al instalador para indicar que
+# node_modules ya viaja dentro del paquete. Son propios de cada distribución.
+instalador/dependencias-*.sha256
+
 # Claude Code
 .claude/
 
