@@ -895,68 +895,74 @@ export function Dashboard() {
                                     </button>
                                 </div>
                             </div>
-                            <table className="admin-tabla">
-                                <thead>
-                                    <tr><th>Nombre</th><th>Curso</th><th>XP</th><th>Acceso</th><th>Acciones</th></tr>
-                                </thead>
-                                <tbody>
-                                    {misEstudiantes.map((est) => (
-                                        <tr key={est.usuario_id}>
-                                            <td>{est.nombre_completo}</td>
-                                            <td>{est.curso}</td>
-                                            <td>{est.xp_total}</td>
-                                            <td>
-                                                {est.pendiente ? (
-                                                    <span
-                                                        className="inv-estado inv-pendiente"
-                                                        title={est.codigo_acceso_pista ? `Su código de activación empieza por ${est.codigo_acceso_pista}` : 'Aún no usa su código de activación'}
-                                                    >
-                                                        Pendiente{est.codigo_acceso_pista ? ` · ${est.codigo_acceso_pista}…` : ''}
-                                                    </span>
-                                                ) : (
-                                                    <span className="inv-estado inv-usado">Activado</span>
-                                                )}
-                                            </td>
-                                            <td className="admin-acciones">
-                                                <button
-                                                    title="Corregir nombres o apellidos"
-                                                    onClick={() => setEditandoEstudiante(est)}
-                                                >
-                                                    <EditRoundedIcon sx={{ fontSize: '1.1rem' }} /> Editar
-                                                </button>
-                                                {est.pendiente ? (
-                                                    <button
-                                                        title="Generar un código de activación nuevo (el anterior deja de servir)"
-                                                        disabled={regenerando}
-                                                        onClick={() => handleRegenerarCodigo(est)}
-                                                    >
-                                                        <VpnKeyRoundedIcon sx={{ fontSize: '1.1rem' }} /> Regenerar código
-                                                    </button>
-                                                ) : (
-                                                    <>
-                                                        <button
-                                                            title="Ver ficha del estudiante"
-                                                            onClick={() => setFichaEstudiante(est)}
+                            {/* Mismo patrón que TablaPro (DashboardWidgets): la tabla se
+                                desplaza dentro de su propio contenedor en vez de ensanchar
+                                el panel. Sin esto, en móvil arrastraba consigo la cabecera
+                                y sus botones fuera de la pantalla. */}
+                            <div className="tabla-scroll">
+                                <table className="admin-tabla">
+                                    <thead>
+                                        <tr><th>Nombre</th><th>Curso</th><th>XP</th><th>Acceso</th><th>Acciones</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        {misEstudiantes.map((est) => (
+                                            <tr key={est.usuario_id}>
+                                                <td>{est.nombre_completo}</td>
+                                                <td>{est.curso}</td>
+                                                <td>{est.xp_total}</td>
+                                                <td>
+                                                    {est.pendiente ? (
+                                                        <span
+                                                            className="inv-estado inv-pendiente"
+                                                            title={est.codigo_acceso_pista ? `Su código de activación empieza por ${est.codigo_acceso_pista}` : 'Aún no usa su código de activación'}
                                                         >
-                                                            <VisibilityRoundedIcon sx={{ fontSize: '1.1rem' }} /> Ver ficha
+                                                            Pendiente{est.codigo_acceso_pista ? ` · ${est.codigo_acceso_pista}…` : ''}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inv-estado inv-usado">Activado</span>
+                                                    )}
+                                                </td>
+                                                <td className="admin-acciones">
+                                                    <button
+                                                        title="Corregir nombres o apellidos"
+                                                        onClick={() => setEditandoEstudiante(est)}
+                                                    >
+                                                        <EditRoundedIcon sx={{ fontSize: '1.1rem' }} /> Editar
+                                                    </button>
+                                                    {est.pendiente ? (
+                                                        <button
+                                                            title="Generar un código de activación nuevo (el anterior deja de servir)"
+                                                            disabled={regenerando}
+                                                            onClick={() => handleRegenerarCodigo(est)}
+                                                        >
+                                                            <VpnKeyRoundedIcon sx={{ fontSize: '1.1rem' }} /> Regenerar código
                                                         </button>
-                                                        <button title="Restablecer PIN a su fecha de nacimiento" onClick={() => handleResetPin(est)}>
-                                                            <RestartAltRoundedIcon sx={{ fontSize: '1.1rem' }} /> Restablecer
-                                                        </button>
-                                                    </>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {!misEstudiantes.length && (
-                                        <tr><td colSpan={5} className="vacio-msg">
-                                            {cursos.length === 0
-                                                ? 'Todavía no tienes cursos asignados. Pídele al administrador que te asigne uno para poder registrar estudiantes.'
-                                                : 'Aún no tienes estudiantes: añádelos con «Añadir estudiante» o importa tu lista desde Excel.'}
-                                        </td></tr>
-                                    )}
-                                </tbody>
-                            </table>
+                                                    ) : (
+                                                        <>
+                                                            <button
+                                                                title="Ver ficha del estudiante"
+                                                                onClick={() => setFichaEstudiante(est)}
+                                                            >
+                                                                <VisibilityRoundedIcon sx={{ fontSize: '1.1rem' }} /> Ver ficha
+                                                            </button>
+                                                            <button title="Restablecer PIN a su fecha de nacimiento" onClick={() => handleResetPin(est)}>
+                                                                <RestartAltRoundedIcon sx={{ fontSize: '1.1rem' }} /> Restablecer
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {!misEstudiantes.length && (
+                                            <tr><td colSpan={5} className="vacio-msg">
+                                                {cursos.length === 0
+                                                    ? 'Todavía no tienes cursos asignados. Pídele al administrador que te asigne uno para poder registrar estudiantes.'
+                                                    : 'Aún no tienes estudiantes: añádelos con «Añadir estudiante» o importa tu lista desde Excel.'}
+                                            </td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </section>
 
                         {/* Sistema anterior de invitaciones (legacy): ya no se

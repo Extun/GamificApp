@@ -55,8 +55,14 @@
     font-size: 1.35rem !important;
 }
 
+/* `flex-wrap` para que las acciones de cabecera bajen de línea en pantallas
+   estrechas en vez de empujar la fila a lo ancho: sin él, «Importar desde
+   Excel» o «Ver ranking completo» quedaban fuera del viewport en móvil (y a
+   768px con el sidebar desplegado). El `gap` ya existente separa también las
+   filas resultantes. En escritorio no wrapea nada: el layout no cambia. */
 .section-head-extra {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 10px;
 }

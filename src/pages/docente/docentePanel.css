@@ -348,11 +348,18 @@
     font-weight: 600;
 }
 
-.perfil-form input {
+/* Los <select> se incluyen aquí (y no en una regla aparte) para que compartan
+   exactamente los mismos valores que los <input> vecinos: sin esto salían con
+   la apariencia nativa del navegador (Arial 13.3px, borde #767676, sin radio)
+   junto a inputs ya tematizados. `background` explícito porque el fondo por
+   defecto de un <select> lo decide el sistema, no el navegador. */
+.perfil-form input,
+.perfil-form select {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     padding: 9px 12px;
     font: inherit;
+    background: var(--color-surface);
 }
 
 .perfil-form-acciones {

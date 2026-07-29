@@ -393,10 +393,17 @@
     padding: 24px;
 }
 
+/* La cabecera es el segundo punto donde la fila podía desbordar: el título y
+   el bloque de acciones son dos ítems flex que, juntos, superan el ancho
+   disponible en móvil. Con `wrap` las acciones caen bajo el título en vez de
+   salirse; el `gap` evita que ambas filas se toquen al hacerlo (con
+   `space-between` y sitio de sobra, en escritorio no tiene efecto visible). */
 .card-head {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
+    gap: 10px;
     margin-bottom: 18px;
 }
 
