@@ -297,10 +297,14 @@
     object-fit: cover;
 }
 
-.perfil-identidad h2 {
+/* h4 desde la corrección de jerarquía (antes h2). `letter-spacing` se declara
+   aquí porque la regla global de index.css solo cubre h1-h3: sin ella el nombre
+   se ensancharía 2px. El resto de propiedades ya eran explícitas. */
+.perfil-identidad h4 {
     margin: 6px 0 0;
     font-family: var(--font-head);
     font-size: 1.2rem;
+    letter-spacing: -0.01em;
 }
 
 .perfil-usuario {

@@ -45,13 +45,18 @@ export function ModuloCursos({ cursos, ejecutar }) {
         );
     };
 
+    // El texto describe lo que hace el backend de verdad (DELETE
+    // /api/admin/cursos/:id): envía el curso a la papelera —restaurable— sin
+    // tocar a los estudiantes, que conservan su curso. Tener estudiantes NO lo
+    // impide; el único bloqueo (409) es que alguno siga pendiente de activar su
+    // cuenta (SPEC-014 §13), porque el curso desaparecería de su selector.
     const eliminar = (c) => {
         pedirConfirmacion({
-            titulo: 'Eliminar curso',
-            mensaje: `¿Eliminar el curso "${c.etiqueta}"? Solo es posible si no tiene estudiantes.`,
-            confirmarTexto: 'Eliminar',
+            titulo: 'Enviar a la papelera',
+            mensaje: `¿Enviar el curso "${c.etiqueta}" a la papelera? Podrás restaurarlo desde allí. Sus estudiantes no se eliminan, pero el curso dejará de aparecer en los listados y selectores. Si alguno todavía no activó su cuenta, no se podrá enviar.`,
+            confirmarTexto: 'Enviar a la papelera',
             variante: 'danger',
-            accion: () => ejecutar(() => adminService.eliminarCurso(c.id), `Curso "${c.etiqueta}" eliminado.`)
+            accion: () => ejecutar(() => adminService.eliminarCurso(c.id), `Curso "${c.etiqueta}" enviado a la papelera.`)
         });
     };
 
@@ -97,7 +102,7 @@ export function ModuloCursos({ cursos, ejecutar }) {
                                                 <button
                                                     type="button"
                                                     className="accion-peligro"
-                                                    title="Eliminar curso"
+                                                    title="Enviar a la papelera"
                                                     aria-label={`Eliminar el curso ${c.etiqueta}`}
                                                     onClick={() => eliminar(c)}
                                                 >

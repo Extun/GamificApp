@@ -877,7 +877,11 @@ export function Dashboard() {
 
                         <section className="card">
                             <div className="card-head">
-                                <h3>Mis estudiantes</h3>
+                                {/* No repite el h1 "Mis Estudiantes" de la página:
+                                    esta tarjeta es la LISTA, y el rótulo describe su
+                                    contenido igual que en Admin ("Cursos" → "Cursos y
+                                    paralelos"). */}
+                                <h3>Listado de estudiantes</h3>
                                 <div className="section-head-extra">
                                     <span className="card-tag">{misEstudiantes.length}</span>
                                     {cursos.length > 0 && (

@@ -77,6 +77,14 @@
 
 /* Estados. */
 .mision-card.mision-bloqueada { opacity: 0.62; filter: grayscale(0.35); }
+/* El atenuado hunde el texto informativo de la tarjeta bloqueada —incluida la
+   pista de cómo desbloquearla— a 2.42:1 sobre el fondo compositado (medido en
+   runtime). Subir la opacidad NO basta: con el gris de origen ni al 100% pasa
+   de 4.84:1, y quitar el atenuado borraría el estado "bloqueado". Se compensa
+   con el color de texto principal, que compositado al mismo 62% da 5.16:1. */
+.mision-bloqueada .mision-desc,
+.mision-bloqueada .mision-progreso-txt,
+.mision-bloqueada .mision-hint { color: var(--color-text); }
 .mision-card.mision-completada {
     background: color-mix(in srgb, var(--cat-color) 8%, white);
     border-color: var(--cat-color);

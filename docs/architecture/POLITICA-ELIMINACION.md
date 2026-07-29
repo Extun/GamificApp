@@ -18,7 +18,7 @@
 | Entidad | Eliminar | Desactivar | Purga definitiva (Papelera) |
 |---|---|---|---|
 | Materia | Papelera. Desaparece de docentes, editores, retos, biblioteca, progreso e historiales; su nombre queda libre. Protegidas: no se eliminan. | `activa = FALSE` (recomendado si tiene contenido) | Solo si no tiene retos, materiales ni docentes asignados |
-| Curso | Papelera. Nombre+paralelo quedan libres. | `activo = FALSE` | Solo sin estudiantes vinculados |
+| Curso | Papelera. Nombre+paralelo quedan libres. Tener estudiantes **no** lo impide (conservan su `curso_id`); 409 solo si alguno sigue pendiente de activar su cuenta (SPEC-014 §13). | `activo = FALSE` (mismo 409 por pendientes) | Solo sin estudiantes vinculados |
 | Docente | Papelera (no inicia sesión, no aparece). Sus asignaciones/retos/material quedan intactos para restaurar. | — | Borra la cuenta; contenido con `docente_id` pasa a NULL (FK) |
 | Estudiante | Papelera (sale del ranking y listados; su ficha/XP queda intacta). | — | Transacción: cuenta + ficha + progreso (cascada) |
 | Administrador | Papelera. Invariante: siempre queda ≥1 Principal activo; no puedes eliminarte a ti mismo. | `activo = FALSE` (mismo invariante) | Borra la cuenta |

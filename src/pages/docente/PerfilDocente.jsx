@@ -112,7 +112,12 @@ export function PerfilDocente({ stats, materias, onAviso, onError }) {
                                 ? <img src={perfil.foto_data} alt="" />
                                 : (perfil.nombre_completo || perfil.username).charAt(0).toUpperCase()}
                         </span>
-                        <h2>{perfil.nombre_completo || perfil.username}</h2>
+                        {/* h4, no h2: vive DENTRO de la sección "Mi identidad",
+                            cuyo título es el h3 de SectionCard. Un h2 aquí
+                            invertía la jerarquía (un rango mayor colgando de
+                            uno menor). El aspecto no cambia: el tamaño, la
+                            familia y el margen los fija .perfil-identidad. */}
+                        <h4>{perfil.nombre_completo || perfil.username}</h4>
                         <span className="perfil-usuario">@{perfil.username} · Docente</span>
                         <button type="button" className="upload-mini-btn" onClick={() => fotoRef.current?.click()} disabled={guardando}>
                             Cambiar foto

@@ -92,13 +92,17 @@ export function ModuloAdministradores({ administradores, ejecutar }) {
         );
     };
 
+    // Decía "no se puede deshacer" y era falso: DELETE /api/admin/administradores/:id
+    // hace soft-delete (`eliminado_en`) y 'administrador' está en TIPOS_PAPELERA,
+    // así que la cuenta se restaura desde la Papelera. Mismo texto que Materias
+    // y Cursos. Lo irreversible es la purga, y ese aviso ya vive en la Papelera.
     const eliminar = (a) => {
         pedirConfirmacion({
-            titulo: 'Eliminar administrador',
-            mensaje: `¿Eliminar la cuenta de administrador "${a.username}"? Esta acción no se puede deshacer.`,
-            confirmarTexto: 'Eliminar',
+            titulo: 'Enviar a la papelera',
+            mensaje: `¿Enviar la cuenta de administrador "${a.username}" a la papelera? Dejará de poder iniciar sesión, pero podrás restaurarla desde allí.`,
+            confirmarTexto: 'Enviar a la papelera',
             variante: 'danger',
-            accion: () => ejecutar(() => adminService.eliminarAdministrador(a.id), `Administrador "${a.username}" eliminado.`)
+            accion: () => ejecutar(() => adminService.eliminarAdministrador(a.id), `Administrador "${a.username}" enviado a la papelera.`)
         });
     };
 
@@ -170,7 +174,7 @@ export function ModuloAdministradores({ administradores, ejecutar }) {
                                             type="button"
                                             className="accion-peligro"
                                             disabled={a.id === yo}
-                                            title={a.id === yo ? 'No puedes eliminar tu propia cuenta' : 'Eliminar administrador'}
+                                            title={a.id === yo ? 'No puedes eliminar tu propia cuenta' : 'Enviar a la papelera'}
                                             aria-label={`Eliminar a ${a.username}`}
                                             onClick={() => eliminar(a)}
                                         >

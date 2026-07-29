@@ -130,14 +130,24 @@ VALUES (1, 'Unidad Educativa Fiscal Clemencia Coronel de Pincay', 'Guayaquil', '
 | `GET /api/materias` | público auth | Se amplía: `id, nombre, color, icono, activa` (estudiante/docente reciben solo activas) |
 | `POST /api/admin/materias` | admin | Crear materia |
 | `PUT /api/admin/materias/:id` | admin | Editar nombre/color/icono/activa |
-| `DELETE /api/admin/materias/:id` | admin | Solo si no tiene retos/materiales/docentes (409 si no) |
+| `DELETE /api/admin/materias/:id` | admin | Envía a la papelera (soft-delete, restaurable). 409 solo si la materia es **protegida** |
 | `GET /api/cursos` | docente/admin | Cursos activos (para el selector del docente) |
 | `GET /api/admin/cursos` | admin | Todos, con conteo de estudiantes y docentes |
 | `POST /api/admin/cursos` | admin | Crear curso |
 | `PUT /api/admin/cursos/:id` | admin | Editar/activar/desactivar |
-| `DELETE /api/admin/cursos/:id` | admin | Solo si no tiene estudiantes (409 si no) |
+| `DELETE /api/admin/cursos/:id` | admin | Envía a la papelera (soft-delete, restaurable). **Tener estudiantes NO lo impide**; 409 solo si alguno sigue pendiente de activar su cuenta (SPEC-014 §13) |
 | `GET /api/institucion` | **público sin auth** | Nombre, logo, favicon, colores (lo necesita el Login) |
 | `PUT /api/admin/institucion` | admin | Actualiza la fila única |
+
+> **Corrección de las dos filas `DELETE` (2026-07-29).** Decían «solo si no tiene
+> …(409 si no)», que era la regla prevista al redactar esta spec pero **nunca la
+> que quedó implementada**: SPEC-003 convirtió ambos borrados en soft-delete a la
+> Papelera y trasladó la validación de dependencias a la **purga definitiva**
+> (`DELETE /api/admin/papelera/:tipo/:id`), donde sí se exige que el curso no
+> tenga estudiantes vinculados y la materia no tenga retos, materiales ni
+> docentes. Verificado contra `server/routes/admin.js` y medido en vivo: un curso
+> con estudiantes activados responde **200**. La política completa está en
+> `docs/architecture/POLITICA-ELIMINACION.md`.
 
 Cambios a endpoints existentes (aditivos, sin romper contrato):
 - `POST /api/docente/invitaciones` acepta `curso_id` (mantiene `curso` texto por compatibilidad durante la transición).

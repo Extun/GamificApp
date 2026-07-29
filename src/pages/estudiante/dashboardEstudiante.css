@@ -213,6 +213,16 @@
     gap: 14px;
 }
 
+/* Por debajo de 360px el `minmax(150px)` no cabe dos veces y los 6 mundos se
+   apilan en una sola columna: 754px de rejilla y 1231px de scroll (medido a
+   320px). Con dos columnas quedan en 427px y 904px, sin desbordes y sin cortar
+   ningún nombre. Va en media query —y no bajando el `minmax`— porque bajarlo
+   metería una TERCERA columna a 480px, encogiendo las tarjetas de 217 a 140px.
+   De 360px en adelante nada cambia. */
+@media (max-width: 359px) {
+    .home-mundos-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
 .home-mundo {
     display: flex;
     flex-direction: column;

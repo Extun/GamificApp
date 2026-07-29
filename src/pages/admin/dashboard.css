@@ -2306,7 +2306,11 @@
 .bib-origen-ia { font-size: 0.9rem; }
 .bib-preview-lista { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.6rem; }
 .bib-preview-lista ul { margin: 0.25rem 0 0; padding-left: 1.1rem; }
-.bib-preview-lista .is-correcta { color: var(--color-success); font-weight: 600; }
+/* Medido en runtime: #16a34a sobre el fondo real de la vista previa (#f8fafc)
+   da 3.15:1 y este texto es normal (16px/600), así que el umbral AA es 4.5:1.
+   El verde oscuro del Design System da 4.79:1 — mismo criterio que las Fases
+   6.3 y 7.4. Solo se cambia este uso: `--color-success` no se toca. */
+.bib-preview-lista .is-correcta { color: var(--color-success-dark); font-weight: 600; }
 .bib-preview-texto p { margin: 0.4rem 0; }
 .bib-preview-json { overflow-x: auto; font-size: 0.8rem; }
 .bib-stats-grid {
