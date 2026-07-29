@@ -1,6 +1,6 @@
 # START_HERE — Lectura obligatoria antes de modificar código
 
-> Última actualización: 2026-07-14
+> Última actualización: 2026-07-29
 
 Este archivo indica exactamente qué debe leer una IA (o desarrollador) nueva antes de tocar GamificApp, y cómo arrancar el proyecto en local. Leer **solo** lo que la tarea requiere; el objetivo es trabajar con el mínimo contexto posible.
 
@@ -66,13 +66,65 @@ Detalles importantes:
     secretos\root.txt       credencial administrativa, con permisos restringidos
   ```
 
-  `runtime/mysql` son **binarios reemplazables**; `%LOCALAPPDATA%\GamificApp\mysql\datos` es **permanente**. Por eso los datos sobreviven a `Detener`, a reinstalar y a **mover o reemplazar la carpeta de GamificApp**: si se pierde `server/.env`, el instalador reconstruye la conexión desde `instancia.json` + la credencial de root, **sin inicializar nada y sin borrar datos**. Para una copia de seguridad, copia esa carpeta con GamificApp cerrada.
+  `runtime/mysql` son **binarios reemplazables**; `%LOCALAPPDATA%\GamificApp\mysql\datos` es **permanente**. Por eso los datos sobreviven a `Detener`, a reinstalar y a **mover o reemplazar la carpeta de GamificApp**: si se pierde `server/.env`, el instalador reconstruye la conexión desde `instancia.json` + la credencial de root, **sin inicializar nada y sin borrar datos**. Ver la tabla de copias de seguridad más abajo.
+- **El runtime de Visual C++ viaja con MySQL.** `mysqld.exe`, `mysql.exe`, `mysqladmin.exe` y `mysqldump.exe` importan de forma estática `vcruntime140.dll`, `vcruntime140_1.dll` y `msvcp140.dll` (leído de su tabla de importaciones PE, no supuesto). **Esas tres DLL no vienen con Windows**: las instala el *Microsoft Visual C++ Redistributable*, y sin ellas el proceso no arranca **y no queda rastro en ningún log de MySQL**, porque falla el cargador de Windows. Por eso se distribuyen **junto a los ejecutables**, dentro de `runtime\mysql\bin`: Windows busca primero en el directorio del `.exe`, así que se usan esas copias. **No se toca System32, ni el PATH, ni el registro, y no hacen falta permisos de administrador.** Las prepara `instalador\runtime.ps1` al empaquetar, verificando firma Authenticode de Microsoft y arquitectura x64; el instalador solo **comprueba** que llegaron (`Test-VcRuntimeMySql`) y aborta con un mensaje claro si faltan. *Contrapartida: una copia app-local no la actualiza Windows Update — si Microsoft publica un parche del runtime, hay que reemplazar esos archivos y volver a empaquetar.* Node no tiene este problema: `node.exe` y los binarios nativos de `node_modules` enlazan su CRT estáticamente.
 - `Detener GamificApp.cmd` cierra la base de datos **en último lugar** y de forma ordenada (`mysqladmin shutdown`); nunca cierra un MySQL que no haya arrancado él.
 - **Es seguro repetirlo**: en la segunda ejecución conserva `server/.env` tal cual (no regenera `JWT_SECRET` ni `ADMIN_PASSWORD`) y no toca los datos.
 - Las credenciales generadas quedan en `CREDENCIALES.txt` (ignorado por Git). El `JWT_SECRET` no se muestra nunca.
 - Los **datos de demostración son opcionales**: pregunta explícitamente y el valor por defecto es *No*. Solo se permiten sobre la base local `gamificapp_dev`, usando `server/scripts/seedDev.js` con sus barreras intactas.
 - Registro de lo ocurrido en `logs/` (`instalador.log`, `iniciar.log`, `detener.log`, `backend.log`, `frontend.log`). Ningún log contiene credenciales.
 - El frontend se sirve con `vite preview --strictPort` en el 5173: **no puede saltar al 5174**, porque el backend solo acepta `CORS_ORIGIN=http://localhost:5173`.
+
+### Copias de seguridad, reinstalar y mover GamificApp
+
+| Quiero… | Qué hacer |
+|---|---|
+| **Respaldar el trabajo de la escuela** | Ejecuta `Detener GamificApp.cmd` y copia entera la carpeta `%LOCALAPPDATA%\GamificApp`. Ahí está el datadir, la credencial administrativa (`secretos\root.txt`) y `instancia.json`. Con GamificApp en marcha la copia puede salir inconsistente |
+| **Restaurar un respaldo** | Con GamificApp detenida, sustituye `%LOCALAPPDATA%\GamificApp` por la copia y ejecuta `Instalar GamificApp.cmd`: detecta los datos y **no inicializa nada** |
+| **Reinstalar sin perder información** | Vuelve a ejecutar `Instalar GamificApp.cmd`. Conserva `server/.env` intacto si existe, y si no existe lo **reconstruye** a partir de `instancia.json` + `secretos\root.txt` |
+| **Mover o reemplazar la carpeta de GamificApp** | Cópiala o sustitúyela y ejecuta `Instalar GamificApp.cmd` en la nueva ubicación. Los datos no viven ahí dentro, así que sobreviven |
+| **Empezar de cero a propósito** | Con GamificApp detenida, **mueve** (no borres, por si acaso) `%LOCALAPPDATA%\GamificApp` a otro sitio y reinstala. El instalador **nunca** borra un datadir existente por su cuenta |
+
+### Preparar el paquete de entrega (Fase Local 2.3)
+
+```bash
+powershell -NoProfile -ExecutionPolicy Bypass -File instalador\empaquetar.ps1
+```
+
+Genera `release\GamificApp\` (ignorado por Git). Opciones: `-Salida <ruta>` —recomendable si el repositorio está en una carpeta sincronizada con OneDrive—, `-Zip`, `-SaltarBuild` y `-SinDependencias`.
+
+Con `-Zip` se obtiene además un `.zip` de **~244 MB** (desde 750,8 MB sin comprimir) en unos 6-7 minutos. Lo comprime el `tar.exe` de Windows (bsdtar, incluido desde Windows 10 1803) porque `System.IO.Compression` es impracticable con 61.000 entradas; si no estuviera, se usa .NET con compresión rápida.
+
+**Qué viaja en el paquete** (~750 MB, ~61.000 archivos):
+
+| Componente | Tamaño | Por qué está |
+|---|---|---|
+| `runtime\mysql` | ~399 MB | MySQL 8.0.44 portable, podado, con el runtime de Visual C++ app-local |
+| `node_modules` + `server\node_modules` | ~252 MB | Para que **la instalación no necesite internet** |
+| `runtime\node` | ~95 MB | Node v22.23.1 portable |
+| `dist`, `src`, `public`, `server`, `database`, `instalador` | ~5 MB | La aplicación y sus scripts |
+| Los 3 `.cmd`, `LEEME.txt`, `INVENTARIO.txt`, `PAQUETE.json` | — | Punto de entrada y documentación para quien lo recibe |
+
+**Qué se genera al instalar, en el equipo de destino**: `server/.env` (credenciales aleatorias e irrepetibles), `CREDENCIALES.txt`, `logs/`, `.run/` y `dist/` reconstruido.
+
+**Qué vive en `%LOCALAPPDATA%\GamificApp`**: el datadir, `my.ini`, `error.log`, `mysqld.pid`, `secretos\root.txt` e `instancia.json`. **Nunca dentro del paquete.**
+
+**Qué no se distribuye jamás**: `server/.env`, `CREDENCIALES.txt`, `.run/`, `logs/`, `server/backups/`, `runtime/descargas/`, `.git/`, `docs/`, `CLAUDE.md`, `START_HERE.md`, `docker-compose.dev.yml`, `server/.env.development.example` y el propio `empaquetar.ps1`.
+
+**La poda de `runtime\mysql` (925 → 399 MB) solo quita lo demostrado prescindible**, y se aplica sobre la copia: el árbol del repositorio queda íntegro, así que es reversible y reproducible.
+
+| Se quita | Cuánto | Por qué se puede |
+|---|---|---|
+| `*.pdb` | 446,7 MB (35) | Símbolos de depuración: el cargador de Windows nunca los abre |
+| `*.lib` | 55,1 MB (7) | Bibliotecas para **compilar** en C contra MySQL |
+| `*-debug.dll` y `lib\plugin\debug\` | ~90 MB (63) | Importan `msvcp140d.dll` / `ucrtbased.dll`, el CRT de **depuración** de Visual Studio, que Microsoft no redistribuye: no pueden cargar en ninguna máquina sin Visual Studio |
+| `include\` | 0,4 MB (17) | Cabeceras `.h`/`.c` del API de C |
+
+Se conserva todo lo demás — los 28 ejecutables cliente, `lib\mecab`, `lib\plugin`, `lib\private` (ICU) y `share\` entero (charsets, collations y mensajes de error) — porque su necesidad no está demostrada como nula. **Fiabilidad por delante del tamaño.**
+
+Antes de dar el paquete por bueno, el empaquetador lo **audita y aborta** si encuentra un archivo prohibido (`.env`, `CREDENCIALES.txt`, `root.txt`, `instancia.json`, `my.ini`, `*.pid`, `*.log`), una carpeta prohibida, o los **valores** secretos de la máquina de desarrollo. Busca valores, no nombres de variable: `JWT_SECRET=` en `.env.example` es legítimo.
+
+**Limitación abierta, y no se declara resuelta:** el paquete **no se ha probado en un Windows realmente recién instalado**. El despliegue app-local del Visual C++ quita la causa conocida del fallo y está verificado que Windows carga esas copias, pero eso no sustituye a la prueba en una máquina limpia. Tampoco se ha probado tras un reinicio del sistema operativo.
 
 ### Opción B: arranque manual (desarrollo)
 
