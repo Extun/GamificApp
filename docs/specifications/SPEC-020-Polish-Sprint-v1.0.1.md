@@ -72,7 +72,7 @@ Cada etapa es un **commit independiente** y **ninguna empieza sin aprobación ex
 |---|---|---|
 | **A** | Memorama: celebración al emparejar y negación suave al fallar | ✅ Hecha |
 | **B** | Verdadero/Falso y Completar espacios: la confirmación se siente | ✅ Hecha |
-| **B-bis** | Diferenciar el tempo de V/F (ágil) y Completar (construcción) — ver §4-quater | ⬜ Pendiente |
+| **B-bis** | Diferenciar el tempo de V/F (ágil) y Completar (construcción) — ver §4-quater | ✅ Hecha |
 | **C** | Transición entre ítems, **con el tempo propio de cada juego** (§4-quater) | ⬜ Pendiente |
 | **D** | Línea del tiempo: movimiento real al reordenar | ✅ Hecha |
 | **E** | Quiz: sensación de avance (barra de progreso + ir a la siguiente) | ⬜ Pendiente |

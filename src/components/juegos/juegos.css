@@ -388,13 +388,16 @@
 
 /* La palabra ATERRIZA en el hueco (Etapa B). Es el momento más bonito de este
    juego —la frase por fin se lee entera— y hasta ahora la palabra aparecía
-   sin más. Solo `transform`, por el mismo motivo que `.completar-sello`. */
+   sin más. Solo `transform`, por el mismo motivo que `.completar-sello`.
+   Etapa B-bis: cae desde más arriba y tarda algo más que en la Etapa B. Una
+   pieza que se encaja tiene PESO; si cayera rápido y de cerca parecería que
+   simplemente apareció, y la emoción de este juego es construcción. */
 .completar-hueco.is-elegido {
-    animation: palabra-aterriza 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: palabra-aterriza 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 @keyframes palabra-aterriza {
-    0%   { transform: translateY(-9px) scale(0.9); }
+    0%   { transform: translateY(-14px) scale(0.88); }
     55%  { transform: translateY(0) scale(1.08); }
     100% { transform: translateY(0) scale(1); }
 }
@@ -481,6 +484,31 @@
     0%   { transform: translateY(-7px) scale(0.92); }
     60%  { transform: translateY(0) scale(1.05); }
     100% { transform: translateY(0) scale(1); }
+}
+
+/* ===== POLISH SPRINT v1.0.1 Etapa B-bis — un tempo por juego =====
+   La Etapa B dio a Verdadero/Falso y a Completar espacios el MISMO gesto y la
+   MISMA duración, porque comparten este bloque de confirmación. Funcionaba,
+   pero los dejaba como gemelos, y según el criterio de personalidad
+   (SPEC-020 §4-quater) deben sentirse opuestos:
+
+     · Verdadero/Falso = AGILIDAD.     Decidir, confirmar, siguiente. Nada frena.
+     · Completar espacios = CONSTRUCCIÓN. Algo se arma pieza a pieza, con peso.
+
+   No se añade ninguna animación nueva ni ningún color: se ajustan duración y
+   recorrido de las que ya existen. Eso es lo que aquí significa personalidad —
+   mismo lenguaje visual, distinta intención. */
+
+/* V/F: el sello aparece casi de inmediato para no interponerse entre la
+   decisión y la siguiente afirmación. */
+.juego-vf .completar-sello {
+    animation-duration: 0.26s;
+}
+
+/* Completar: el sello se toma su tiempo. Es el remate de haber colocado una
+   pieza, no un trámite que despachar. */
+.juego-completar .completar-sello {
+    animation-duration: 0.5s;
 }
 
 .completar-btn-siguiente {
