@@ -141,6 +141,43 @@
     100% { transform: scale(1); }
 }
 
+/* ---------- Entrada del siguiente ítem (compartida) ----------
+   POLISH SPRINT v1.0.1 Etapa C — la primera etapa transversal del sprint.
+   Antes, avanzar de frase / afirmación / capítulo SUSTITUÍA el texto en el
+   sitio: no había sensación de haber avanzado, solo de que el contenido
+   cambió.
+
+   Aquí vive UNA sola animación, no una por juego. La personalidad no la da un
+   efecto propio, la dan los parámetros: cada juego fija su distancia, su eje y
+   su duración, y el gesto de fondo es el mismo en toda la aplicación. Por eso
+   el desplazamiento entra por variables — así se ve de un vistazo que lo único
+   que cambia entre juegos es el ritmo:
+
+     · Verdadero/Falso  → 14px en horizontal, 0.18s  (AGILIDAD: pasar tarjetas)
+     · Completar        → 16px desde abajo,  0.42s  (CONSTRUCCIÓN: colocar una pieza)
+     · Misión Narrativa → 20px en horizontal, 0.3s   (la historia AVANZA)
+
+   Cada regla vive en el CSS de su propio juego, junto al resto de su
+   identidad. Solo `transform`, nunca `opacity`: con el reloj de animaciones
+   congelado un fotograma inicial transparente dejaría el ítem invisible, y
+   aquí el ítem es la actividad entera.
+
+   La curva es `--ease-standard`, decidida y sin rebote, para los tres. Entrar
+   no es una recompensa —es navegación—: el rebote elástico está reservado a
+   los momentos que sí celebran algo. */
+@keyframes item-entra {
+    from { transform: translate(var(--entra-x, 0), var(--entra-y, 0)); }
+    to   { transform: translate(0, 0); }
+}
+
+/* Completar espacios — CONSTRUCCIÓN. Sube desde abajo y se toma su tiempo:
+   la frase nueva se COLOCA, como la pieza siguiente de algo que se está
+   armando. Es el recorrido más largo y lento de los tres. */
+.juego-completar .completar-tarjeta {
+    --entra-y: 16px;
+    animation: item-entra 0.42s var(--ease-standard);
+}
+
 /* ---------- Línea del tiempo ---------- */
 .linea-titulo-secuencia {
     margin: 0.25rem 0 0;

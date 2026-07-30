@@ -104,7 +104,12 @@ export function MisionNarrativa({ reto, estudianteId, onSalir, onCompletado, sol
 
             {/* ---- Capítulos / desafíos ---- */}
             {fase === 'jugando' && desafio && (
-                <div className="mision-escena">
+                // `key` cambia al pasar de capítulo: React remonta la escena y
+                // la entrada de CSS se reproduce. Sin esto el texto se
+                // sustituía en el sitio y la historia no parecía avanzar, solo
+                // cambiar. El estado (capítulo, elegida, superado) vive en este
+                // componente, así que remontar la escena no pierde nada.
+                <div className="mision-escena" key={capitulo}>
                     <div className="mision-capitulos">
                         {desafios.map((_, i) => (
                             <span

@@ -2,6 +2,30 @@
 
 # Última actualización
 
+2026-07-30 (**POLISH SPRINT v1.0.1 — ETAPA C: UNA SOLA ANIMACIÓN DE ENTRADA, TRES RITMOS.** Primera etapa **transversal** del sprint (toca tres reproductores), con la condición explícita de Fabrizio de **no introducir una capa compartida que haga que todos los juegos se sientan iguales**. **Cero cambios de mecánica, puntuación, XP, corrección diferida, backend o navegación.** Seis archivos: `VerdaderoFalso.jsx`, `CompletarEspacios.jsx`, `MisionNarrativa.jsx`, `juegos.css`, `verdaderoFalso.css` y `misionNarrativa.css`.
+
+**EL PROBLEMA.** Avanzar de afirmación, de frase o de capítulo **sustituía el texto en el sitio**. No había sensación de haber avanzado, solo de que el contenido cambió.
+
+**LA SOLUCIÓN: UNA animación, no una por juego.** `@keyframes item-entra` vive una sola vez en `juegos.css` y recibe el desplazamiento por **variables CSS** (`--entra-x` / `--entra-y`). Cada juego fija su distancia, su eje y su duración en **su propio archivo**, junto al resto de su identidad. Así la personalidad no la da un efecto propio —que rompería la identidad única— sino los parámetros, y se ve de un vistazo que lo único que cambia entre juegos es el ritmo:
+
+| Juego | Emoción | Parámetros | Verificado en juego real |
+|---|---|---|---|
+| Verdadero/Falso | agilidad | **14 px en X, 0,18 s** | a los 60 ms, `translateX(9,86 px)` |
+| Misión Narrativa | la historia avanza | **20 px en X, 0,30 s** | a los 90 ms, `translateX(12,30 px)` |
+| Completar espacios | construcción | **16 px en Y, 0,42 s** | a los 80 ms, `translateY(10,73 px)` |
+
+**Los tres comparten animación y curva** (`--ease-standard`, decidida y sin rebote: entrar es navegación, no recompensa — el rebote elástico queda reservado a lo que sí celebra algo). **El contraste es medible:** V/F se mueve en X y Completar en Y, con más del doble de duración.
+
+**SE SUSTITUYÓ `modal-rise` EN LOS CAPÍTULOS DE LA MISIÓN.** Dos motivos: comunica «apareció un panel», no «la historia siguió»; y **anima `opacity` desde 0**, el patrón que SPEC-018 dejó documentado como peligroso —con el reloj de animaciones congelado el capítulo entero quedaría invisible—. **La portada y el final la conservan** (`:not(.mision-portada)`), verificado con una sonda: portada `modal-rise 0.25s`, capítulo `item-entra 0.3s`.
+
+**MECANISMO.** El mismo `key` de React que ya usaba el contador de avance: al cambiar de ítem la tarjeta se remonta y la animación de CSS se reproduce sola, **sin estado ni temporizadores nuevos**. El estado del intento vive en el componente padre en los tres juegos, así que remontar la tarjeta no pierde nada.
+
+**VERIFICACIÓN.** Secuencia completa de V/F medida en una sola partida: al responder `eleccion-confirma (0,22 s)` + `sello-cae (0,26 s)`; al avanzar `avance-late` + `item-entra (0,18 s)`, con `transform: none` al terminar en los tres juegos. Capítulo de la Misión: 1 → 2 con `item-entra (0,3 s)`. **Consola: los dos `[vite] Failed to reload QuizInteractivo.jsx` son los MISMOS de la Etapa E —la Etapa C no tocó ese archivo, así que no puede haber una recarga fallida nueva— y el buffer de la herramienta no se vacía.**
+
+**ACOPLAMIENTO CONOCIDO, ANOTADO:** `misionNarrativa.css` y `quizInteractivo.css` consumen ahora piezas definidas en `juegos.css` (`item-entra`, `.avance-cuenta`) sin importarlo. Funciona porque la app entrega **un único CSS empaquetado** y el registro de juegos carga todos los reproductores; es el mismo patrón que `juegos.css` ya documenta respecto de `juegoDragAndDrop.css`.
+
+**CALIDAD:** `npm run build` limpio (4,44 s). **Lint 29 (26 errores + 3 warnings) = línea base exacta, cero nuevos.**)
+
 2026-07-30 (**POLISH SPRINT v1.0.1 — ETAPAS B-bis Y E: TEMPO PROPIO POR JUEGO Y EL QUIZ RECUPERA EL SENTIDO DE AVANCE.** Se añade el criterio de ***delight***: cada mejora debe dejar al estudiante con la sensación de «estoy avanzando» (SPEC-020 §4-bis). **Cero cambios de mecánica, puntuación, XP, corrección diferida, backend o navegación.** Cuatro archivos: `juegos.css`, `verdaderoFalso.css`, `QuizInteractivo.jsx` y `quizInteractivo.css`.
 
 **B-bis · UN TEMPO POR JUEGO.** La Etapa B había dado a Verdadero/Falso y a Completar espacios **el mismo gesto y la misma duración**, porque comparten el bloque de confirmación; funcionaba, pero los dejaba como gemelos cuando deben sentirse opuestos. **Sin animaciones ni colores nuevos — solo duración y recorrido de las que ya existen.** V/F (**agilidad**): sello 0,42s → **0,26s** y opción elegida 0,36s → **0,22s**; nada se interpone entre la decisión y la siguiente afirmación. Completar (**construcción**): sello → **0,5s** y la palabra cae desde **14 px** en vez de 9; una pieza que se encaja tiene peso, y cayendo rápido y de cerca parecería que simplemente apareció. **Medido con una sonda por juego: 0,26s en V/F, 0,5s en Completar y 0,42s sin contexto** — el valor base intacto para cualquier otro consumidor.

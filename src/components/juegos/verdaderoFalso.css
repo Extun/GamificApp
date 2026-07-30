@@ -66,6 +66,17 @@
     color: #92400e; /* ámbar más oscuro que --color-accent-dark; se conserva el contraste actual */
 }
 
+/* Entrada de la siguiente afirmación (Etapa C) — AGILIDAD. Usa la animación
+   compartida `item-entra` de juegos.css con los parámetros más cortos de los
+   tres juegos: 14px en horizontal y 0.18s. La afirmación nueva ENTRA de lado,
+   como quien pasa tarjetas, y está en su sitio antes de que el niño termine de
+   levantar el dedo. Un recorrido largo o lento aquí contradiría la emoción del
+   juego: haría esperar justo donde no se debe esperar. */
+.juego-vf .vf-tarjeta {
+    --entra-x: 14px;
+    animation: item-entra 0.18s var(--ease-standard);
+}
+
 /* Confirmación instantánea del toque (Etapa B), acortada en la Etapa B-bis:
    la misma animación que `.completar-opcion`, pero MÁS RÁPIDA. La emoción de
    este juego es la agilidad —decidir, confirmar, siguiente— y en Completar es

@@ -120,7 +120,11 @@ export function CompletarEspacios({ reto, estudianteId, onSalir, onCompletado, s
                         </span>
                     </div>
 
-                    <div className="completar-tarjeta">
+                    {/* `key` cambia al pasar de frase: React remonta la tarjeta
+                        y la entrada de CSS se reproduce (mismo mecanismo que el
+                        contador de avance). El estado del intento vive en este
+                        componente: remontar la tarjeta no pierde nada. */}
+                    <div className="completar-tarjeta" key={actual}>
                         {/* Corrección diferida: durante el intento la elección
                             solo se marca en ámbar ("tu respuesta"), sin revelar
                             si es correcta; el verde/rojo llega en la revisión. */}

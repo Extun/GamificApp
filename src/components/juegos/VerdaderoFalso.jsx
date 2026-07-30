@@ -115,7 +115,13 @@ export function VerdaderoFalso({ reto, estudianteId, onSalir, onCompletado, solo
                         </span>
                     </div>
 
-                    <div className="vf-tarjeta">
+                    {/* `key` cambia al pasar de afirmación: React remonta la
+                        tarjeta y la entrada de CSS se reproduce. Mismo
+                        mecanismo que el contador de avance — sin estado ni
+                        temporizadores nuevos. El estado del intento vive en
+                        este componente, así que remontar la tarjeta no pierde
+                        nada. */}
+                    <div className="vf-tarjeta" key={actual}>
                         <p className="vf-afirmacion">{afirmacion.texto}</p>
 
                         {/* Corrección diferida: al elegir, la opción queda

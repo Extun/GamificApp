@@ -19,6 +19,22 @@
     animation: modal-rise 0.25s ease;
 }
 
+/* Entrada del siguiente CAPÍTULO (POLISH SPRINT v1.0.1 Etapa C) — la historia
+   AVANZA. Usa la animación compartida `item-entra` de juegos.css con un ritmo
+   intermedio: 20px en horizontal y 0.3s. Más recorrido que Verdadero/Falso
+   porque un capítulo pesa más que una afirmación, y más rápido que Completar
+   porque aquí no se coloca nada, se pasa página.
+
+   Sustituye a `modal-rise` SOLO en las escenas de capítulo (la portada y el
+   final la conservan). Dos motivos: `modal-rise` comunica «apareció un panel»,
+   no «la historia siguió — y además anima `opacity` desde 0, el patrón que
+   SPEC-018 dejó documentado como peligroso, porque con el reloj de animaciones
+   congelado el capítulo entero se quedaría invisible. */
+.mision-escena:not(.mision-portada) {
+    --entra-x: 20px;
+    animation: item-entra 0.3s var(--ease-standard);
+}
+
 /* --- Portada e intro --- */
 .mision-portada {
     align-items: center;
