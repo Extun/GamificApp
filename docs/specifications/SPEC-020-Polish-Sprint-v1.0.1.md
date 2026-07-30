@@ -75,7 +75,7 @@ Cada etapa es un **commit independiente** y **ninguna empieza sin aprobación ex
 | **B-bis** | Diferenciar el tempo de V/F (ágil) y Completar (construcción) — ver §4-quater | ✅ Hecha |
 | **C** | Transición entre ítems, **con el tempo propio de cada juego** (§4-quater) | ⬜ Pendiente |
 | **D** | Línea del tiempo: movimiento real al reordenar | ✅ Hecha |
-| **E** | Quiz: sensación de avance (barra de progreso + ir a la siguiente) | ⬜ Pendiente |
+| **E** | Quiz: sensación de avance (barra de progreso + ir a la siguiente) | ✅ Hecha |
 
 **Orden recomendado: A → B → D → C → E.** A y B son el mayor salto con el menor riesgo y tocan un reproductor cada uno. D revive keyframes ya escritos (ítem 42). C y E van al final por transversales: C toca tres reproductores y E comparte las clases `.opcion-*` con la Misión Narrativa.
 
@@ -99,6 +99,8 @@ Cada juego debe tener **personalidad propia: no exagerada, pero reconocible**. L
 | **Completar espacios** | **construcción** | Algo se arma pieza a pieza: tempo deliberado, no veloz. |
 
 **Restricción que no cambia:** la personalidad se expresa dentro del **mismo lenguaje visual** (curvas, duraciones y tokens ya establecidos). Personalidad es **tempo e intención**, no una paleta ni un set de efectos por juego — eso rompería la coherencia que el sprint viene construyendo.
+
+**Criterio añadido el 2026-07-30 — *delight*.** Además de UX, cada mejora debe dejar al estudiante con la sensación de **«estoy avanzando»**. No se busca sorprender con efectos: se busca que cada interacción resulte **agradable, clara y satisfactoria**. En la práctica esto ordena las prioridades cuando dos soluciones son igual de correctas: gana la que hace más visible el avance.
 
 ### Revisión de A y B a la luz de este criterio
 

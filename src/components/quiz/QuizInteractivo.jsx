@@ -78,7 +78,11 @@ export function PreguntaCard({ pregunta, indice, onResponder, revelar = true }) 
     const responder = (letra) => {
         if (respondida) return;
         setElegida(letra);
-        onResponder?.(letra === correcta);
+        // El índice viaja con la respuesta (POLISH SPRINT v1.0.1 Etapa E) para
+        // que el contenedor sepa DESDE dónde acompañar al niño a la siguiente
+        // pregunta. El conteo de aciertos no cambia: sigue siendo el 1.er
+        // argumento, y quien lo ignore se comporta igual que antes.
+        onResponder?.(letra === correcta, indice);
     };
 
     return (
@@ -230,6 +234,15 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
     // juega en este intento, no sobre todo el pool guardado.
     const total = preguntasJugables.length;
 
+    // ===== POLISH SPRINT v1.0.1 Etapa E — progreso y acompañamiento =====
+    // Qué índices ya se respondieron. NO participa en el puntaje —de eso
+    // siguen encargándose `aciertos` y `respondidas`, intactos—: sirve solo
+    // para saber a qué pregunta llevar al niño después de responder. Se
+    // declara ANTES del efecto de reinicio, que es quien lo vacía al cambiar
+    // de intento.
+    const [indicesRespondidos, setIndicesRespondidos] = useState(() => new Set());
+    const contenedorRef = useRef(null);
+
     // Evita otorgar XP/logros más de una vez por quiz completado.
     const recompensado = useRef(false);
     useEffect(() => {
@@ -239,11 +252,52 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
         setPuntosGanados(0);
         setXpIntento(null);
         setResultadoCerradoDe(null);
+        setIndicesRespondidos(new Set());
     }, [claveIntento]);
 
-    const registrar = (esCorrecta) => {
+    // Tras responder, la siguiente pregunta PENDIENTE se pone a la vista. Un
+    // quiz es una página larga: hasta ahora el niño respondía y se quedaba
+    // solo, buscando a mano dónde seguía. Se busca hacia delante desde la
+    // recién respondida y, si ya no queda ninguna por debajo, se vuelve a la
+    // primera pendiente de arriba: así el niño SIEMPRE aterriza en algo que
+    // todavía tiene que hacer, que es exactamente lo que le falta para
+    // terminar.
+    const acompanarASiguiente = (desde, yaRespondidas) => {
+        // Era la última: en un instante aparece el overlay de resultado, que
+        // bloquea el scroll. Moverse ahora sería pelear con él.
+        if (yaRespondidas.size >= total) return;
+
+        let destino = null;
+        for (let i = desde + 1; i < total; i++) {
+            if (!yaRespondidas.has(i)) { destino = i; break; }
+        }
+        if (destino === null) {
+            for (let i = 0; i < desde; i++) {
+                if (!yaRespondidas.has(i)) { destino = i; break; }
+            }
+        }
+        if (destino === null) return;
+
+        const tarjetas = contenedorRef.current?.querySelectorAll('.pregunta-card');
+        const nodo = tarjetas?.[destino];
+        if (!nodo) return;
+
+        // `scrollIntoView` con `smooth` es movimiento, así que también obedece
+        // a quien pidió menos: sin él el desplazamiento ocurre igual, pero de
+        // golpe. La pregunta se centra en vez de pegarse al borde, para que se
+        // vea entera junto con sus alternativas.
+        const suave = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        requestAnimationFrame(() => {
+            nodo.scrollIntoView({ behavior: suave ? 'smooth' : 'auto', block: 'center' });
+        });
+    };
+
+    const registrar = (esCorrecta, indice) => {
         setRespondidas((n) => n + 1);
         if (esCorrecta) setAciertos((n) => n + 1);
+        const yaRespondidas = new Set(indicesRespondidos).add(indice);
+        setIndicesRespondidos(yaRespondidas);
+        acompanarASiguiente(indice, yaRespondidas);
     };
 
     const completado = mostrarPuntaje && respondidas === total && total > 0;
@@ -319,7 +373,7 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
     }, [completado, aciertos, total, estudianteId, reto, onCompletado, soloPrueba]);
 
     return (
-        <div className="quiz-interactivo" key={claveIntento}>
+        <div className="quiz-interactivo" key={claveIntento} ref={contenedorRef}>
             {/* Calificación /100 sobre las preguntas realmente presentadas en
                 este intento (con banco aleatorio, la muestra — nunca el pool),
                 retroalimentación por rango y XP como recompensa separada.
@@ -352,6 +406,31 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
                 >
                     🏅 Ver mi resultado
                 </button>
+            )}
+
+            {/* La barra de avance que le faltaba al Quiz: era el ÚNICO de los
+                siete juegos sin ella. Reutiliza exactamente el mismo marcado
+                que los otros seis (`.juego-dnd-avance` + `.progress-track` +
+                `.avance-cuenta`), así que el niño reconoce el mismo indicador
+                en todos. Va pegada arriba (`sticky`) a propósito: un quiz es
+                una página larga y una barra que se pierde al segundo scroll no
+                comunica «progreso CONSTANTE», que es la emoción de este juego.
+                Solo en modo puntaje: fuera de él nadie cuenta respuestas. */}
+            {mostrarPuntaje && total > 0 && !completado && (
+                <div className="quiz-avance juego-dnd-avance">
+                    <div className="progress-track">
+                        <div
+                            className="progress-fill progress-fill-accent"
+                            style={{ width: `${(respondidas / total) * 100}%` }}
+                        />
+                    </div>
+                    <span
+                        key={respondidas}
+                        className={`avance-cuenta ${respondidas > 0 ? 'is-pulso' : ''}`}
+                    >
+                        {respondidas} / {total}
+                    </span>
+                </div>
             )}
 
             {preguntasJugables.map((p, i) => (

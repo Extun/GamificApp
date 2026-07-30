@@ -91,6 +91,27 @@
 .logro-toast-close:hover { background: var(--color-surface-alt); color: var(--color-text); }
 .logro-toast-close svg { font-size: 1.2rem; }
 
+/* ===== POLISH SPRINT v1.0.1 Etapa E — la barra de avance del Quiz =====
+   Emoción del juego: PROGRESO CONSTANTE. Por eso la barra se queda pegada
+   arriba mientras se recorre el quiz — si se perdiera con el primer scroll
+   dejaría de ser constante justo cuando más falta hace.
+
+   `--z-sticky` es el tramo documentado para barras pegadas: queda por debajo
+   del overlay de resultado (`--z-modal`/`--z-overlay`), que debe taparla.
+   El fondo opaco es obligatorio: sin él las preguntas se leerían por debajo
+   al pasar. Los estilos del indicador en sí (barra, relleno y contador) NO se
+   duplican aquí: son los mismos que usan los otros seis juegos. */
+.quiz-avance {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+    background: var(--color-surface);
+    padding: 12px 0;
+    /* Compensa el `gap: 18px` de `.quiz-interactivo` para que, al despegarse,
+       no quede una franja de fondo entre la barra y la primera pregunta. */
+    margin-bottom: -6px;
+}
+
 @keyframes toast-in {
     from { opacity: 0; transform: translateY(20px) scale(0.96); }
     to { opacity: 1; transform: translateY(0) scale(1); }
