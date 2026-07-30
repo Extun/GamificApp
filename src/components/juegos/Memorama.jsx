@@ -31,6 +31,12 @@ export function Memorama({ reto, estudianteId, onSalir, onCompletado, soloPrueba
     // cada intento cuenta, que es lo que mide la formula.
     const [fallos, setFallos] = useState(0);
     const [bloqueado, setBloqueado] = useState(false);
+    // Estado SOLO de presentación (POLISH SPRINT v1.0.1 Etapa A): qué par acaba
+    // de resolverse y cuál acaba de fallar, para animarlos. No participa en la
+    // mecánica ni en el puntaje — el mismo patrón que el Clasificador ya usa
+    // con `canastaFeliz` / `rebotando`.
+    const [recienPareja, setRecienPareja] = useState([]);
+    const [fallando, setFallando] = useState([]);
 
     const totalParejas = parejas.length;
     const encontradas = emparejadas.size / 2;
@@ -63,6 +69,8 @@ export function Memorama({ reto, estudianteId, onSalir, onCompletado, soloPrueba
         setEmparejadas(new Set());
         setFallos(0);
         setBloqueado(false);
+        setRecienPareja([]);
+        setFallando([]);
         setSemilla((s) => s + 1);
     };
 
@@ -78,12 +86,25 @@ export function Memorama({ reto, estudianteId, onSalir, onCompletado, soloPrueba
         if (c1.pareja === c2.pareja) {
             setEmparejadas((prev) => new Set([...prev, id1, id2]));
             setVolteadas([]);
+            // Encontrar la pareja es LA recompensa de este juego y hasta ahora
+            // no movía nada: las cartas se ponían verdes y ya. Ahora dan un
+            // saltito elástico que dura lo mismo que la animación del
+            // Clasificador, para que los dos juegos celebren igual.
+            setRecienPareja([id1, id2]);
+            setTimeout(() => setRecienPareja([]), 600);
         } else {
             setFallos((n) => n + 1);
             setBloqueado(true);
+            // Negación suave dentro de la MISMA espera de 900 ms que ya
+            // existía: sin fallar antes el niño solo veía silencio. La
+            // sacudida dura 450 ms, así que quedan otros 450 ms para leer las
+            // dos cartas antes de que se den la vuelta. Ni rojo ni castigo:
+            // en este juego siempre se termina ganando.
+            setFallando([id1, id2]);
             setTimeout(() => {
                 setVolteadas([]);
                 setBloqueado(false);
+                setFallando([]);
             }, 900);
         }
     };
@@ -108,7 +129,17 @@ export function Memorama({ reto, estudianteId, onSalir, onCompletado, soloPrueba
                         style={{ width: `${totalParejas ? (encontradas / totalParejas) * 100 : 0}%` }}
                     />
                 </div>
-                <span>{encontradas} / {totalParejas} parejas</span>
+                {/* `key` cambia con cada pareja encontrada: React remonta el
+                    contador y la animación de CSS se vuelve a reproducir sin
+                    necesidad de un estado ni un temporizador propios. Solo
+                    late a partir de la primera pareja, para que no parpadee
+                    al abrir el juego. */}
+                <span
+                    key={encontradas}
+                    className={`avance-cuenta ${encontradas > 0 ? 'is-pulso' : ''}`}
+                >
+                    {encontradas} / {totalParejas} parejas
+                </span>
             </div>
 
             {!completado && (
@@ -119,7 +150,7 @@ export function Memorama({ reto, estudianteId, onSalir, onCompletado, soloPrueba
                             <button
                                 key={carta.id}
                                 type="button"
-                                className={`memorama-carta ${arriba ? 'is-arriba' : ''} ${emparejadas.has(carta.id) ? 'is-resuelta' : ''}`}
+                                className={`memorama-carta ${arriba ? 'is-arriba' : ''} ${emparejadas.has(carta.id) ? 'is-resuelta' : ''} ${recienPareja.includes(carta.id) ? 'is-pareja' : ''} ${fallando.includes(carta.id) ? 'is-fallo' : ''}`}
                                 onClick={() => voltear(carta)}
                                 aria-label={arriba ? carta.texto : 'Carta boca abajo'}
                                 disabled={emparejadas.has(carta.id)}

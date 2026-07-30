@@ -71,6 +71,42 @@
     border-color: var(--color-success);
 }
 
+/* ===== POLISH SPRINT v1.0.1 Etapa A — el Memorama deja de estar mudo =====
+   Auditoría del 2026-07-30, medida en vivo escuchando `animationstart`: al
+   emparejar se disparaban CERO animaciones y al fallar también CERO. Las dos
+   cartas se ponían verdes, o esperaban 900 ms en silencio y se daban la
+   vuelta. Encontrar la pareja es la recompensa del juego y no se celebraba.
+
+   Las dos animaciones CONSERVAN `rotateY(180deg)`: la carta está boca arriba
+   gracias a esa rotación y perderla en un fotograma la voltearía a mitad de
+   celebración. */
+
+/* Acierto: saltito elástico con la MISMA curva que la canasta feliz del
+   Clasificador, para que los dos juegos celebren con el mismo lenguaje. */
+.memorama-carta.is-pareja .memorama-carta-interior {
+    animation: memorama-pareja 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes memorama-pareja {
+    0%   { transform: rotateY(180deg) scale(1); }
+    45%  { transform: rotateY(180deg) scale(1.12); }
+    100% { transform: rotateY(180deg) scale(1); }
+}
+
+/* Fallo: negación suave, SOLO movimiento. Sin rojo y sin sacudida violenta —
+   la filosofía del juego es que siempre se termina ganando, así que esto
+   dice «esas dos no» sin regañar. Dura 450 ms de los 900 ms que la carta
+   permanece visible, dejando tiempo de sobra para memorizarlas. */
+.memorama-carta.is-fallo .memorama-carta-interior {
+    animation: memorama-fallo 0.45s ease;
+}
+
+@keyframes memorama-fallo {
+    0%, 100% { transform: rotateY(180deg) translateX(0); }
+    25%      { transform: rotateY(180deg) translateX(-6px); }
+    75%      { transform: rotateY(180deg) translateX(6px); }
+}
+
 .memorama-carta:disabled {
     cursor: default;
 }
@@ -82,6 +118,27 @@
 .memorama-carta:focus-visible {
     outline: 3px solid var(--color-primary);
     outline-offset: 2px;
+}
+
+/* ---------- Contador de avance (compartido) ----------
+   POLISH SPRINT v1.0.1 Etapas A y B. La barra de `.juego-dnd-avance` ya
+   animaba su ancho (0,6s), pero el número de al lado cambiaba de golpe y era
+   fácil no notarlo. Ahora late al subir: es el «llevo una más» que el niño
+   necesita ver. Lo usan Memorama, Verdadero/Falso y Completar espacios; el
+   Clasificador celebra con sus canastas y se deja tal cual. */
+.avance-cuenta {
+    display: inline-block;
+    white-space: nowrap;
+}
+
+.avance-cuenta.is-pulso {
+    animation: avance-late 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes avance-late {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.18); }
+    100% { transform: scale(1); }
 }
 
 /* ---------- Línea del tiempo ---------- */
@@ -319,6 +376,34 @@
     border-color: var(--color-accent);
 }
 
+/* La palabra ATERRIZA en el hueco (Etapa B). Es el momento más bonito de este
+   juego —la frase por fin se lee entera— y hasta ahora la palabra aparecía
+   sin más. Solo `transform`, por el mismo motivo que `.completar-sello`. */
+.completar-hueco.is-elegido {
+    animation: palabra-aterriza 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes palabra-aterriza {
+    0%   { transform: translateY(-9px) scale(0.9); }
+    55%  { transform: translateY(0) scale(1.08); }
+    100% { transform: translateY(0) scale(1); }
+}
+
+/* Confirmación instantánea de la opción elegida (Etapa B). El niño toca y la
+   pastilla se hunde y vuelve: acusa recibo ANTES de que aparezca el sello.
+   ACOTADO a `.completar-opcion` a propósito: la clase `.opcion-elegida` sin
+   acotar la comparten el Quiz y la Misión Narrativa, que están fuera de esta
+   etapa. */
+.completar-opcion.opcion-elegida {
+    animation: eleccion-confirma 0.36s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes eleccion-confirma {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(0.93); }
+    100% { transform: scale(1); }
+}
+
 /* Revisión final del intento (verde/rojo recién aquí). */
 .completar-revision {
     margin-top: 16px;
@@ -364,6 +449,28 @@
     justify-content: space-between;
     gap: 0.75rem;
     flex-wrap: wrap;
+}
+
+/* ===== POLISH SPRINT v1.0.1 Etapa B — la confirmación se siente =====
+   Compartido por Completar espacios y Verdadero/Falso. Antes el niño elegía
+   y aparecía, sin movimiento, un «¡Respuesta guardada!» que suena a
+   formulario. Ahora el texto CAE como un sello sobre el papel: es lo único
+   que ocurre al responder (la corrección es diferida y no puede revelarse),
+   así que tiene que notarse.
+
+   Se anima SOLO `transform`, nunca `opacity`: con el reloj de animaciones
+   congelado un fotograma inicial transparente dejaría el texto invisible
+   —lección registrada en SPEC-018— y aquí el texto es la única respuesta
+   que recibe el niño. */
+.completar-sello {
+    display: inline-block;
+    animation: sello-cae 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes sello-cae {
+    0%   { transform: translateY(-7px) scale(0.92); }
+    60%  { transform: translateY(0) scale(1.05); }
+    100% { transform: translateY(0) scale(1); }
 }
 
 .completar-btn-siguiente {
