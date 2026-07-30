@@ -3,7 +3,7 @@
 > Estado: **APROBADA por Fabrizio e IMPLEMENTADA** (2026-07-29). Fase 1 en
 > código y **9 escenarios verificados en local contra MySQL real**; resultados
 > en §8. Producción sin validar hasta el deploy (regla §6.16).
-> Toca `server/middleware/auth.js` → **§10 de CLAUDE.md (autenticación)**, por
+> Toca `server/middleware/auth.js` → **§9 de CONTRIBUTING.md (autenticación)**, por
 > eso existe este documento: sin aprobación no había primer commit.
 > Origen: observación del experto, ítem **59** del backlog de `MASTER_PLAN.md`.
 

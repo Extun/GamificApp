@@ -6,7 +6,7 @@ Auditoría profunda de la experiencia del estudiante (niños de 2.º a 4.º EGB,
 
 # Estado
 
-🟢 Completo — pendiente de convertirse en RFC de rediseño.
+🟢 Completo — pendiente de convertirse en spec de rediseño.
 
 > **Nota (2026-07-14, auditoría documental):** las críticas de este documento al sistema de logros de `localStorage` (3/5 sin lógica de desbloqueo, no compartidos entre dispositivos) **ya fueron resueltas** por SPEC-007 (Sistema de Misiones, server-backed, 46 misiones semilla). Las demás recomendaciones (shell del estudiante sin sidebar, motor único de retos, login infantil, vitrina de premios) siguen vigentes y son el insumo de SPEC-001, aún no implementada — ver `docs/architecture/CURRENT_STATE.md` §3.
 
@@ -84,7 +84,7 @@ La mejor pantalla de toda la app es **MisionNarrativa.jsx**: pantalla completa p
 **1. ¿Qué intenta hacer?** Responder UNA pregunta: "¿qué hago ahora?" — y de paso sentir que va bien.
 
 **2. Carga cognitiva innecesaria.**
-- **Cuatro secciones apiladas** (Continuar aprendiendo / Mi progreso / Mi comunidad / Actividad reciente) que exigen scroll y lectura. Es el layout de un dashboard de gestión (de hecho es el mismo RFC-004 que el del docente).
+- **Cuatro secciones apiladas** (Continuar aprendiendo / Mi progreso / Mi comunidad / Actividad reciente) que exigen scroll y lectura. Es el layout de un dashboard de gestión (de hecho es el mismo que el del docente).
 - `StatCard` con "XP acumulado", "Nivel actual", "Logros obtenidos": tres números abstractos sin representación visual de avance. "1350 XP" no significa nada para un niño; una barra que se llena o un cofre que se abre, sí.
 - "Actividad reciente" con porcentajes y fechas ("Quiz de sumas · Matemáticas · 80% · 3 jul") es un **log de auditoría**. Ningún niño quiere leer su propio historial tabulado.
 - El subtítulo "Sigue aprendiendo y suma puntos para subir en el ranking" enmarca todo en competencia y lectura.
@@ -267,7 +267,7 @@ La mejor pantalla de toda la app es **MisionNarrativa.jsx**: pantalla completa p
 | 4 | **Un solo motor de retos** basado en el patrón de MisionNarrativa (fases, una decisión por pantalla, celebración final): el Quiz-muro desaparece para estudiantes. | Radical |
 | 5 | **El progreso se unifica en "Mis premios"** (nivel visual + vitrina de logros); se retiran los logros sin lógica y "Actividad reciente"; el ranking absoluto se reformula (meta de aula / semanal) o se elimina. | Radical |
 | 6 | **Capa de juicio sensorial**: sonidos de acierto/error/celebración, animaciones de recompensa a pantalla completa en vez de toasts, cero `window.prompt`/`alert`, texto mínimo con límites duros por campo (incluido el prompt del generador IA del docente). | Transversal |
-| 7 | **Rutas reales para el estudiante** (el botón atrás nunca expulsa al login) y diseño tablet-first táctil. Convierte el RFC-006 pendiente en prerequisito de esta épica. | Técnico-UX |
+| 7 | **Rutas reales para el estudiante** (el botón atrás nunca expulsa al login) y diseño tablet-first táctil. Convierte el trabajo de rutas pendiente en prerequisito de esta épica. | Técnico-UX |
 
 ## Qué se conserva como cimiento
 

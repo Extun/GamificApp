@@ -30,7 +30,7 @@ export const clasificador = {
     etiqueta: 'Clasificador',
     emoji: '🧩',
     descripcion: 'Arrastra cada elemento a la categoría que le corresponde.',
-    // Banco diferido a post-tesis (SPEC-013 §3 / MASTER_PLAN §3.18): la unidad
+    // Banco diferido a post-tesis (SPEC-013 §3): la unidad
     // reutilizable sería el grupo de categorías completo, no elementos sueltos.
     capacidades: { ia: true, banco: false, reutilizar: false, automatico: false },
     verboAuditoria: 'Jugó el clasificador',

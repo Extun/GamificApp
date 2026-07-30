@@ -1,6 +1,7 @@
-# CLAUDE.md — Reglas permanentes de GamificApp
+# CONTRIBUTING — Reglas de trabajo en GamificApp
 
-Este es el único documento que hace falta leer antes de trabajar. Amplía la lectura solo si la tarea lo pide (ver §8/§9).
+Documento único de referencia antes de modificar el proyecto. Amplía la lectura
+solo si la tarea lo pide (ver §8).
 
 ## 1. Descripción del proyecto
 
@@ -15,7 +16,7 @@ Roles: **Administrador** (Principal y Administrador — gestiona docentes, estud
 | Frontend | React 19 + Vite, React Router, MUI (iconos/algunos componentes), CSS plano con tokens de tema |
 | Backend | Node.js + Express (`server/`), JWT, bcryptjs, mysql2 |
 | Base de datos | MySQL — dev `gamificapp`, producción Aiven `defaultdb`; esquema en `database/*.sql`, migraciones idempotentes vía `server/initDb.js` |
-| IA | `@google/genai` (Gemini), solo server-side, endpoints `/api/ia/*` |
+| IA | `@google/genai` (Gemini) y `openai`, solo server-side, endpoints `/api/ia/*` |
 | Archivos | `pdfjs-dist` (preview PDF), `mammoth` (texto .docx); archivos como base64 en MySQL |
 | Deploy | Vercel (frontend) + Render (backend) + Aiven (MySQL) |
 
@@ -26,7 +27,7 @@ Roles: **Administrador** (Principal y Administrador — gestiona docentes, estud
 - **Retos polimórficos**: la tabla `retos` guarda cualquier mecánica en `configuracion_json` con un `tipo` slug libre; añadir un juego nuevo no requiere migrar la BD.
 - **Materias son un catálogo 100% dinámico en BD** (no hay lista fija en el código; `src/services/materiasService.js`).
 - Estructura de carpetas: `src/` (frontend: componentes, páginas por rol, services/, hooks/), `server/` (backend Express: routes/, lib/, middleware/, scripts/), `database/` (esquema SQL + migraciones), `docs/` (documentación).
-- Toda generación de contenido con IA pasa por `server/lib/ia/` (adaptadores por proveedor —Gemini y OpenAI— con selección de modelo y reintentos, SPEC-016) y `server/lib/actividadesIA.js` (registro por tipo de juego). Las API keys viven **solo** en el servidor. *(Corregido el 2026-07-30: este punto citaba `server/lib/iaCliente.js`, que desde SPEC-016 es solo un shim de compatibilidad sin importadores; el camino real es `server/lib/ia/index.js`.)*
+- Toda generación de contenido con IA pasa por `server/lib/ia/` (adaptadores por proveedor —Gemini y OpenAI— con selección de modelo y reintentos, SPEC-016) y `server/lib/actividadesIA.js` (registro por tipo de juego). Las API keys viven **solo** en el servidor.
 - XP transaccional e idempotente: `POST /api/progreso` con `FOR UPDATE`, nunca duplica XP en reintentos.
 - Detalle completo (principios de arquitectura y UX, filosofía de gamificación "siempre se termina ganando"): `docs/architecture/PROJECT_CONTEXT.md` y `docs/architecture/VISION.md`.
 
@@ -36,11 +37,11 @@ Ver §1. El Administrador Principal es el único que ve institución/administrad
 
 ## 5. Módulos implementados
 
-MVP completo y en producción: auth, 3 roles, materias/cursos/institución dinámicos, 6 juegos (Quiz, Clasificador, Misión Narrativa, Memorama, Línea del tiempo, Completar espacios) generables con IA, XP/ranking/misiones, papelera, auditoría, permisos, sistema RESET.
+MVP completo y en producción: auth, 3 roles, materias/cursos/institución dinámicos, 7 juegos (Quiz, Clasificador, Misión Narrativa, Memorama, Línea del tiempo, Completar espacios, Verdadero/Falso) generables con IA, XP/ranking/misiones, banco de preguntas, papelera, auditoría, permisos, sistema RESET.
 
 Pendiente: Épica 1 (rediseño del shell del estudiante, SPEC-001 en adelante) — nada implementado aún.
 
-Estado módulo por módulo, prioridad actual y bitácora de cambios: **`docs/architecture/CURRENT_STATE.md`** (fuente de verdad, se actualiza en cada cambio relevante).
+Estado módulo por módulo y bitácora de cambios: **`docs/architecture/CURRENT_STATE.md`** (fuente de verdad del estado, se actualiza en cada cambio relevante). Roadmap y backlog: `docs/architecture/MASTER_PLAN.md`.
 
 ## 6. Reglas obligatorias
 
@@ -50,43 +51,43 @@ Estado módulo por módulo, prioridad actual y bitácora de cambios: **`docs/arc
 4. **Reutilizar antes de crear.** Componentes existentes primero: `DashboardWidgets` (DashboardHeader, StatCard, SectionCard, EmptyState, QuickActionCard), `ArchivoChip`/`FilePreviewModal`, `LogroToast`, `QuizInteractivo`, `MisionNarrativa`. Servicios en `src/services/`, uno por dominio.
 5. **Responsive obligatorio.** Todo cambio de UI debe funcionar en móvil/tablet (los niños usan dispositivos compartidos de la escuela). Verificar resoluciones pequeñas antes de dar por terminado.
 6. **Cambios grandes requieren spec aprobada.** Rediseños, cambios de backend/BD/APIs o de arquitectura necesitan un documento en `docs/specifications/` aprobado por Fabrizio antes del primer commit. Bugs y ajustes pequeños se hacen directo.
-7. **No depender del historial del chat.** Lo que importa se escribe en `docs/`. Al cerrar trabajo relevante, actualizar `docs/architecture/CURRENT_STATE.md` (y `MASTER_PLAN.md` si cambia el roadmap).
-8. **Commits:** mensajes en español, nunca mencionan Claude, IA ni herramientas de IA.
+7. **La documentación vive en el repositorio.** Lo que importa se escribe en `docs/`, no se deja en notas sueltas. Al cerrar trabajo relevante, actualizar `docs/architecture/CURRENT_STATE.md` (y `MASTER_PLAN.md` si cambia el roadmap).
+8. **Commits:** mensajes en español, descriptivos y en imperativo.
 9. CSS plano con tokens de tema (`--color-*`, `--radius-*`, `--shadow-*`); no introducir librerías de estilos nuevas.
 10. Comentarios y UI en español. Texto visible para estudiantes comprensible por un niño de 6 años.
 11. `localStorage` es caché, nunca fuente de verdad; toda lista se refresca desde la API tras escribir.
 12. No romper la compatibilidad de `configuracion_json` de retos ya publicados.
-13. Secretos (API key Gemini, JWT_SECRET) solo en el servidor.
+13. Secretos (API keys de los proveedores de IA, `JWT_SECRET`) solo en el servidor.
 14. **Prohibido el dato ficticio**: ningún número o estadística hardcodeada presentada como real. Sin datos → `EmptyState` que explique cómo llenarlo.
 15. El XP es transaccional e idempotente (`POST /api/progreso` con `FOR UPDATE`); mantener esa garantía.
-16. Sin MySQL local disponible: la verificación end-to-end contra BD real (permisos, migraciones, IA con datos reales) se hace en producción tras el deploy — dejarlo explícito al reportar avances.
+16. La verificación end-to-end contra BD real (permisos, migraciones, IA con datos reales) requiere un MySQL accesible; si no lo hay, se hace en producción tras el deploy y se deja explícito en el reporte de avance.
 
-## 7. Flujo oficial de desarrollo
+## 7. Flujo de desarrollo
 
-1. Leer este archivo + `docs/architecture/CURRENT_STATE.md` (y `MASTER_PLAN.md` si la tarea es de roadmap).
-2. Si el cambio es grande (rediseño, backend/BD/API, arquitectura) o toca algo del §10: redactar/usar spec aprobada en `docs/specifications/SPEC-00N-*.md` antes del primer commit.
+1. Leer este archivo + `docs/architecture/CURRENT_STATE.md` (y `MASTER_PLAN.md` si la tarea es de roadmap). Si el cambio toca un área con spec, leer también la spec correspondiente en `docs/specifications/`.
+2. Si el cambio es grande (rediseño, backend/BD/API, arquitectura) o toca algo del §9: redactar/usar spec aprobada en `docs/specifications/SPEC-00N-*.md` antes del primer commit.
 3. Implementar en pasos pequeños que compilen.
 4. Al terminar: `npm run build` sin errores; si el cambio es visible, verificar en navegador (incluido móvil).
 5. Reportar con evidencia real de lo probado, sin exagerar.
 6. Actualizar `CURRENT_STATE.md` (y `MASTER_PLAN.md` si cambió el roadmap).
 
-## 8. Archivos que SIEMPRE debe consultar
+## 8. Documentación de referencia
 
-- `CLAUDE.md` (este archivo)
-- `docs/architecture/CURRENT_STATE.md`
-- `docs/architecture/MASTER_PLAN.md`
-- La SPEC activa en `docs/specifications/`, si la tarea toca ese cambio
+Consultar solo lo que la tarea requiera:
 
-## 9. Archivos que NO necesita consultar salvo indicación
+- `START_HERE.md` (raíz) — orden de lectura y, sobre todo, cómo arrancar el proyecto en local.
+- `docs/architecture/CURRENT_STATE.md` — estado real de los módulos y bitácora de cambios.
+- `docs/architecture/MASTER_PLAN.md` — roadmap y backlog priorizado.
+- `docs/architecture/PROJECT_CONTEXT.md` — arquitectura y stack en más detalle que este resumen.
+- `docs/architecture/VISION.md` — principios de producto y "qué nunca hacer".
+- `docs/architecture/MODELO-ENTIDAD-RELACION.md` — modelo de datos.
+- `docs/architecture/POLITICA-ELIMINACION.md` — borrado y papelera de cualquier entidad.
+- `docs/COMO-AGREGAR-UN-JUEGO.md` — contrato para añadir un tipo de juego nuevo.
+- `docs/DEV-ENTORNO-LOCAL.md` — preparar un entorno local de desarrollo.
+- `docs/specifications/` — specs de diseño de cada módulo.
+- `docs/audit/` — auditorías puntuales; son registro histórico y no se reescriben.
 
-- `docs/architecture/PROJECT_CONTEXT.md` — solo si hace falta arquitectura/stack en más detalle que este resumen.
-- `docs/architecture/VISION.md` — solo para principios de producto / "qué nunca hacer".
-- `docs/architecture/POLITICA-ELIMINACION.md` — solo si la tarea toca borrado/papelera de alguna entidad.
-- `docs/audit/*.md` — bitácora de auditorías puntuales, no se reescriben.
-- `docs/archive/` — histórico y plantillas abandonadas. **No leer para trabajo diario.**
-- `README.md` / `START_HERE.md` — guías de arranque local, no de producto.
-
-## 10. Restricciones — nunca modificar sin SPEC aprobada
+## 9. Restricciones — nunca modificar sin spec aprobada
 
 - Login / autenticación (JWT, PIN, código de emergencia)
 - XP y su transaccionalidad (`POST /api/progreso`)

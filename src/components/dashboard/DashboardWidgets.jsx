@@ -1,4 +1,4 @@
-// Piezas compartidas de los dashboards (RFC-004). Son componentes de
+// Piezas compartidas de los dashboards. Son componentes de
 // presentación puros: reciben datos REALES por props y no consultan APIs.
 // La regla de la casa: si no hay datos, el contenedor muestra <EmptyState />
 // en lugar de inventar valores.

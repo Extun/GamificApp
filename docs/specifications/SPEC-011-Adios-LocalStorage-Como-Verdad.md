@@ -6,7 +6,7 @@
 
 ## 1. Problema
 
-La regla permanente del proyecto (CLAUDE.md §6.11) dice: *"localStorage es caché, nunca fuente de verdad"*. La auditoría completa del código (2026-07-16) encontró que casi todo el uso actual cumple la regla, **excepto los historiales de borradores de los generadores**, que viven SOLO en localStorage: si el docente cambia de navegador/dispositivo o limpia datos, pierde sus borradores; y el badge "Publicado" del historial puede divergir de la BD.
+La regla permanente del proyecto (CONTRIBUTING.md §6.11) dice: *"localStorage es caché, nunca fuente de verdad"*. La auditoría completa del código (2026-07-16) encontró que casi todo el uso actual cumple la regla, **excepto los historiales de borradores de los generadores**, que viven SOLO en localStorage: si el docente cambia de navegador/dispositivo o limpia datos, pierde sus borradores; y el badge "Publicado" del historial puede divergir de la BD.
 
 ## 2. Auditoría completa de localStorage (inventario)
 

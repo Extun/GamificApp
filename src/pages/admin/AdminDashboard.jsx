@@ -403,7 +403,7 @@ export function AdminDashboard() {
                             </div>
                         )}
 
-                        {/* INICIO — resumen real de la institución (RFC-004). */}
+                        {/* INICIO — resumen real de la institución. */}
                         {pagina === 'inicio' && (
                             <div className="dash-secciones">
                                 <header className="admin-hero">

@@ -310,7 +310,7 @@ Publicar exige ahora que `totalEsperado` sea derivable. Endurecimiento intencion
 |---|---|
 | Actividades históricas intactas | La tabla `retos` no se modifica; ningún borrado |
 | XP y calificaciones inmutables | El estado no se consulta al calificar (§5.1.4) |
-| Ranking y misiones sin cambios | No se tocan (§10 de CLAUDE.md) |
+| Ranking y misiones sin cambios | No se tocan (§9 de CONTRIBUTING.md) |
 | Imports existentes válidos | Re-exports durante toda la transición (§9) |
 | Sin fila = hoy | Default `activo` |
 | `configuracion_json` | Sin cambios de forma (regla §12) |

@@ -40,7 +40,7 @@ Cuatro puntos concretos, no un rediseño:
 
 El revisor pidió **analizar la viabilidad de reemplazar**, no reemplazar. La respuesta técnicamente superior es demostrar independencia del proveedor:
 
-> Se analizó la viabilidad del reemplazo directo y se concluyó que resolvía el síntoma (usar otro proveedor) pero no la causa (acoplamiento a un proveedor único). GamificApp implementó una arquitectura de adaptadores agnóstica al proveedor: Gemini y OpenAI son proveedores reales e intercambiables desde el panel de administración, y añadir Anthropic u otro no requiere modificar los generadores de actividades.
+> Se analizó la viabilidad del reemplazo directo y se concluyó que resolvía el síntoma (usar otro proveedor) pero no la causa (acoplamiento a un proveedor único). GamificApp implementó una arquitectura de adaptadores agnóstica al proveedor: Gemini y OpenAI son proveedores reales e intercambiables desde el panel de administración, y añadir un proveedor nuevo no requiere modificar los generadores de actividades.
 
 **Se implementa OpenAI de verdad, no solo "preparado".** Una demostración con dos proveedores reales y conmutables en vivo es la evidencia que cierra la observación; un adaptador teórico no lo haría.
 
@@ -221,7 +221,7 @@ CREATE TABLE IF NOT EXISTS configuracion_ia (
 
 **Docente y estudiante: cero cambios.** La generación de actividades funciona exactamente igual.
 
-## 9. Relación con las áreas protegidas (§10 de CLAUDE.md)
+## 9. Relación con las áreas protegidas (§9 de CONTRIBUTING.md)
 
 El permiso `'ia'` se añade a `PERMISOS_VALIDOS` pero **NO** a `PERMISOS_OPERATIVOS` (`server/middleware/auth.js:59-64`). Consecuencias:
 

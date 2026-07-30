@@ -6,7 +6,7 @@ Plan de implementación (sin código) del nuevo "cascarón" del estudiante: ruta
 
 # Estado
 
-🟡 Propuesto — pendiente de aprobación como RFC.
+🟡 Propuesto — pendiente de aprobación.
 
 > **ALCANCE PARCIALMENTE ENTREGADO FUERA DE ESTA SPEC (2026-07-30, bloque P1 de la fase RC, commit `b5f1dc3`).** Leer antes de implementar, para no hacer el trabajo dos veces:
 >
@@ -68,7 +68,7 @@ Todos bajo `src/pages/estudiante/` y `src/components/estudiante/`:
 - **`src/pages/estudiante/DashboardEstudiante.jsx`** — se desmonta progresivamente hasta desaparecer.
 - **`src/pages/estudiante/dashboardEstudiante.css`** — las clases que sobreviven (lista de quizzes, `vacio-msg`, etc.) migran al CSS de `MateriaEstudiante`; el resto se elimina.
 - **`src/constants/materias.js`** — solo si se añade metadato visual mínimo (color por materia) para el grid del Inicio; opcional en esta spec.
-- **Docs DevOS al cerrar**: `PROJECT_CONTEXT.md` (tabla RFC, estado), `MASTER_PLAN.md`, `NAVIGATION.md`, changelog del RFC.
+- **Documentación a actualizar al cerrar**: `PROJECT_CONTEXT.md` (estado y navegación).
 
 **Sin cambios:** backend completo, servicios, BD, componentes de docente/admin, reproductores de juego.
 
@@ -80,7 +80,7 @@ Todos bajo `src/pages/estudiante/` y `src/components/estudiante/`:
 4. **Doble fuente del XP.** El Inicio nuevo pinta `getProgresoNivel()` (caché local) y la sincronización llega asíncrona de `obtenerProgreso()`; el patrón `setSync` actual es frágil. Riesgo de mostrar barra desactualizada un instante. Aceptable en esta spec; documentar.
 5. **`DashboardPorRol` en `/dashboard` con sub-rutas**: docente y admin NO deben ganar sub-rutas accidentalmente ni romperse con `path="/dashboard/*"`. Probar los tres roles tras tocar `App.jsx`.
 6. **Botón atrás vs. juego a medias**: con rutas reales, "atrás" durante un quiz abandona el reto sin aviso. Comportamiento aceptado (el XP solo se otorga al completar y es idempotente), pero debe quedar anotado.
-7. **Regla DevOS**: este trabajo requiere RFC aprobado antes del primer commit.
+7. **Regla de proceso**: este trabajo requiere una spec aprobada antes del primer commit.
 
 ## 6. División en commits
 
@@ -92,4 +92,4 @@ Cada commit deja la app funcional y verificable en navegador (`npm run build` + 
 4. **`feat: modal de cambio de PIN`** — reemplaza `window.prompt/alert`.
 5. **`feat: nuevo Inicio del estudiante con barra de nivel y Seguir jugando`** — `InicioEstudiante` + `BarraNivel` + hero; retira StatCards, ranking y actividad reciente de la home.
 6. **`chore: eliminar DashboardEstudiante.jsx y CSS muerto`** — limpieza final.
-7. **`docs: changelog SPEC-001 y actualización de PROJECT_CONTEXT/MASTER_PLAN/NAVIGATION`.**
+7. **`docs: cierre de SPEC-001 y actualización de PROJECT_CONTEXT`.**

@@ -1,7 +1,7 @@
 # Release Candidate 1.0 — Plan de limpieza y backlog único
 
 **Fecha:** 2026-07-30 · **Rol:** Release Manager · **Objetivo:** v1.0 estable en 2 días.
-**Fuentes:** `CLAUDE.md`, `START_HERE.md`, `CURRENT_STATE.md`, `MASTER_PLAN.md`, `REPOSITORY_CONTEXT.md`, `REPOSITORY_CLEANUP.md` + auditoría UI/UX del 2026-07-30.
+**Fuentes:** `CONTRIBUTING.md`, `START_HERE.md`, `CURRENT_STATE.md`, `MASTER_PLAN.md`, `REPOSITORY_CONTEXT.md`, `REPOSITORY_CLEANUP.md` + auditoría UI/UX del 2026-07-30.
 
 ---
 
@@ -34,7 +34,7 @@ Verifiqué con `git ls-files` cada candidato de la lista "Eliminar" de `REPOSITO
 |---|---|---|
 | `.env`, `server/.env` | **No** (`.gitignore:14`) | **MANTENER en disco** |
 | `CREDENCIALES.txt` | **No** (`.gitignore:24`) | **MANTENER en disco** |
-| `logs/`, `.run/`, `.claude/` | **No** | **MANTENER en disco** |
+| `logs/`, `.run/` y la configuración local del editor | **No** | **MANTENER en disco** |
 | `node_modules/`, `server/node_modules/`, `dist/` | **No** | **MANTENER en disco** |
 | `release/`, `runtime/` | **No** | **MANTENER en disco** |
 
@@ -69,7 +69,7 @@ El endpoint `/api/ia/asistente` del backend **se deja intacto** (restricción de
 
 | Archivo | Verificación | Recomendación |
 |---|---|---|
-| `server/lib/iaCliente.js` | Shim de 13 líneas; re-exporta desde `./ia/index.js`. **0 importadores** (solo aparece en comentarios). | **Post v1.0.** Eliminarlo obliga a corregir `CLAUDE.md §3`, que hoy documenta este archivo como el camino de la IA (**documentación desactualizada**: el camino real es `server/lib/ia/`). Tocar las reglas permanentes a dos días de la entrega no lo vale. |
+| `server/lib/iaCliente.js` | Shim de 13 líneas; re-exporta desde `./ia/index.js`. **0 importadores** (solo aparece en comentarios). | **Post v1.0.** Eliminarlo obliga a corregir `CONTRIBUTING.md §3`, que hoy documenta este archivo como el camino de la IA (**documentación desactualizada**: el camino real es `server/lib/ia/`). Tocar las reglas permanentes a dos días de la entrega no lo vale. |
 | `server/lib/totalEsperado.js` | Shim; re-exporta desde `./juegos/registro.js`. 0 importadores (`progreso.js` y `retos.js` importan del registro). | **Mantener.** El nombre figura en la lista de fórmulas congeladas de SPEC-018 §3 y `totalEsperado` es un control de seguridad de `POST /api/progreso`. Beneficio nulo, roza área congelada. |
 | `src/App.css` | 0 bytes, importado por `App.jsx`. | **Post v1.0.** Eliminarlo exige editar el import. Trivial pero sin valor para la 1.0. |
 
@@ -80,6 +80,8 @@ El endpoint `/api/ia/asistente` del backend **se deja intacto** (restricción de
 - `docs/audit/*`, `docs/specifications/SPEC-001..019` → trazabilidad de decisiones.
 - `scripts/verificar-registros-juegos.mjs` → verificación de consistencia de juegos.
 - Todo `src/`, `server/`, `database/`, `instalador/`.
+
+> **Nota posterior (limpieza final del Release Candidate, 2026-07-30).** Esta sección C recoge la decisión vigente **en el momento de escribir este plan** y no se reescribe. Parte de lo que aquí se decidió mantener **fue retirado después**, en la limpieza final del repositorio para la entrega: `tools/build_auditoria_docx.py` (con su carpeta `tools/`), `Auditoria-Panel-Docente-SPEC-004.docx`, `docs/archive/` completo y —dentro de `docs/audit/`— `Auditoria-Documental-2026-07-14.md`, que auditaba el sistema documental y pasó a describir un árbol de archivos inexistente. También desaparecieron `REPOSITORY_CONTEXT.md` y `REPOSITORY_CLEANUP.md`, citados como fuentes en la cabecera de este documento y en la sección 2. **Siguen vigentes** el resto de `docs/audit/`, las 19 SPECs, `scripts/` y todo el código. Motivo y alcance completo: entrada del 2026-07-30 en `docs/architecture/CURRENT_STATE.md`.
 
 ### Acción propuesta para la Fase 1
 

@@ -99,7 +99,7 @@ Ningún otro cambio de modelo.
 >
 > **Relación con SPEC-017:** las fases pendientes NO están bloqueadas por SPEC-017 ni al revés. SPEC-017 centraliza *dónde se decide* qué capacidades tiene cada tipo; las fases 4-7 siguen siendo trabajo de UX del docente y se apoyarán en el registro cuando existan.
 
-Cada fase: objetivo único, mínimos archivos, `npm run build` limpio, prueba en navegador (incl. móvil) cuando es visible, `CURRENT_STATE.md` actualizado, visto bueno antes de la siguiente. Lo que necesita IA/BD real se verifica en producción tras deploy (§6.16 CLAUDE.md).
+Cada fase: objetivo único, mínimos archivos, `npm run build` limpio, prueba en navegador (incl. móvil) cuando es visible, `CURRENT_STATE.md` actualizado, visto bueno antes de la siguiente. Lo que necesita IA/BD real se verifica en producción tras deploy (§6.16 CONTRIBUTING.md).
 
 - **Fase 0 — esta spec** + anotaciones en MASTER_PLAN. ✅ al aprobarse.
 - **Fase 1 — Toggles "Mezclar" del Quiz:** flags aditivos + lectura condicional + 2 checkboxes en "⚙ Configuración". Archivos: `QuizInteractivo.jsx`, `GeneradorQuiz.jsx`.

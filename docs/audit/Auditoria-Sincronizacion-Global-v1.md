@@ -105,7 +105,7 @@ lo cual es correcto para el alcance de la tesis.
    "materia nueva visible para todos los docentes al instante", habría que
    decidir una política (¿todas las materias a todos? ¿opción "materia global"
    en el catálogo?). Es un **cambio de modelo de datos/permisos**, no un
-   parche; requiere spec aprobada (regla 6 de CLAUDE.md).
+   parche; requiere spec aprobada (regla 6 de CONTRIBUTING.md).
 2. **Sin tiempo real.** La propagación ocurre al recargar/navegar, no por push.
    Aceptable para la tesis; websockets serían post-tesis.
 3. **Roles y estados son enums de esquema**, no configurables desde el panel.

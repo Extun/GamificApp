@@ -1,7 +1,7 @@
 // Registro de proveedores de IA (SPEC-016, Fase 2).
 //
-// Añadir un proveedor nuevo (Anthropic u otro) = crear su adaptador con el
-// contrato de abajo y registrarlo aquí. Ningún generador educativo cambia.
+// Añadir un proveedor nuevo = crear su adaptador con el contrato de abajo y
+// registrarlo aquí. Ningún generador educativo cambia.
 //
 // Contrato del adaptador:
 //   id, etiqueta, variableEntorno, modelosSugeridos[]
@@ -12,7 +12,7 @@
 //
 // `clasificarError` existe desde ya aunque SPEC-016 NO implemente fallback
 // automático entre proveedores: es el punto de extensión que permitirá
-// añadirlo después sin tocar los adaptadores (MASTER_PLAN §3 ítem 24).
+// añadirlo después sin tocar los adaptadores.
 import proveedorGemini from './proveedorGemini.js';
 import proveedorOpenAI from './proveedorOpenAI.js';
 

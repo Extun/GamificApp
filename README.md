@@ -2,7 +2,7 @@
 
 Plataforma web de gamificación educativa para niños de 6–9 años (proyecto de tesis). React 19 + Vite en el frontend, Node/Express + MySQL en el backend.
 
-Para contexto de producto, arquitectura y reglas de trabajo, ver `CLAUDE.md` (raíz). Para arrancar el proyecto en tu máquina, ver `START_HERE.md`.
+Para contexto de producto, arquitectura y reglas de trabajo, ver `CONTRIBUTING.md` (raíz). Para arrancar el proyecto en tu máquina, ver `START_HERE.md`.
 
 ## Estructura del repositorio
 
@@ -28,7 +28,7 @@ docs/           documentación viva (arquitectura, specs, auditorías)
 | `Iniciar GamificApp.cmd` | Arranque diario (no duplica procesos si ya está en marcha) |
 | `Detener GamificApp.cmd` | Cierra solo los procesos de GamificApp |
 
-**No instala nada en el sistema.** Si falta Node.js —o el instalado no sirve— descarga una copia portable verificada por SHA-256 en `runtime/node/`, sin tocar el PATH de Windows, el registro ni pedir permisos de administrador. **La base de datos también la pone GamificApp**: arranca el MySQL 8 de `runtime/mysql` como un proceso de usuario más (sin servicio de Windows, sin Docker y sin permisos de administrador), escuchando solo en `127.0.0.1:3308` —con reserva 3309-3315 si ese puerto está ocupado— y **guardando los datos en `%LOCALAPPDATA%\GamificApp\`, fuera de la carpeta del proyecto**, para que sobrevivan a mover o reemplazar GamificApp. Si esa carpeta `runtime/mysql` no viene incluida, se usa un MySQL 8 ya instalado en el equipo. Es seguro repetirlo — nunca regenera credenciales existentes ni toca los datos. Detalle en `START_HERE.md`.
+**No instala nada en el sistema.** Si falta Node.js —o el instalado no sirve— descarga una copia portable verificada por SHA-256 en `runtime/node/`, sin tocar el PATH de Windows, el registro ni pedir permisos de administrador. **La base de datos también la pone GamificApp**: arranca el MySQL 8 de `runtime/mysql` como un proceso de usuario más (sin servicio de Windows, sin Docker y sin permisos de administrador), escuchando solo en `127.0.0.1:3308` —con reserva 3309-3315 si ese puerto está ocupado— y **guardando los datos en `%LOCALAPPDATA%\GamificApp\`, fuera de la carpeta del proyecto**, para que sobrevivan a mover o reemplazar GamificApp. Si esa carpeta `runtime/mysql` no viene incluida, se usa un MySQL 8 ya instalado en el equipo. Es seguro repetirlo — nunca regenera credenciales existentes ni toca los datos.
 
 ## Paquete de distribución
 
@@ -47,7 +47,7 @@ Deja en `release\GamificApp\` (ignorado por Git) una carpeta que se comprime y s
 | `-SaltarBuild` | reutilizar `dist/` tal cual, sin reconstruir |
 | `-SinDependencias` | no incluir `node_modules` (paquete más pequeño, pero la instalación necesitará internet) |
 
-El empaquetador **construye el frontend antes de copiar y aborta si el build falla**, poda `runtime\mysql` con reglas demostradas (~925 MB → ~398 MB), incluye el runtime de Visual C++ junto a `mysqld.exe` y **audita el resultado: si detecta un secreto, un dato o un artefacto de la máquina de desarrollo, no entrega el paquete**. Qué contiene, qué se genera al instalar y qué nunca viaja: `START_HERE.md`.
+El empaquetador **construye el frontend antes de copiar y aborta si el build falla**, poda `runtime\mysql` con reglas demostradas (~925 MB → ~398 MB), incluye el runtime de Visual C++ junto a `mysqld.exe` y **audita el resultado: si detecta un secreto, un dato o un artefacto de la máquina de desarrollo, no entrega el paquete**. Qué contiene, qué se genera al instalar y qué nunca viaja está declarado como datos auditables en la cabecera de `instalador\empaquetar.ps1`.
 
 ### Manual (cualquier sistema)
 
@@ -58,7 +58,7 @@ npm install
 cp .env.example .env   # completar credenciales de BD, JWT_SECRET, etc.
 # La base debe existir Y tener el esquema base ANTES del primer arranque:
 #   mysql -u root -p <DB_NAME> < ../database/produccion_defaultdb.sql
-# (initDb.js no puede inicializar una base vacía; ver START_HERE.md)
+# (initDb.js no puede inicializar una base vacía)
 npm run dev
 
 # Frontend (en otra terminal, desde la raíz)
@@ -74,4 +74,6 @@ npm run dev
 | ¿Qué está implementado hoy? | `docs/architecture/CURRENT_STATE.md` |
 | ¿Qué sigue en el roadmap? | `docs/architecture/MASTER_PLAN.md` |
 | ¿Cómo corro el proyecto localmente? | `START_HERE.md` |
-| Reglas de trabajo para cambios | `CLAUDE.md` |
+| ¿Cómo preparo un entorno local con Docker? | `docs/DEV-ENTORNO-LOCAL.md` |
+| ¿Cómo añado un tipo de juego nuevo? | `docs/COMO-AGREGAR-UN-JUEGO.md` |
+| Reglas de trabajo para cambios | `CONTRIBUTING.md` |

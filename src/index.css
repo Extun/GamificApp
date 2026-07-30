@@ -58,7 +58,7 @@
      `.contenido`, medía 4.39:1 y NO alcanzaba el 4.5:1 de WCAG 1.4.3; afectaba
      al subtítulo que va bajo cada h1 de los tres paneles. Ahora 5.06:1 sobre
      el fondo del panel y 5.48:1 sobre blanco, conservando la jerarquía
-     respecto a --color-text (~16:1). Cierra MASTER_PLAN §3 ítem 36. */
+     respecto a --color-text (~16:1). */
   --color-text-muted: #5c6a80;
   --color-border: #e2e8f0;
 

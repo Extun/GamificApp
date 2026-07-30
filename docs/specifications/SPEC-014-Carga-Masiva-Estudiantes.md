@@ -8,7 +8,7 @@
 > retirada de la generación de invitaciones de la UI (backend y datos
 > intactos). Cambio de curso de un estudiante: fuera de alcance.
 > Autor: requerimiento nº 3 del revisor de tesis; diseño acordado con Fabrizio.
-> Toca áreas restringidas (§10 de CLAUDE.md): añade rutas públicas a `auth.js`
+> Toca áreas restringidas (§9 de CONTRIBUTING.md): añade rutas públicas a `auth.js`
 > y modifica la consulta de localización del login de estudiante. Todo lo demás
 > del login (verificación bcrypt, emisión de token, mensajes) queda igual.
 

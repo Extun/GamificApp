@@ -2,11 +2,11 @@
 
 > Última actualización: 2026-07-29
 
-Este archivo indica exactamente qué debe leer una IA (o desarrollador) nueva antes de tocar GamificApp, y cómo arrancar el proyecto en local. Leer **solo** lo que la tarea requiere; el objetivo es trabajar con el mínimo contexto posible.
+Este archivo indica exactamente qué debe leer un desarrollador nuevo antes de tocar GamificApp, y cómo arrancar el proyecto en local. Leer **solo** lo que la tarea requiere.
 
 ## Lectura mínima (siempre, en este orden)
 
-1. **`CLAUDE.md`** (raíz) — reglas permanentes de trabajo. Se carga automáticamente en Claude Code.
+1. **`CONTRIBUTING.md`** (raíz) — reglas permanentes de trabajo.
 2. **`docs/architecture/PROJECT_CONTEXT.md`** — qué es GamificApp, stack, arquitectura y principios, en una lectura.
 3. **`docs/architecture/CURRENT_STATE.md`** — estado real del MVP, qué está implementado, prioridades inmediatas.
 
@@ -20,7 +20,8 @@ Con esos 3 documentos ya se puede trabajar. No leer nada más salvo que la tarea
 | Experiencia del estudiante (rediseño en curso) | `docs/audit/Auditoria-UX-Estudiante-v1.md` y `docs/specifications/SPEC-001-Student-Shell-Plan.md` |
 | Visión de producto / principios UX de fondo | `docs/architecture/VISION.md` |
 | Borrado / papelera de cualquier entidad | `docs/architecture/POLITICA-ELIMINACION.md` |
-| Detalle histórico de endpoints, BD o navegación vieja | `docs/archive/fundamentos/Inventario-Funcional-v1.md` (referencia profunda; puede estar desactualizada — el código manda) |
+| Modelo de datos | `docs/architecture/MODELO-ENTIDAD-RELACION.md` |
+| Añadir un tipo de juego nuevo | `docs/COMO-AGREGAR-UN-JUEGO.md` |
 
 ## Dónde está la verdad técnica
 
@@ -109,7 +110,7 @@ Con `-Zip` se obtiene además un `.zip` de **~244 MB** (desde 750,8 MB sin compr
 
 **Qué vive en `%LOCALAPPDATA%\GamificApp`**: el datadir, `my.ini`, `error.log`, `mysqld.pid`, `secretos\root.txt` e `instancia.json`. **Nunca dentro del paquete.**
 
-**Qué no se distribuye jamás**: `server/.env`, `CREDENCIALES.txt`, `.run/`, `logs/`, `server/backups/`, `runtime/descargas/`, `.git/`, `docs/`, `CLAUDE.md`, `START_HERE.md`, `docker-compose.dev.yml`, `server/.env.development.example` y el propio `empaquetar.ps1`.
+**Qué no se distribuye jamás**: `server/.env`, `CREDENCIALES.txt`, `.run/`, `logs/`, `server/backups/`, `runtime/descargas/`, `.git/`, `docs/`, `CONTRIBUTING.md`, `README.md`, `START_HERE.md`, `docker-compose.dev.yml`, `server/.env.development.example` y el propio `empaquetar.ps1`.
 
 **La poda de `runtime\mysql` (925 → 399 MB) solo quita lo demostrado prescindible**, y se aplica sobre la copia: el árbol del repositorio queda íntegro, así que es reversible y reproducible.
 
@@ -186,7 +187,7 @@ El frontend usa `VITE_API_URL` (ver `.env.example` en la raíz) para saber dónd
 
 ### Nota sobre MySQL local
 
-En este proyecto normalmente **no hay MySQL local disponible** durante el desarrollo asistido por IA: los cambios de backend/BD se verifican con `npm run build` + revisión de código, y la verificación end-to-end contra datos reales (permisos, migraciones, IA) se confirma después del deploy a producción (Vercel + Render + Aiven). Si tu entorno sí tiene MySQL, puedes verificar localmente antes de esperar al deploy.
+Si tu entorno **no tiene MySQL local**, los cambios de backend/BD se verifican con `npm run build` + revisión de código, y la verificación end-to-end contra datos reales (permisos, migraciones, IA) se confirma después del deploy a producción (Vercel + Render + Aiven). Si sí tienes MySQL, puedes verificar localmente antes de esperar al deploy.
 
 Hay **tres** formas documentadas de tener MySQL local:
 
@@ -197,7 +198,3 @@ Hay **tres** formas documentadas de tener MySQL local:
 | **MySQL 8 instalado en Windows** | 3306 | Respaldo: solo si no viene `runtime/mysql`. El instalador lo detecta y pide credenciales |
 
 **Las tres pueden convivir a la vez**: el instalador portable nunca toca los puertos 3306 ni 3307, y la conexión que use manda siempre desde `server/.env`.
-
-## docs/archive/
-
-Todo lo que está en `docs/archive/` es histórico o plantillas nunca redactadas. **No leerlo para el trabajo diario**; solo consultarlo si se necesita el "por qué" de una decisión pasada.

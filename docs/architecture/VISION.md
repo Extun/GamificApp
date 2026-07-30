@@ -10,7 +10,7 @@ Definir qué es GamificApp, qué problema resuelve y los principios de producto 
 
 # Última actualización
 
-2026-07-05 (RFC-005)
+2026-07-05
 
 # Responsable
 
@@ -64,7 +64,7 @@ Un estudiante entra y en un vistazo sabe cuánto ha avanzado y qué jugar a cont
 - **Nunca bloquear a un niño por equivocarse** ni exponerlo a comparaciones humillantes (el ranking celebra a los primeros, no señala a los últimos).
 - **Nunca pedir al estudiante datos personales innecesarios** (email, teléfono) ni exponer su información a otros roles sin necesidad.
 - **Nunca enviar secretos al navegador** (API keys, credenciales) ni confiar en el cliente para decisiones de permisos o XP.
-- **Nunca implementar funcionalidades fuera de un RFC aprobado** ni romper la compatibilidad de los retos ya publicados por docentes.
+- **Nunca implementar funcionalidades grandes fuera de una spec aprobada** ni romper la compatibilidad de los retos ya publicados por docentes.
 - **Nunca complicar el login del niño**: el acceso con nombre + PIN de 6 caracteres es intocable como principio.
 
 # Pendientes

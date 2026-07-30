@@ -1,7 +1,7 @@
 # Entorno local de desarrollo/QA sin MySQL de producción
 
 > **Naturaleza:** infraestructura de desarrollo, **no** una SPEC. No toca
-> ninguna área protegida (`CLAUDE.md §10`), no cambia el comportamiento de
+> ninguna área protegida (`CONTRIBUTING.md §9`), no cambia el comportamiento de
 > producción, no añade migraciones productivas ni altera contratos de API.
 
 ## 1. Qué es y qué resuelve

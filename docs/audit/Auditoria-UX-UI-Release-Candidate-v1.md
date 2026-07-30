@@ -273,7 +273,7 @@ Cada fase deja la app compilando y verificable, y respeta el punto de parada ant
 
 Verificación obligatoria por fase (misma regla que SPEC-018 §6): `npm run build` limpio, lint sin nuevos problemas sobre la línea base de 28, navegación real en el entorno local, responsive 320/375/768/1024/escritorio cuando aplique, consola sin errores nuevos.
 
-**Nota de proceso.** Todo este informe es presentación. Nada de lo propuesto toca `server/`, migraciones, `configuracion_json`, permisos, XP ni fórmulas de calificación — es decir, **ninguna de las áreas del §10 de CLAUDE.md**, y por tanto no requiere SPEC nueva. Si al implementar algo apareciera la necesidad de tocar backend, se detiene y se consulta.
+**Nota de proceso.** Todo este informe es presentación. Nada de lo propuesto toca `server/`, migraciones, `configuracion_json`, permisos, XP ni fórmulas de calificación — es decir, **ninguna de las áreas del §9 de CONTRIBUTING.md**, y por tanto no requiere SPEC nueva. Si al implementar algo apareciera la necesidad de tocar backend, se detiene y se consulta.
 
 ---
 

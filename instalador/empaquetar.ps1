@@ -44,8 +44,9 @@
 #   NO SE DISTRIBUYE JAMÁS
 #     · server\.env, CREDENCIALES.txt, .run\, logs\, server\backups\
 #     · runtime\descargas\ (los ZIP de origen, 233 MB de redundancia)
-#     · .git\, .claude\, docs\ internos y CLAUDE.md/START_HERE.md
-#       (contienen rutas y detalles del equipo de desarrollo)
+#     · .git\, docs\ internos, CONTRIBUTING.md/START_HERE.md y la
+#       configuración local del editor (contienen rutas y detalles del
+#       equipo de desarrollo)
 #     · README.md — documentación del repositorio; sus enlaces apuntan a
 #       archivos que no viajan. Para el revisor está LEEME.txt.
 # ============================================================
@@ -89,8 +90,8 @@ $CarpetasDelPaquete = @(
 # Archivos sueltos de la raíz.
 #
 # README.md NO viaja a propósito: es documentación del REPOSITORIO, escrita
-# para quien desarrolla. Remite a `CLAUDE.md`, `START_HERE.md` y `docs/`, que
-# se excluyen deliberadamente del paquete, así que dentro de la distribución
+# para quien desarrolla. Remite a `CONTRIBUTING.md`, `START_HERE.md` y `docs/`,
+# que se excluyen deliberadamente del paquete, así que dentro de la distribución
 # sus enlaces quedarían rotos y explicaría un flujo (build manual, npm,
 # Docker) que el revisor no necesita. Su equivalente para quien recibe el
 # paquete es `LEEME.txt`, que se genera más abajo y es autosuficiente.
@@ -549,7 +550,7 @@ foreach ($archivo in $archivosPaquete) {
 }
 
 # --- 9b. Carpetas que nunca deben viajar ---
-foreach ($prohibida in @('.git', '.claude', '.run', 'logs', 'server\backups', 'runtime\descargas', 'docs')) {
+foreach ($prohibida in @('.git', '.run', 'logs', 'server\backups', 'runtime\descargas', 'docs')) {
     if (Test-Path (Join-Path $Salida $prohibida)) { $hallazgos += "CARPETA PROHIBIDA: $prohibida" }
 }
 

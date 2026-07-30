@@ -213,7 +213,7 @@ Al insertar preguntas en una actividad, el endpoint de creación/edición de ret
 ## 7. Frontend (módulo nuevo, sin tocar los flujos actuales)
 
 Nueva página **"Repositorio de Preguntas"** para Administrador y Docente (según
-permisos). Reutiliza componentes existentes (§4 de `CLAUDE.md`): `DashboardWidgets`
+permisos). Reutiliza componentes existentes (§4 de `CONTRIBUTING.md`): `DashboardWidgets`
 (`SectionCard`, `StatCard`, `EmptyState`, `QuickActionCard`), `TablaPro`/`ModalPanel`,
 `ArchivoChip`. CSS con tokens de tema, responsive obligatorio.
 
@@ -272,7 +272,7 @@ duplicación.
 - ✅ **Actividades existentes:** ni una fila cambia; siguen reproduciéndose igual.
 - ✅ **`configuracion_json`:** formato inalterado; snapshots con la forma actual por
   tipo (§5); trazabilidad como metadato aditivo ignorado por los juegos. §12
-  (CLAUDE.md) respetada.
+  (CONTRIBUTING.md) respetada.
 - ✅ **IA:** contrato de `actividadesIA.js` y `/api/ia/generar` intactos.
 - ✅ **Juegos:** reproductores y `validadoresRetos.js` sin cambios.
 - ✅ **Nomenclatura español** en tablas, campos y rutas.
@@ -348,7 +348,7 @@ las siguientes se construye ahora. Cada una requerirá su propia SPEC aprobada:
 
 Prohibido tocar en este sprint: Login, JWT, Dashboard, XP, Ranking, Misiones,
 sistema de permisos y arquitectura de juegos. Cualquier roce con estas áreas
-requiere su propia SPEC aprobada (§10 `CLAUDE.md`).
+requiere su propia SPEC aprobada (§9 `CONTRIBUTING.md`).
 
 ---
 
@@ -419,7 +419,7 @@ No hay tabla nueva para esto: la trazabilidad viaja **dentro** de
 
 - Cada ítem del arreglo del juego conserva su forma actual **y** puede llevar una
   clave extra `_banco_id` (número). Los reproductores y validadores existentes
-  ignoran claves que no conocen → sin regresión (§12 CLAUDE.md, §10 de esta SPEC).
+  ignoran claves que no conocen → sin regresión (§12 CONTRIBUTING.md, §10 de esta SPEC).
 - El ítem **es** el snapshot: si la pregunta del banco cambia luego, la actividad
   conserva la copia. `_banco_id` solo sirve para contar uso y para analítica futura.
 - Ítems escritos a mano en el editor simplemente **no** llevan `_banco_id`.

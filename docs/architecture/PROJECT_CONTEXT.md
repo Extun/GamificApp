@@ -2,7 +2,7 @@
 
 # Objetivo
 
-Dar a cualquier desarrollador o IA el contexto completo de GamificApp en una sola lectura, sin depender del historial de ningún chat. El estado actual y las prioridades viven en `CURRENT_STATE.md`; este documento solo cambia si cambia el producto o la arquitectura.
+Dar a cualquier desarrollador el contexto completo de GamificApp en una sola lectura. Las reglas de trabajo viven en `CONTRIBUTING.md` (raíz) y el estado actual en `CURRENT_STATE.md`; este documento solo cambia si cambia el producto o la arquitectura.
 
 # Última actualización
 
@@ -57,8 +57,9 @@ El login del niño es **nombre + PIN de 6 caracteres** derivado de su fecha de n
 
 ## 6. Documentos relacionados
 
+- `CONTRIBUTING.md` (raíz) — reglas de trabajo, módulos implementados y áreas protegidas.
 - `CURRENT_STATE.md` — estado real de módulos y prioridades (leer siempre).
-- `MASTER_PLAN.md` — roadmap.
+- `MASTER_PLAN.md` — roadmap y backlog.
 - `VISION.md` — visión de producto y "lo que nunca debemos hacer".
+- `MODELO-ENTIDAD-RELACION.md` — modelo de datos.
 - `docs/audit/` y `docs/specifications/` — auditorías y specs del trabajo en curso.
-- `docs/archive/` — histórico (RFC-001..005, plantillas DevOS); no necesario para el trabajo diario.

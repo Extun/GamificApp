@@ -19,7 +19,7 @@ compartir entre dispositivos) por un **sistema de misiones escalable, server-bac
 guiado por datos reales**, que mantenga al estudiante con objetivos nuevos durante semanas o
 meses, con progreso calculado automáticamente (sin botones de "reclamar").
 
-Principios (heredados de CLAUDE.md):
+Principios (heredados de CONTRIBUTING.md):
 - **Nada hardcodeado en el frontend**: todas las misiones, recompensas y umbrales viven en BD.
 - **Prohibido el dato ficticio**: cada objetivo se calcula desde `progreso_estudiante` / `retos`
   / `estudiantes`. Sin datos → estado "en progreso 0%", nunca números inventados.

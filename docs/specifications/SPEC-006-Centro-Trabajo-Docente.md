@@ -11,7 +11,7 @@ Convertir el apartado **Materias** del panel Docente en el centro de trabajo rea
 docente: crear, reutilizar, adaptar, analizar, administrar y publicar actividades con IA,
 sin romper producción ni los paneles de Administrador y Estudiante.
 
-Principios que rigen toda la spec (heredados de CLAUDE.md):
+Principios que rigen toda la spec (heredados de CONTRIBUTING.md):
 - **Nada hardcodeado**: materias, cursos, colores, iconos, institución y nivel vienen de la BD.
 - **Permisos siempre en servidor** (`puedeGestionarMateria`, docente solo sus materias/estudiantes).
 - **Auditoría** en toda acción importante (`registrarAuditoria`).

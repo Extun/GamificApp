@@ -35,7 +35,7 @@ release/
 # node_modules ya viaja dentro del paquete. Son propios de cada distribución.
 instalador/dependencias-*.sha256
 
-# Claude Code
+# Configuración local de herramientas de edición
 .claude/
 
 # Editor directories and files
