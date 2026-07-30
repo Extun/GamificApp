@@ -170,14 +170,25 @@ export function Login(){
                             </button>
 
                             <div className="login-links">
-                                <button type="button" className="login-link" onClick={() => setMostrarAyudaPin((v) => !v)}>
+                                {/* Disclosure (RC 1.0 · P2-3): el estado abierto/cerrado se
+                                    comunicaba solo por la aparición del bloque de ayuda, que un
+                                    lector de pantalla no relaciona con este botón. `aria-controls`
+                                    solo viaja cuando la región existe, para no dejar una
+                                    referencia colgada mientras está cerrada. */}
+                                <button
+                                    type="button"
+                                    className="login-link"
+                                    onClick={() => setMostrarAyudaPin((v) => !v)}
+                                    aria-expanded={mostrarAyudaPin}
+                                    aria-controls={mostrarAyudaPin ? 'login-ayuda-pin' : undefined}
+                                >
                                     ¿Olvidaste tu PIN?
                                 </button>
                                 <Link className="login-link" to="/registro">¿Primera vez? Regístrate con tu código</Link>
                             </div>
 
                             {mostrarAyudaPin && (
-                                <div className="login-ayuda-pin">
+                                <div className="login-ayuda-pin" id="login-ayuda-pin">
                                     <p>
                                         Tu PIN es tu <strong>fecha de nacimiento</strong>: día, mes y año,
                                         con dos números cada uno. Si naciste el 15 de marzo de 2017,

@@ -12,7 +12,7 @@
 | **Fase 1 · Limpieza** | ✅ **Ejecutada parcialmente por decisión de Fabrizio: solo los 4 assets.** `src/assets/react.svg`, `vite.svg`, `hero.png` y `public/icons.svg` borrados (`src/assets/` queda vacía). **`asistenteIA.jsx` y `respuestaIA.jsx` se conservan** — el endpoint `/api/ia/asistente` sigue intacto. Ninguna de las 10 categorías no versionadas se tocó. |
 | **Fase 2 · Backlog** | ✅ Vigente. Es la lista de trabajo de la fase. |
 | **Fase 3 · P1** | ✅ **13/13 completados y verificados funcionalmente**, incluidos los dos que estaban bloqueados: **P1-B1 (modal de PIN) y P1-B2 (fuentes autoalojadas) fueron autorizados por Fabrizio** y están hechos. |
-| **P2** | ⛔ **No implementado**, pendiente de autorización. |
+| **P2** | ✅ **Cerrado: 4 de 8 implementados y verificados** (P2-8, P2-2, P2-3 y P2-5 en variante segura). **P2-1, P2-4 y P2-7 reclasificados a Post v1.0** por decisión de Fabrizio tras reevaluar el backlog a dos días de la entrega. **P2-6 aprobado solo si sobra tiempo — no implementado.** Ver la tabla P2 de abajo y `CURRENT_STATE.md`. |
 
 **Correcciones a este propio documento, encontradas al ejecutar:**
 
@@ -142,18 +142,20 @@ Decisiones previas que **respeto y no reabro**: ítem **33** (verde `--color-suc
 | **P1-B1** | **Modal de cambio de PIN** que sustituya los dos `window.prompt` encadenados del estudiante. | Choca con dos cosas tuyas: (a) tu restricción *"no modificar autenticación salvo bug crítico"*, y (b) el `MASTER_PLAN` ítem **37**, que dice literalmente *"toca autenticación (§10, requiere spec)"* y lo remite a SPEC-001. Y me pediste no proponer SPEC nuevas. **Mi lectura técnica:** el cambio es de piel, no de comportamiento — mismo `authService.cambiarPin(actual, nuevo)`, mismo endpoint, mismos parámetros; es el principio que SPEC-018 §3 ya autorizó para áreas congeladas. **Pero es tu llamada, no la mía.** Es el hallazgo nº1 de la auditoría y el único diálogo nativo que queda en el camino del niño. |
 | **P1-B2** | **Autoalojar Inter y Poppins.** Hoy vienen del CDN de Google: sin internet la tipografía cae a `system-ui` y la identidad visual cambia — en una app que se instala en Windows y cuya validación es el hito siguiente. | Requiere **descargar 7 archivos `.woff2`** de `fonts.gstatic.com` (~150 kB al instalador). No descargo archivos sin tu permiso. Alternativa sin descargas si prefieres: reforzar la cadena de `font-family` para que el degradado offline sea predecible (mitiga, no resuelve). |
 
-### P2 — Importante (tras tu aprobación)
+### P2 — Reevaluado y cerrado (2026-07-30)
 
-| # | Tarea |
-|---|---|
-| P2-1 | Pausar el temporizador de los toasts en hover/foco (4,5–8 s hoy son inamovibles; guía de snackbar de MD3 + SC 2.2.1). |
-| P2-2 | `scroll-padding-block-end` en los dos contenedores con scroll que tienen barra sticky (`.sidebar-nav` con `.sidebar-footer`, editor con `.editor-publicar-barra`) → WCAG 2.2 SC 2.4.11. |
-| P2-3 | `aria-expanded` en el disclosure "¿Olvidaste tu PIN?". |
-| P2-4 | `<title>` por vista (`"Biblioteca · GamificApp"`) en lugar del estático. |
-| P2-5 | La racha 🔥 del Home solo se explica en un `title=""` nativo: no funciona con teclado ni táctil, y un niño de 7 años no hace hover. |
-| P2-6 | Bienvenida de primer uso para el docente: `QuickActionCard` visible solo si `stats.actividades === 0`. |
-| P2-7 | Densidad de filtros de la Biblioteca: 6 `<select>` + búsqueda → 2 visibles + "Más filtros". |
-| P2-8 | Estado de carga/error en el resto de vistas (materia del estudiante, Home del docente). |
+Backlog reevaluado a dos días de la entrega y aprobado por Fabrizio: **se implementan 4, se reclasifican 3 y 1 queda condicionado al tiempo restante.**
+
+| # | Tarea | Estado |
+|---|---|---|
+| P2-8 | Estado de carga/error en el resto de vistas. | ✅ **Hecho.** Alcance real menor que el enunciado: la «materia del estudiante» **ya la cubrió P1**, así que solo quedaba el Home del docente. Tres estados explícitos, esqueletos con la geometría real (134 px a 1280 / 170 px a 720-) y «Intentar de nuevo» que recupera sin recargar. |
+| P2-2 | `scroll-padding-block-end` → WCAG 2.2 SC 2.4.11. | ✅ **Hecho, y con una corrección al enunciado.** **`.sidebar-nav`/`.sidebar-footer` era premisa falsa** (hermanos, **0 px de solape** medidos) → no se tocó. El caso real de `.contenido` con la barra del editor sí se reprodujo: **4 → 0 controles tapados a 1280 y 3 → 0 a 375**. Valor 188 px acotado con `:has(.editor-publicar-barra)`. |
+| P2-3 | `aria-expanded` en el disclosure "¿Olvidaste tu PIN?". | ✅ **Hecho.** Un atributo, cero lógica de autenticación (mismo principio que P1-8). `aria-controls` solo se emite con la región montada, para no dejar una referencia colgada. |
+| P2-5 | La racha 🔥 solo se explica en un `title=""`. | ✅ **Hecho en la variante segura, la única autorizada:** `role="img"` + `aria-label` con singular/plural. **Cero texto visible nuevo**; el chip mide **47,78 px a 1280 y a 320**, idéntico, con 0 desbordes. |
+| P2-6 | Bienvenida de primer uso para el docente. | 🟡 **Aprobado solo si sobra tiempo — NO implementado.** ~30-45 min, riesgo bajo (aditivo y condicional a `stats.actividades === 0`). |
+| P2-1 | Pausar el temporizador de los toasts en hover/foco. | ⛔ **Post v1.0.** Lógica de temporizadores sobre infraestructura compartida por los 3 roles **ya modificada en P1**, para un beneficio que ningún usuario real nota: el niño no hace hover y ningún toast lleva información irrecuperable. |
+| P2-4 | `<title>` por vista. | ⛔ **Post v1.0.** Beneficio nulo (una sola pestaña) y WCAG 2.4.2 ya se cumple con el título estático; obligaba a tocar los **tres** paneles porque la navegación es `useState`, pagando la deuda de SPEC-001 sin resolverla. |
+| P2-7 | Densidad de filtros de la Biblioteca. | ⛔ **Post v1.0.** Es un rediseño, no un pulido: colapsable nuevo con su responsive, 2-3 h y riesgo de regresión en una vista que hoy funciona. Contra §6.1 y §6.3. |
 
 ### P3 — Opcional (solo si sobra tiempo)
 
@@ -161,7 +163,7 @@ Escalas de tipografía y espaciado (30+ tamaños, 14 gaps) · 19 breakpoints →
 
 ### Post v1.0 — no implementar
 
-Code splitting del bundle de 1,6 MB · Zod o cualquier validación nueva · reestructurar JWT · pruebas automatizadas · archivos base64 en MySQL · los 4 `window.confirm` de los editores (MP 28: exige refactor asíncrono en área estabilizada por SPEC-013) · fallback entre proveedores de IA (MP 24) · sistema formal de migraciones (MP 27) · extensiones del Banco de Preguntas (MP 18, 19).
+Pausa de toasts en hover/foco (P2-1) · `<title>` por vista (P2-4) · densidad de filtros de la Biblioteca (P2-7) · code splitting del bundle de 1,6 MB · Zod o cualquier validación nueva · reestructurar JWT · pruebas automatizadas · archivos base64 en MySQL · los 4 `window.confirm` de los editores (MP 28: exige refactor asíncrono en área estabilizada por SPEC-013) · fallback entre proveedores de IA (MP 24) · sistema formal de migraciones (MP 27) · extensiones del Banco de Preguntas (MP 18, 19).
 
 ---
 

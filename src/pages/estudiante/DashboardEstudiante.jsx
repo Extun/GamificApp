@@ -365,8 +365,21 @@ export function DashboardEstudiante() {
                                             <div className="progress-fill" style={{ width: `${porcentajeNivel}%` }} />
                                         </div>
                                         <span className="home-nivel-xp">⭐ {xpMostrado} XP</span>
+                                        {/* Racha (RC 1.0 · P2-5, variante segura): el significado del
+                                            🔥 vivía SOLO en el `title`, que no existe con teclado ni
+                                            en táctil —y el niño no hace hover—, y para un lector de
+                                            pantalla el chip sonaba "fuego 3". `role="img"` +
+                                            `aria-label` le dan un nombre completo, el mismo patrón
+                                            que ya usa el ✓ de misión (SPEC-018 F6.3).
+                                            NO se añade texto visible a propósito: este chip es el que
+                                            se salía del contenedor a 320px y su ancho queda intacto. */}
                                         {rachaActual > 0 && (
-                                            <span className="home-nivel-racha" title="Días seguidos jugando">
+                                            <span
+                                                className="home-nivel-racha"
+                                                role="img"
+                                                aria-label={`Racha: ${rachaActual} ${rachaActual === 1 ? 'día seguido' : 'días seguidos'} jugando`}
+                                                title="Días seguidos jugando"
+                                            >
                                                 🔥 {rachaActual}
                                             </span>
                                         )}

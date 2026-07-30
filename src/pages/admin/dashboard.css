@@ -323,6 +323,24 @@
     overflow-y: auto;
 }
 
+/* WCAG 2.2 SC 2.4.11 «Focus Not Obscured» (RC 1.0 · P2-2).
+   `.contenido` es el contenedor con scroll de los 3 paneles, y el editor de
+   actividades ancla su barra de publicar con `position: sticky; bottom: 0`
+   justo sobre su borde inferior: al llegar con Tab a un control del final del
+   formulario, el navegador lo dejaba DEBAJO de la barra.
+   Zona tapada MEDIDA en el navegador (barra pegada + el padding inferior de
+   `.contenido`): 79 + 36 = 115px a 1280, y 159 + 24 = 183px a 375, donde la
+   barra envuelve en dos filas. Un solo valor cubre las dos.
+   Se acota con `:has()` a las vistas que realmente llevan la barra, para no
+   reservar 188px de colchón en pantallas que no lo necesitan. Si el navegador
+   no soportara `:has()` la regla se ignora y el comportamiento es el de hoy:
+   degrada sin romper nada.
+   Solo afecta al desplazamiento automático (el que provoca el foco); el
+   scroll manual y el layout quedan idénticos. */
+.contenido:has(.editor-publicar-barra) {
+    scroll-padding-block-end: 188px;
+}
+
 .contenido h1 {
     margin: 0 0 4px;
     font-size: 1.9rem;

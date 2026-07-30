@@ -195,21 +195,49 @@ export function Dashboard() {
         if (materiaSeleccionada) refrescarMaterial(materiaSeleccionada);
     }, [materiaSeleccionada]);
 
+    // Estado de las cargas del Home (RC 1.0 · P2-8): 'cargando' | 'listo' | 'error'.
+    // Mismo defecto de clase que arreglamos en el panel del estudiante (P1-1):
+    // una lista vacía significaba a la vez "todavía no sé" y "no hay nada", y el
+    // Home siempre elegía la segunda. Con Render en frío el docente veía
+    // "Hoy tienes 0 materias y 0 estudiantes" y "Aún no tienes materias
+    // asignadas" mientras las peticiones viajaban.
+    const [estadoMaterias, setEstadoMaterias] = useState('cargando');
+    const [estadoEstudiantes, setEstadoEstudiantes] = useState('cargando');
+    const [estadoRetosInicio, setEstadoRetosInicio] = useState('cargando');
+
+    // Reintento sin recargar la página. El paso a 'cargando' vive aquí, en el
+    // manejador, y NO dentro de los efectos, para no introducir set-state en el
+    // cuerpo de un useEffect (mismo criterio que en el panel del estudiante).
+    const [intentoInicio, setIntentoInicio] = useState(0);
+    const reintentarInicio = () => {
+        setErrorMaterial('');
+        setEstadoMaterias('cargando');
+        setEstadoEstudiantes('cargando');
+        setEstadoRetosInicio('cargando');
+        setIntentoInicio((n) => n + 1);
+    };
+
     const [materias, setMaterias] = useState([]);
     useEffect(() => {
         listarMaterias()
             .catch(() => [])
             .then(() => docenteService.misMaterias())
-            .then((lista) => setMaterias((prev) => {
-                const nombres = lista.map((m) => m.nombre);
-                // Misma referencia si nada cambió, para no re-disparar los
-                // efectos que dependen de `materias` en cada navegación.
-                return JSON.stringify(prev) === JSON.stringify(nombres) ? prev : nombres;
-            }))
-            .catch((err) => setErrorMaterial(`No se pudieron cargar tus materias: ${err.message}`));
+            .then((lista) => {
+                setMaterias((prev) => {
+                    const nombres = lista.map((m) => m.nombre);
+                    // Misma referencia si nada cambió, para no re-disparar los
+                    // efectos que dependen de `materias` en cada navegación.
+                    return JSON.stringify(prev) === JSON.stringify(nombres) ? prev : nombres;
+                });
+                setEstadoMaterias('listo');
+            })
+            .catch((err) => {
+                setEstadoMaterias('error');
+                setErrorMaterial(`No se pudieron cargar tus materias: ${err.message}`);
+            });
         // Depende de `pagina`: al cambiar de sección se re-consulta la BD,
         // así una materia recién asignada por el admin aparece sin recargar.
-    }, [pagina]);
+    }, [pagina, intentoInicio]);
 
     const [misEstudiantes, setMisEstudiantes] = useState([]);
     // Invitaciones legacy: solo para mostrar los códigos aún sin usar.
@@ -227,14 +255,16 @@ export function Dashboard() {
             setMisEstudiantes(est);
             setInvitaciones(inv);
             setCursos(cur);
+            setEstadoEstudiantes('listo');
         } catch (err) {
+            setEstadoEstudiantes('error');
             setErrorMaterial(err.message);
         }
     };
 
     useEffect(() => {
         cargarEstudiantes();
-    }, []);
+    }, [intentoInicio]);
 
     useEffect(() => {
         if (pagina === 'estudiantes') cargarEstudiantes();
@@ -244,15 +274,23 @@ export function Dashboard() {
     useEffect(() => {
         if (!materias.length) return;
         let vigente = true;
+        // `propagarError` (opt-in añadido en P1) es lo que hace ALCANZABLE el
+        // estado de error: por defecto el servicio se traga el fallo y devuelve
+        // [], y entonces la tarjeta afirmaba "Sin actividades · crea la primera"
+        // aunque la red estuviese caída.
         Promise.all(materias.map(async (nombre) => {
             const materiaId = materiaIdPorNombre(nombre);
-            const retos = materiaId ? await obtenerRetosPublicados({ materiaId }) : [];
+            const retos = materiaId ? await obtenerRetosPublicados({ materiaId, propagarError: true }) : [];
             return [nombre, retos];
         })).then((pares) => {
-            if (vigente) setRetosPorMateria(Object.fromEntries(pares));
+            if (!vigente) return;
+            setRetosPorMateria(Object.fromEntries(pares));
+            setEstadoRetosInicio('listo');
+        }).catch(() => {
+            if (vigente) setEstadoRetosInicio('error');
         });
         return () => { vigente = false; };
-    }, [materias]);
+    }, [materias, intentoInicio]);
 
 
     const retosRecientes = useMemo(() => (
@@ -464,14 +502,39 @@ export function Dashboard() {
                             </span>
                             <div className="doc-saludo-meta">
                                 <h1>{saludoDia}, {nombreDocente}.</h1>
-                                <p>
-                                    Hoy tienes {materias.length} {materias.length === 1 ? 'materia' : 'materias'} y{' '}
-                                    {misEstudiantes.length} {misEstudiantes.length === 1 ? 'estudiante' : 'estudiantes'}.
-                                </p>
+                                {/* Sin dato NO se afirma nada: antes esta línea decía
+                                    "Hoy tienes 0 materias y 0 estudiantes" mientras las
+                                    peticiones viajaban (regla §6.14). */}
+                                {estadoMaterias === 'cargando' || estadoEstudiantes === 'cargando' ? (
+                                    <p>Preparando tu aula…</p>
+                                ) : estadoMaterias === 'error' || estadoEstudiantes === 'error' ? (
+                                    <p>No pudimos consultar tu aula.</p>
+                                ) : (
+                                    <p>
+                                        Hoy tienes {materias.length} {materias.length === 1 ? 'materia' : 'materias'} y{' '}
+                                        {misEstudiantes.length} {misEstudiantes.length === 1 ? 'estudiante' : 'estudiantes'}.
+                                    </p>
+                                )}
                             </div>
                         </header>
 
-                        {materias.length > 0 ? (
+                        {estadoMaterias === 'cargando' ? (
+                            /* Mientras no se sabe, se muestra la FORMA de las tarjetas
+                               reales, así el Home no da un salto cuando llegan. */
+                            <section className="home-doc-materias">
+                                <h2>Tus materias</h2>
+                                <div className="home-doc-materias-grid" role="status" aria-label="Buscando tus materias">
+                                    {[0, 1, 2].map((i) => <span key={i} className="home-doc-materia-esqueleto" />)}
+                                </div>
+                            </section>
+                        ) : estadoMaterias === 'error' ? (
+                            <EmptyState
+                                Icon={MenuBookIcon}
+                                titulo="No pudimos cargar tus materias"
+                                mensaje="Revisa tu conexión e inténtalo otra vez."
+                                accion={{ label: 'Intentar de nuevo', onClick: reintentarInicio }}
+                            />
+                        ) : materias.length > 0 ? (
                             <section className="home-doc-materias">
                                 <h2>Tus materias</h2>
                                 <div className="home-doc-materias-grid">
@@ -488,7 +551,14 @@ export function Dashboard() {
                                             >
                                                 <span className="home-doc-materia-emoji" aria-hidden="true">{ui.icono}</span>
                                                 <span className="home-doc-materia-nombre">{mat}</span>
-                                                {retos.length ? (
+                                                {/* "Sin actividades" solo se dice cuando consta que
+                                                    no las hay: con la red caída el servicio devolvía
+                                                    [] y la tarjeta afirmaba lo mismo que con 0 reales. */}
+                                                {estadoRetosInicio === 'cargando' ? (
+                                                    <span className="home-doc-materia-detalle">Contando actividades…</span>
+                                                ) : estadoRetosInicio === 'error' ? (
+                                                    <span className="home-doc-materia-detalle">Actividades no disponibles</span>
+                                                ) : retos.length ? (
                                                     <span className="home-doc-materia-detalle">
                                                         {cuenta('quiz')} quizzes · {cuenta('clasificador')} juegos · {cuenta('mision')} misiones
                                                     </span>

@@ -49,6 +49,41 @@
     color: var(--color-warning-dark);
 }
 
+/* ===== Estado de carga del Home (RC 1.0 · P2-8) =====
+   Mismo tratamiento visual que los esqueletos del panel del estudiante (P1),
+   pero con clase y animación propias: los dos paneles no comparten hoja de
+   estilos y hacer que este archivo dependiera de un @keyframes declarado en
+   `dashboardEstudiante.css` sería un acoplamiento invisible.
+   `min-height` reproduce el alto real de `.home-doc-materia` (medido en el
+   navegador: 134,41px) para que la rejilla no dé un salto cuando llegan los
+   datos.
+   El brillo es decorativo: la regla global de `prefers-reduced-motion` lo
+   completa al instante y queda un bloque neutro. */
+.home-doc-materia-esqueleto {
+    display: block;
+    min-height: 134px;
+    border-radius: var(--radius-md);
+    background: linear-gradient(
+        100deg,
+        var(--color-border) 30%,
+        var(--color-surface-alt) 50%,
+        var(--color-border) 70%
+    );
+    background-size: 300% 100%;
+    animation: doc-esqueleto-brillo 1.4s ease-in-out infinite;
+}
+
+@keyframes doc-esqueleto-brillo {
+    from { background-position: 100% 0; }
+    to { background-position: 0 0; }
+}
+
+/* En pantallas estrechas la tarjeta real crece a 169,8px porque el detalle
+   («1 quizzes · 0 juegos · 0 misiones») pasa a dos líneas. Medido a 375px. */
+@media (max-width: 720px) {
+    .home-doc-materia-esqueleto { min-height: 170px; }
+}
+
 /* Centro de actividad: timeline ligera */
 .home-doc-centro h2,
 .home-doc-duo h3 {
