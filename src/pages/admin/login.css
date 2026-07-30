@@ -158,17 +158,9 @@
     font-weight: 500;
 }
 
-.login-aviso {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 11px 14px;
-    border-radius: var(--radius-sm);
-    background: var(--color-accent-soft);
-    color: var(--color-accent-dark);
-    font-size: 0.9rem;
-    font-weight: 500;
-}
+/* `.login-aviso` se retiró junto al estado `aviso` de login.jsx: nunca se
+   poblaba (setAviso solo recibía ""), así que el bloque era inalcanzable. Los
+   avisos de la entrada de emergencia van por toast desde SPEC-018 Fase 4. */
 
 /* Selección de rol: dos tarjetas grandes, no un control de formulario */
 .login-role {

@@ -4,20 +4,55 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link
-  rel="stylesheet"
-  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap"
-/>
-<link
-  rel="stylesheet"
-  href="https://fonts.googleapis.com/icon?family=Material+Icons"
-/>
+    <!-- Inter y Poppins viajan en public/fonts/ (@font-face en src/index.css):
+         la app se instala en Windows y no puede depender del CDN de Google.
+         El precarga de la variable de Inter evita el parpadeo de la fuente. -->
+    <link rel="preload" href="/fonts/inter-latin-var.woff2" as="font" type="font/woff2" crossorigin />
     <title>GamificApp</title>
+    <!-- Pantalla de arranque. Entre que llega el HTML y React monta no había
+         NADA: blanco. Vive en línea (sin CSS ni JS externo) para pintarse en el
+         primer frame; React la reemplaza al montar en #root. -->
+    <style>
+      #arranque {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        background: #f1f5f9;
+        font-family: 'Poppins', 'Inter', system-ui, -apple-system, sans-serif;
+        color: #0f766e;
+      }
+      #arranque span {
+        font-size: 1.35rem;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      #arranque i {
+        width: 30px;
+        height: 30px;
+        border: 3px solid #ccfbf1;
+        border-top-color: #0f766e;
+        border-radius: 50%;
+        animation: arranque-gira 0.9s linear infinite;
+      }
+      @keyframes arranque-gira { to { transform: rotate(360deg); } }
+      /* El giro es la única señal de "estoy cargando": no se congela, se
+         ralentiza (mismo criterio que los spinners en src/index.css). */
+      @media (prefers-reduced-motion: reduce) {
+        #arranque i { animation-duration: 1.8s; }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="arranque" role="status" aria-label="Cargando GamificApp">
+        <i aria-hidden="true"></i>
+        <span>GamificApp</span>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -469,3 +469,118 @@
     margin-left: auto;
     margin-right: auto;
 }
+
+/* ===== Estados de carga (RC 1.0) =====
+   Antes no existían: una lista vacía significaba a la vez "todavía no sé" y
+   "no hay nada", y el panel siempre elegía la segunda. Los esqueletos
+   reproducen la GEOMETRÍA de la tarjeta real, así que el Home no salta cuando
+   llegan los datos y nunca afirma algo que aún no sabe.
+   El brillo es decorativo: la regla global de `prefers-reduced-motion` lo
+   completa al instante y el bloque se queda visible como placeholder neutro. */
+.home-hero-esqueleto,
+.home-mundo-esqueleto {
+    display: block;
+    background: linear-gradient(
+        100deg,
+        var(--color-border) 30%,
+        var(--color-surface-alt) 50%,
+        var(--color-border) 70%
+    );
+    background-size: 300% 100%;
+    animation: esqueleto-brillo 1.4s ease-in-out infinite;
+}
+
+.home-hero-esqueleto {
+    width: 100%;
+    min-height: 90px;
+    border-radius: var(--radius-lg);
+}
+
+.home-mundo-esqueleto {
+    min-height: 96px;
+    border-radius: var(--radius-md);
+}
+
+@keyframes esqueleto-brillo {
+    from { background-position: 100% 0; }
+    to { background-position: 0 0; }
+}
+
+/* Texto de espera de las pestañas de materia. Deliberadamente breve y en el
+   lenguaje del estudiante ("Buscando…", no "Cargando datos"). */
+.materia-estado {
+    margin: 0;
+    padding: 18px 0;
+    color: var(--color-text-muted);
+    font-size: 0.95rem;
+}
+
+@media (max-width: 480px) {
+    .home-hero-esqueleto { min-height: 78px; }
+}
+
+/* ===== Modal "Cambiar mi PIN" (RC 1.0) =====
+   Reutiliza .quiz-field (campos + anillo de foco) y .preview-action (botones
+   del pie) de dashboard.css: aquí solo van las piezas propias del modal. */
+.pin-modal .preview-panel,
+.pin-modal { max-width: 420px; }
+
+.pin-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    border-radius: var(--radius-sm);
+    background: var(--color-primary-soft);
+    font-size: 1.3rem;
+}
+
+.pin-campo { margin-bottom: 14px; }
+
+.pin-campo input { letter-spacing: 0.14em; }
+
+.pin-aviso {
+    margin-top: 5px;
+    color: var(--color-warning-dark);
+    font-size: 0.82rem;
+    font-weight: 500;
+}
+
+.pin-error {
+    margin: 0 0 14px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--color-danger-soft);
+    color: var(--color-danger-dark);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+/* Objetivo táctil holgado: lo pulsa un niño en tablet compartida. */
+.pin-ojo {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-surface-alt);
+    color: var(--color-text-muted);
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.pin-ojo:hover { color: var(--color-primary); border-color: var(--color-primary); }
+.pin-ojo svg { font-size: 1.15rem; }
+
+.pin-contador {
+    margin-top: 5px;
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+}

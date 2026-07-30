@@ -1,3 +1,44 @@
+/* ===== Tipografía autoalojada (RC 1.0) =====
+   Antes Inter y Poppins venían del CDN de Google. GamificApp se INSTALA en
+   Windows en una escuela: sin internet las dos familias desaparecían y todo
+   caía a system-ui, cambiando métricas, saltos de línea e identidad visual
+   justo en la demo. Y era un fallo intermitente, imposible de anticipar.
+   Ahora viajan dentro del paquete: 4 archivos, 76 kB, subset latin.
+   Inter es VARIABLE (un solo fichero cubre 400-700); Poppins es estática y
+   necesita un archivo por peso. `swap` = el texto se ve al instante con la
+   fuente del sistema y cambia al cargar, nunca queda invisible. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin-var.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/poppins-latin-500.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/poppins-latin-600.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/poppins-latin-700.woff2') format('woff2');
+}
+
 :root {
   --color-primary: #0f766e;
   --color-primary-dark: #115e59;
@@ -13,7 +54,12 @@
   --color-surface-alt: #f8fafc;
 
   --color-text: #0f172a;
-  --color-text-muted: #64748b;
+  /* Antes #64748b. Sobre --color-bg (#f1f5f9), que es el fondo real de
+     `.contenido`, medía 4.39:1 y NO alcanzaba el 4.5:1 de WCAG 1.4.3; afectaba
+     al subtítulo que va bajo cada h1 de los tres paneles. Ahora 5.06:1 sobre
+     el fondo del panel y 5.48:1 sobre blanco, conservando la jerarquía
+     respecto a --color-text (~16:1). Cierra MASTER_PLAN §3 ítem 36. */
+  --color-text-muted: #5c6a80;
   --color-border: #e2e8f0;
 
   --radius-sm: 10px;

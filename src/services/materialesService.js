@@ -19,7 +19,10 @@ const aArchivoUI = (fila) => ({
 
 // GET /api/materias/:id/material — material unificado (web y móvil ven lo
 // mismo). Devuelve [] si la red falla para que las vistas no se rompan.
-export const obtenerMaterial = async (materiaId) => {
+// `propagarError` (opt-in): mismo criterio que en retosService — por defecto
+// devuelve [] como siempre; quien deba distinguir "no hay material" de "no pude
+// preguntar" pide la excepción.
+export const obtenerMaterial = async (materiaId, { propagarError = false } = {}) => {
     try {
         const res = await authFetch(`${API_URL}/api/materias/${materiaId}/material`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -27,6 +30,7 @@ export const obtenerMaterial = async (materiaId) => {
         return filas.map(aArchivoUI);
     } catch (err) {
         console.warn('No se pudo obtener el material del servidor:', err.message);
+        if (propagarError) throw err;
         return [];
     }
 };

@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import SchoolRoundedIcon from '@mui/icons-material/SchoolRounded';
-import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded';
 import './login.css';
 import authService from '../../services/authService';
 import { toast } from '../../components/dashboard/toastBus';
@@ -21,8 +20,8 @@ export function Login(){
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
+    const [showPin, setShowPin] = useState(false);
     const [error, setError] = useState("");
-    const [aviso, setAviso] = useState("");
     const [mostrarAyudaPin, setMostrarAyudaPin] = useState(false);
     const [cargando, setCargando] = useState(false);
     const outlinedPasswordId = useId();
@@ -41,7 +40,6 @@ export function Login(){
 
     const ejecutar = async (accion) => {
         setError("");
-        setAviso("");
         setCargando(true);
         try {
             await accion();
@@ -76,7 +74,6 @@ export function Login(){
     const cambiarModo = (nuevo) => {
         setModo(nuevo);
         setError("");
-        setAviso("");
         setMostrarAyudaPin(false);
     };
 
@@ -104,14 +101,17 @@ export function Login(){
                     </header>
 
                     {error && <div className="login-error" role="alert">{error}</div>}
-                    {aviso && <div className="login-aviso" role="status"><EmojiEventsRoundedIcon /> {aviso}</div>}
 
                     <div className="login-role">
                         <span className="login-role-label">Selecciona tu perfil para continuar</span>
+                        {/* aria-pressed: el perfil elegido se distinguía SOLO por color, así
+                            que era invisible para lectores de pantalla. Es el mismo arreglo
+                            que SPEC-018 aplicó a las pestañas `.opcion` del estudiante. */}
                         <div className="login-role-options">
                             <button
                                 type="button"
                                 className={`login-role-card ${modo === "estudiante" || modo === "emergencia" ? "active" : ""}`}
+                                aria-pressed={modo === "estudiante" || modo === "emergencia"}
                                 onClick={() => cambiarModo("estudiante")}
                             >
                                 <span className="login-role-emoji" aria-hidden="true">🎒</span>
@@ -121,6 +121,7 @@ export function Login(){
                             <button
                                 type="button"
                                 className={`login-role-card ${modo === "docente" ? "active" : ""}`}
+                                aria-pressed={modo === "docente"}
                                 onClick={() => cambiarModo("docente")}
                             >
                                 <span className="login-role-emoji" aria-hidden="true">📗</span>
@@ -143,12 +144,26 @@ export function Login(){
                             </label>
                             <label className="login-field">
                                 <span>Tu PIN (6 letras o números)</span>
-                                <input
-                                    type="password"
-                                    value={pin}
-                                    onChange={(e)=>setPin(e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6))}
-                                    placeholder="••••••"
-                                />
+                                {/* Mostrar/ocultar como en la contraseña del docente: un niño
+                                    de 6-9 años necesita poder comprobar lo que teclea, y su
+                                    error más probable es justo escribir mal el PIN. Reutiliza
+                                    .login-password/.login-eye; no cambia qué se envía. */}
+                                <div className="login-password">
+                                    <input
+                                        type={showPin ? 'text' : 'password'}
+                                        value={pin}
+                                        onChange={(e)=>setPin(e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6))}
+                                        placeholder="••••••"
+                                    />
+                                    <button
+                                        type="button"
+                                        className="login-eye"
+                                        aria-label={showPin ? 'Ocultar mi PIN' : 'Ver mi PIN'}
+                                        onClick={() => setShowPin((v) => !v)}
+                                    >
+                                        {showPin ? <VisibilityOff /> : <Visibility />}
+                                    </button>
+                                </div>
                             </label>
                             <button type="submit" className="login-submit" disabled={cargando}>
                                 {cargando ? 'Un momento…' : 'Ingresar'}

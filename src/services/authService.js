@@ -128,11 +128,17 @@ export const loginEmergencia = async (nombre, codigoEmergencia) => {
     return data;
 };
 
+// `conservarSesionEn401`: en ESTE endpoint un 401 no significa "tu sesión
+// murió" sino "el PIN que escribiste no es el correcto" — el servidor ya
+// validó el token en `autenticar` para llegar al handler. Sin esta excepción,
+// equivocarse al teclear el PIN actual cerraba la sesión del estudiante en
+// silencio y la operación siguiente fallaba con "Token requerido".
 export const cambiarPin = async (pinActual, pinNuevo) => {
     const res = await authFetch(`${API_URL}/api/auth/cambiar-pin`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin_actual: pinActual, pin_nuevo: pinNuevo })
+        body: JSON.stringify({ pin_actual: pinActual, pin_nuevo: pinNuevo }),
+        conservarSesionEn401: true
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
@@ -178,16 +184,22 @@ export const isAuthenticated = () => Boolean(getToken());
 
 // fetch con el token incluido. Si el servidor responde 401 (token expirado
 // o inválido), cierra la sesión local: la próxima navegación cae al login.
+//
+// `conservarSesionEn401` (opt-in, por llamada) desactiva ESE cierre en los
+// pocos endpoints donde un 401 describe la credencial enviada en el cuerpo y
+// no el estado de la sesión — hoy solo `cambiar-pin`. La red de seguridad
+// sigue intacta en todas las demás peticiones, que es donde importa.
 export const authFetch = async (url, options = {}) => {
+    const { conservarSesionEn401 = false, ...resto } = options;
     const token = getToken();
     const res = await fetch(url, {
-        ...options,
+        ...resto,
         headers: {
-            ...(options.headers || {}),
+            ...(resto.headers || {}),
             ...(token ? { Authorization: `Bearer ${token}` } : {})
         }
     });
-    if (res.status === 401) logout();
+    if (res.status === 401 && !conservarSesionEn401) logout();
     return res;
 };
 

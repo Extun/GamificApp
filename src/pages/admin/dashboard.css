@@ -506,8 +506,12 @@
     background: var(--color-text-muted);
 }
 
-.rank-pos-1 { background: #f59e0b; }
-.rank-pos-2 { background: #94a3b8; }
+/* Oro y plata son fondos CLAROS: el blanco heredado de `.rank-pos` daba 2.14:1
+   y 2.56:1 (WCAG 1.4.3 exige 4.5:1 para este texto de 12.8px). Con texto
+   oscuro suben a 8.36:1 y 6.97:1, y además es la convención de las medallas
+   reales. El bronce se queda en blanco porque ya cumplía (5.02:1). */
+.rank-pos-1 { background: #f59e0b; color: var(--color-text); }
+.rank-pos-2 { background: #94a3b8; color: var(--color-text); }
 .rank-pos-3 { background: #b45309; }
 
 .rank-name { flex: 1; }
@@ -2272,6 +2276,13 @@
     width: 9rem;
     max-width: 40vw;
     background: transparent;
+}
+/* Estos inputs viven sin borde dentro de la píldora de la opción, así que
+   `outline: none` los dejaba SIN ninguna señal de foco (WCAG 2.4.7). El anillo
+   va sobre la píldora contenedora, que es el rectángulo que el usuario ve. */
+.gen-ia-opcion:focus-within {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
 .gen-ia-opcion.is-correcta { border-color: var(--color-success); background: #f0fdf4; }
 .gen-ia-acciones { display: flex; flex-wrap: wrap; gap: 0.6rem; }

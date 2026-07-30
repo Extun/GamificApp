@@ -24,6 +24,8 @@ function ToastItem({ datos, onCerrar }) {
         <div
             className={`toast toast-${datos.tipo}`}
             // Los errores interrumpen (assertive); el resto espera turno (polite).
+            // El anuncio real lo hace la región `aria-live` del host, que existe
+            // desde el montaje; estos roles son el refuerzo por tipo.
             role={datos.tipo === 'error' ? 'alert' : 'status'}
         >
             <span className="toast-icono" aria-hidden="true">{ICONO_POR_TIPO[datos.tipo]}</span>
@@ -43,9 +45,13 @@ export function ToastHost() {
         nuevo
     ])), []);
 
-    if (toasts.length === 0) return null;
+    // El host se monta SIEMPRE, incluso vacío: una región `aria-live` tiene que
+    // existir en el DOM ANTES de que llegue su contenido, o muchos lectores de
+    // pantalla no anuncian el primer mensaje. Con `return null` la región nacía
+    // junto al aviso y ese primer anuncio se perdía. Vacío es inerte: no ocupa
+    // alto y `.toast-host` ya lleva `pointer-events: none`.
     return (
-        <div className="toast-host">
+        <div className="toast-host" aria-live="polite" aria-atomic="false">
             {toasts.map((t) => (
                 <ToastItem
                     key={t.id}

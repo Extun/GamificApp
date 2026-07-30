@@ -10,8 +10,8 @@ import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import LockRoundedIcon from '@mui/icons-material/LockRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import RocketLaunchRoundedIcon from '@mui/icons-material/RocketLaunchRounded';
+import CloudOffRoundedIcon from '@mui/icons-material/CloudOffRounded';
 import { SidebarLayout } from '../../components/dashboard/SidebarLayout';
-import { toast } from '../../components/dashboard/toastBus';
 import { FileChip, FilePreviewModal, descargarArchivo } from '../../components/archivos/ArchivoChip';
 import { QuizInteractivo } from '../../components/quiz/QuizInteractivo';
 import { JUEGOS_UI, juegoJugable } from '../../components/juegos/registroJuegos';
@@ -27,6 +27,7 @@ import { nombreInstitucion } from '../../services/institucionService';
 import { obtenerMisiones } from '../../services/misionesService';
 import { EmptyState } from '../../components/dashboard/DashboardWidgets';
 import { PanelMisiones } from './PanelMisiones';
+import { ModalCambiarPin } from './ModalCambiarPin';
 import { useGuardiaActividad } from '../../hooks/useGuardiaActividad';
 
 export function DashboardEstudiante() {
@@ -52,16 +53,41 @@ export function DashboardEstudiante() {
     // cuando el estudiante aún no tiene progreso registrado.
     const [retosDisponibles, setRetosDisponibles] = useState([]);
 
+    // Estado de las cargas del panel: 'cargando' | 'listo' | 'error'.
+    // Antes no existía, así que una lista vacía significaba dos cosas
+    // distintas —"todavía no sé" y "no hay nada"— y el panel siempre elegía
+    // la segunda: afirmaba "Todavía no hay juegos" mientras la petición
+    // viajaba, y para SIEMPRE si fallaba la red, porque el .catch() se la
+    // tragaba en silencio. Ahora cada estado se dice tal cual es.
+    const [estadoCatalogo, setEstadoCatalogo] = useState('cargando');
+    const [estadoRetos, setEstadoRetos] = useState('cargando');
+    const [estadoMateria, setEstadoMateria] = useState('cargando');
+
+    // Reintento sin recargar la página: vuelve a disparar los efectos de carga.
+    // El paso a 'cargando' va aquí (en el manejador) y no dentro del efecto,
+    // para no introducir un set-state en el cuerpo de un useEffect.
+    const [intento, setIntento] = useState(0);
+    const reintentar = () => {
+        setEstadoCatalogo('cargando');
+        setEstadoRetos('cargando');
+        setEstadoMateria('cargando');
+        setIntento((n) => n + 1);
+    };
+
     // Catálogo dinámico de materias (SPEC-002): los "mundos" del estudiante
     // vienen de la BD (solo las activas), con su color e icono oficiales.
     const [catalogoMaterias, setCatalogoMaterias] = useState([]);
     useEffect(() => {
         let vigente = true;
         listarMaterias()
-            .then((lista) => { if (vigente) setCatalogoMaterias(lista); })
-            .catch(() => { /* sin red: el resto del panel sigue funcionando */ });
+            .then((lista) => {
+                if (!vigente) return;
+                setCatalogoMaterias(lista);
+                setEstadoCatalogo('listo');
+            })
+            .catch(() => { if (vigente) setEstadoCatalogo('error'); });
         return () => { vigente = false; };
-    }, []);
+    }, [intento]);
     const materias = catalogoMaterias.map((m) => m.nombre);
 
     // Identidad del estudiante en sesión: habilita la persistencia en MySQL.
@@ -90,11 +116,15 @@ export function DashboardEstudiante() {
     // entrar; no dependen del progreso ni de la página activa.
     useEffect(() => {
         let vigente = true;
-        obtenerRetosPublicados()
-            .then((retos) => { if (vigente) setRetosDisponibles(retos); })
-            .catch(() => { /* sin red: el Home muestra su estado vacío */ });
+        obtenerRetosPublicados({ propagarError: true })
+            .then((retos) => {
+                if (!vigente) return;
+                setRetosDisponibles(retos);
+                setEstadoRetos('listo');
+            })
+            .catch(() => { if (vigente) setEstadoRetos('error'); });
         return () => { vigente = false; };
-    }, []);
+    }, [intento]);
 
     // Progreso oficial (XP por reto) + resumen de misiones desde la BD. Se
     // vuelve a leer al llegar al Home y tras completar una actividad, así el
@@ -139,19 +169,32 @@ export function DashboardEstudiante() {
         // Juegos = todo reto cuyo tipo esté en el registro JUEGOS_UI
         // (clasificador, memorama, línea del tiempo, completar…): un solo
         // despacho por tipo, sin pedir tipo por tipo.
-        obtenerRetosPublicados({ materiaId: materia.id })
-            .then((retos) => {
-                if (!vigente) return;
-                setQuizzes(retos.filter((r) => r.tipo === 'quiz' && r.configuracion?.preguntas?.length));
-                setJuegos(retos.filter((r) => JUEGOS_UI[r.tipo] && juegoJugable(r)));
-                setMisionesRetos(retos.filter((r) => r.tipo === 'mision' && r.configuracion?.desafios?.length));
-            });
-        obtenerMaterial(materia.id)
-            .then((lista) => { if (vigente) setArchivos(lista); });
+        // allSettled: las pestañas solo salen de 'cargando' cuando AMBAS
+        // peticiones terminan, y un fallo de red deja 'error' en lugar de un
+        // "no hay nada" falso (antes ni siquiera había .catch: el rechazo
+        // quedaba sin manejar).
+        Promise.allSettled([
+            // propagarError: los servicios devuelven [] ante un fallo por
+            // defecto, así que sin esto un error de red llegaba aquí disfrazado
+            // de "no hay contenido" y el estado 'error' era inalcanzable.
+            obtenerRetosPublicados({ materiaId: materia.id, propagarError: true })
+                .then((retos) => {
+                    if (!vigente) return;
+                    setQuizzes(retos.filter((r) => r.tipo === 'quiz' && r.configuracion?.preguntas?.length));
+                    setJuegos(retos.filter((r) => JUEGOS_UI[r.tipo] && juegoJugable(r)));
+                    setMisionesRetos(retos.filter((r) => r.tipo === 'mision' && r.configuracion?.desafios?.length));
+                }),
+            obtenerMaterial(materia.id, { propagarError: true })
+                .then((lista) => { if (vigente) setArchivos(lista); })
+        ]).then((resultados) => {
+            if (!vigente) return;
+            setEstadoMateria(resultados.some((r) => r.status === 'rejected') ? 'error' : 'listo');
+        });
         return () => { vigente = false; };
         // catalogoMaterias entra en las dependencias: al llegar el catálogo
         // de la API se resuelve el id y recién ahí se cargan los retos.
-    }, [materiaSeleccionada, catalogoMaterias]);
+        // `intento` permite que "Intentar de nuevo" repita también esta carga.
+    }, [materiaSeleccionada, catalogoMaterias, intento]);
 
     // Avance por reto ordenado del más reciente al más antiguo.
     const actividadReciente = useMemo(
@@ -173,6 +216,7 @@ export function DashboardEstudiante() {
 
     const abrirMateria = (mat) => {
         setMateriaSeleccionada(mat);
+        setEstadoMateria('cargando');
         setSubVista('material');
         setQuizActivo(null);
         setJuegoActivo(null);
@@ -204,30 +248,91 @@ export function DashboardEstudiante() {
         navigate('/');
     };
 
+    // Las 4 pestañas de materia comparten los mismos tres estados. Antes todas
+    // usaban `<p class="vacio-msg">` —texto gris plano— mientras el resto del
+    // producto usa `EmptyState` con icono y mensaje; ahora comparten componente
+    // y, sobre todo, distinguen "todavía no sé" de "no hay nada".
+    // Es una función que devuelve JSX, no un componente anidado: así las
+    // pestañas no se remontan en cada render.
+    const contenidoMateria = ({ hayDatos, Icon, titulo, mensaje, contenido }) => {
+        if (estadoMateria === 'cargando') {
+            return <p className="materia-estado" role="status">Buscando…</p>;
+        }
+        if (estadoMateria === 'error') {
+            return (
+                <EmptyState
+                    Icon={CloudOffRoundedIcon}
+                    titulo="No pudimos cargar esto"
+                    mensaje="Revisa tu conexión a internet y vuelve a intentarlo."
+                    accion={{ label: 'Intentar de nuevo', onClick: reintentar }}
+                />
+            );
+        }
+        return hayDatos ? contenido : <EmptyState Icon={Icon} titulo={titulo} mensaje={mensaje} />;
+    };
+
+    // Rejilla de mundos con sus tres estados (la usan el Home y "Mis mundos").
+    const rejillaMundos = (alElegir) => {
+        if (estadoCatalogo === 'cargando') {
+            return (
+                <div className="home-mundos-grid" aria-hidden="true">
+                    {[0, 1, 2, 3].map((i) => <span key={i} className="home-mundo-esqueleto" />)}
+                </div>
+            );
+        }
+        if (estadoCatalogo === 'error') {
+            return (
+                <EmptyState
+                    Icon={CloudOffRoundedIcon}
+                    titulo="No pudimos cargar tus mundos"
+                    mensaje="Revisa tu conexión a internet y vuelve a intentarlo."
+                    accion={{ label: 'Intentar de nuevo', onClick: reintentar }}
+                />
+            );
+        }
+        if (materias.length === 0) {
+            return (
+                <EmptyState
+                    Icon={MenuBookIcon}
+                    titulo="Todavía no hay mundos"
+                    mensaje="Tu docente está preparando tus materias. ¡Vuelve pronto!"
+                />
+            );
+        }
+        return (
+            <div className="home-mundos-grid">
+                {materias.map((mat) => {
+                    const ui = uiMateria(mat);
+                    return (
+                        <button key={mat} className="home-mundo" style={ui.estilo} onClick={() => alElegir(mat)}>
+                            <span className="home-mundo-emoji" aria-hidden="true">{ui.icono}</span>
+                            <span>{mat}</span>
+                        </button>
+                    );
+                })}
+            </div>
+        );
+    };
+
     // Nombre real del estudiante (viene del registro con invitación); las
     // cuentas antiguas sin nombre completo muestran el genérico.
     const nombreEstudiante = authService.getUsuario()?.nombre_completo || 'Estudiante';
 
-    const handleCambiarPin = async () => {
-        const pinActual = window.prompt('Escribe tu PIN actual (6 letras o números):');
-        if (!pinActual) return;
-        const pinNuevo = window.prompt('Escribe tu PIN nuevo (6 letras o números):');
-        if (!pinNuevo) return;
-        try {
-            const data = await authService.cambiarPin(pinActual.trim(), pinNuevo.trim());
-            toast.exito(data.mensaje);
-        } catch (err) {
-            toast.error(err.message);
-        }
-    };
+    // El cambio de PIN vive en un modal accesible (ModalCambiarPin) en lugar de
+    // los dos window.prompt encadenados que había antes. Mismo servicio, mismo
+    // endpoint: solo cambia la interfaz.
+    const [modalPin, setModalPin] = useState(false);
 
     return (
         <SidebarLayout
             titulo={nombreInstitucion()}
             items={[
                 { id: '', label: 'Inicio', Icon: HomeFilledIcon },
-                { id: 'materias', label: 'Mis Mundos', Icon: MenuBookIcon },
-                { id: 'logros', label: 'Mis Premios', Icon: EmojiEventsRoundedIcon }
+                // Sentence case, igual que los encabezados de las propias
+                // pantallas ("Mis mundos" / "Mis premios"): antes el sidebar y
+                // el h1 escribían la misma etiqueta de dos formas distintas.
+                { id: 'materias', label: 'Mis mundos', Icon: MenuBookIcon },
+                { id: 'logros', label: 'Mis premios', Icon: EmojiEventsRoundedIcon }
             ].map((item) => ({
                 ...item,
                 activo: pagina === item.id,
@@ -239,7 +344,7 @@ export function DashboardEstudiante() {
                 detalle: 'Estudiante'
             }}
             accionesFooter={[
-                { label: 'Cambiar mi PIN', Icon: LockRoundedIcon, onClick: handleCambiarPin },
+                { label: 'Cambiar mi PIN', Icon: LockRoundedIcon, onClick: () => setModalPin(true) },
                 { label: 'Cerrar sesión', Icon: LogoutRoundedIcon, onClick: proteger(cerrarSesion) }
             ]}
         >
@@ -269,7 +374,18 @@ export function DashboardEstudiante() {
                                 </div>
                             </header>
 
-                            {ultimaActividad ? (
+                            {estadoRetos === 'cargando' || estadoCatalogo === 'cargando' ? (
+                                /* Mientras no se sabe, se muestra la FORMA de la
+                                   tarjeta, no una afirmación falsa. */
+                                <div className="home-hero-esqueleto" role="status" aria-label="Buscando tus juegos" />
+                            ) : estadoRetos === 'error' || estadoCatalogo === 'error' ? (
+                                <EmptyState
+                                    Icon={CloudOffRoundedIcon}
+                                    titulo="No pudimos cargar tus juegos"
+                                    mensaje="Revisa tu conexión a internet y vuelve a intentarlo."
+                                    accion={{ label: 'Intentar de nuevo', onClick: reintentar }}
+                                />
+                            ) : ultimaActividad ? (
                                 <button className="home-hero" onClick={() => irAMateria(ultimaActividad.materia)}>
                                     <span className="home-hero-emoji" aria-hidden="true">🚀</span>
                                     <span className="home-hero-texto">
@@ -297,22 +413,7 @@ export function DashboardEstudiante() {
 
                             <section className="home-mundos">
                                 <h2>Mis mundos</h2>
-                                <div className="home-mundos-grid">
-                                    {materias.map((mat) => {
-                                        const ui = uiMateria(mat);
-                                        return (
-                                            <button
-                                                key={mat}
-                                                className="home-mundo"
-                                                style={ui.estilo}
-                                                onClick={() => irAMateria(mat)}
-                                            >
-                                                <span className="home-mundo-emoji" aria-hidden="true">{ui.icono}</span>
-                                                <span>{mat}</span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                {rejillaMundos(irAMateria)}
                             </section>
 
                             <button className="home-logros" onClick={() => setPagina('logros')}>
@@ -320,9 +421,15 @@ export function DashboardEstudiante() {
                                 <span className="home-logros-texto">
                                     <strong>Mis premios</strong>
                                     <span>
-                                        {premiosGanados > 0
-                                            ? `¡Ya ganaste ${premiosGanados} ${premiosGanados === 1 ? 'insignia' : 'insignias'}!`
-                                            : 'Juega para ganar tu primera insignia'}
+                                        {/* Mientras el resumen del servidor no llega, `premiosGanados`
+                                            es 0 y la tarjeta decía "juega para ganar tu primera
+                                            insignia" a un niño que ya tiene diez. Sin el dato no se
+                                            afirma nada: solo se invita a entrar. */}
+                                        {misionesResumen === null
+                                            ? 'Mira todo lo que has ganado'
+                                            : premiosGanados > 0
+                                                ? `¡Ya ganaste ${premiosGanados} ${premiosGanados === 1 ? 'insignia' : 'insignias'}!`
+                                                : 'Juega para ganar tu primera insignia'}
                                     </span>
                                 </span>
                                 <ArrowForwardRoundedIcon className="home-logros-flecha" />
@@ -337,22 +444,7 @@ export function DashboardEstudiante() {
                                 <h1 style={{ pointerEvents: "none" }}>Mis mundos</h1>
                                 <p className="contenido-sub" style={{ pointerEvents: "none" }}>Elige un mundo para repasar y jugar lo que preparó tu docente.</p>
                             </div>
-                            <div className="home-mundos-grid">
-                                {materias.map((mat) => {
-                                    const ui = uiMateria(mat);
-                                    return (
-                                        <button
-                                            key={mat}
-                                            className="home-mundo"
-                                            style={ui.estilo}
-                                            onClick={() => abrirMateria(mat)}
-                                        >
-                                            <span className="home-mundo-emoji" aria-hidden="true">{ui.icono}</span>
-                                            <span>{mat}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            {rejillaMundos(abrirMateria)}
                         </div>
                     )}
 
@@ -411,17 +503,25 @@ export function DashboardEstudiante() {
                                 <section className="card materia-cards">
                                     <div className="card-head">
                                         <h3>Material de estudio</h3>
-                                        <span className="card-tag">{archivos.length} recursos</span>
+                                        {/* El contador solo se muestra cuando es un dato y no
+                                            un "0" provisional mientras carga. */}
+                                        {estadoMateria === 'listo' && (
+                                            <span className="card-tag">{archivos.length} recursos</span>
+                                        )}
                                     </div>
-                                    {archivos.length > 0 ? (
-                                        <div className="file-chip-grid">
-                                            {archivos.map((archivo) => (
-                                                <FileChip key={archivo.id} archivo={archivo} onClick={() => setArchivoPreview(archivo)} />
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="vacio-msg">Tu docente aún no ha publicado material para esta materia.</p>
-                                    )}
+                                    {contenidoMateria({
+                                        hayDatos: archivos.length > 0,
+                                        Icon: MenuBookIcon,
+                                        titulo: 'Todavía no hay material',
+                                        mensaje: 'Tu docente aún no ha publicado material en este mundo.',
+                                        contenido: (
+                                            <div className="file-chip-grid">
+                                                {archivos.map((archivo) => (
+                                                    <FileChip key={archivo.id} archivo={archivo} onClick={() => setArchivoPreview(archivo)} />
+                                                ))}
+                                            </div>
+                                        )
+                                    })}
                                 </section>
                             )}
 
@@ -429,9 +529,16 @@ export function DashboardEstudiante() {
                                 <section className="card materia-cards">
                                     <div className="card-head">
                                         <h3>Quizzes disponibles</h3>
-                                        <span className="card-tag">{quizzes.length} quizzes</span>
+                                        {estadoMateria === 'listo' && (
+                                            <span className="card-tag">{quizzes.length} quizzes</span>
+                                        )}
                                     </div>
-                                    {quizzes.length > 0 ? (
+                                    {contenidoMateria({
+                                        hayDatos: quizzes.length > 0,
+                                        Icon: QuizRoundedIcon,
+                                        titulo: 'Todavía no hay quizzes',
+                                        mensaje: 'Tu docente está preparando preguntas para este mundo. ¡Vuelve pronto!',
+                                        contenido: (
                                         <ul className="quiz-disponible-lista">
                                             {quizzes.map((q) => (
                                                 <li key={q.id}>
@@ -450,9 +557,8 @@ export function DashboardEstudiante() {
                                                 </li>
                                             ))}
                                         </ul>
-                                    ) : (
-                                        <p className="vacio-msg">Aún no hay quizzes publicados en esta materia. ¡Vuelve pronto!</p>
-                                    )}
+                                        )
+                                    })}
                                 </section>
                             )}
 
@@ -477,9 +583,16 @@ export function DashboardEstudiante() {
                                 <section className="card materia-cards">
                                     <div className="card-head">
                                         <h3>Juegos disponibles</h3>
-                                        <span className="card-tag">{juegos.length} juegos</span>
+                                        {estadoMateria === 'listo' && (
+                                            <span className="card-tag">{juegos.length} juegos</span>
+                                        )}
                                     </div>
-                                    {juegos.length > 0 ? (
+                                    {contenidoMateria({
+                                        hayDatos: juegos.length > 0,
+                                        Icon: ExtensionRoundedIcon,
+                                        titulo: 'Todavía no hay juegos',
+                                        mensaje: 'Tu docente está preparando aventuras para este mundo. ¡Vuelve pronto!',
+                                        contenido: (
                                         <ul className="quiz-disponible-lista">
                                             {juegos.map((j) => {
                                                 const ui = JUEGOS_UI[j.tipo];
@@ -503,9 +616,8 @@ export function DashboardEstudiante() {
                                                 );
                                             })}
                                         </ul>
-                                    ) : (
-                                        <p className="vacio-msg">Aún no hay juegos publicados en esta materia. ¡Vuelve pronto!</p>
-                                    )}
+                                        )
+                                    })}
                                 </section>
                             )}
 
@@ -513,9 +625,16 @@ export function DashboardEstudiante() {
                                 <section className="card materia-cards">
                                     <div className="card-head">
                                         <h3>Misiones narrativas</h3>
-                                        <span className="card-tag">{misionesRetos.length} aventuras</span>
+                                        {estadoMateria === 'listo' && (
+                                            <span className="card-tag">{misionesRetos.length} aventuras</span>
+                                        )}
                                     </div>
-                                    {misionesRetos.length > 0 ? (
+                                    {contenidoMateria({
+                                        hayDatos: misionesRetos.length > 0,
+                                        Icon: AutoStoriesRoundedIcon,
+                                        titulo: 'Todavía no hay misiones',
+                                        mensaje: 'Tu docente está escribiendo historias para este mundo. ¡Vuelve pronto!',
+                                        contenido: (
                                         <ul className="quiz-disponible-lista">
                                             {misionesRetos.map((m) => (
                                                 <li key={m.id}>
@@ -534,9 +653,8 @@ export function DashboardEstudiante() {
                                                 </li>
                                             ))}
                                         </ul>
-                                    ) : (
-                                        <p className="vacio-msg">Aún no hay misiones publicadas en esta materia. ¡Vuelve pronto!</p>
-                                    )}
+                                        )
+                                    })}
                                 </section>
                             )}
 
@@ -585,6 +703,8 @@ export function DashboardEstudiante() {
                     {pagina === "logros" && <PanelMisiones />}
 
             {dialogoSalida}
+
+            {modalPin && <ModalCambiarPin onCerrar={() => setModalPin(false)} />}
 
             <FilePreviewModal
                 archivo={archivoPreview}

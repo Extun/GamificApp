@@ -37,7 +37,12 @@ export const publicarReto = async ({ materiaId, titulo, tipo, configuracion, xpR
 
 // GET /api/retos — retos publicados, filtrables por materia y tipo.
 // Devuelve [] si la red falla: las vistas muestran su estado vacío sin romperse.
-export const obtenerRetosPublicados = async ({ materiaId, tipo } = {}) => {
+// `propagarError` (opt-in): por defecto un fallo se traga y devuelve [], que es
+// lo que esperan los consumidores históricos. Quien necesite DISTINGUIR "no hay
+// retos" de "no pude preguntar" —el panel del estudiante, que muestra un estado
+// de error con reintento— pide la excepción explícitamente. Sin el flag, el
+// comportamiento es idéntico al de siempre.
+export const obtenerRetosPublicados = async ({ materiaId, tipo, propagarError = false } = {}) => {
     try {
         const params = new URLSearchParams();
         if (materiaId) params.set('materia_id', materiaId);
@@ -48,6 +53,7 @@ export const obtenerRetosPublicados = async ({ materiaId, tipo } = {}) => {
         return await res.json();
     } catch (err) {
         console.warn('No se pudieron obtener los retos del servidor:', err.message);
+        if (propagarError) throw err;
         return [];
     }
 };
