@@ -223,6 +223,20 @@
     background: var(--color-primary-soft, #e0f2fe);
 }
 
+/* La flecha es el control que PRODUCE el movimiento (POLISH SPRINT v1.0.1
+   Etapa D). Si no responde al pulsarla, el niño no llega a conectar su gesto
+   con el recorrido del evento: parece que la lista se movió sola. Mismo
+   lenguaje de pulsación que el resto de la app. */
+.linea-evento-flechas button {
+    transition: background var(--duration-base) var(--ease-standard),
+                transform var(--duration-fast) var(--ease-standard);
+}
+
+.linea-evento-flechas button:active:not(:disabled) {
+    transform: scale(var(--press-scale));
+    background: var(--color-primary-soft, #e0f2fe);
+}
+
 .linea-evento-flechas button:disabled {
     opacity: 0.35;
     cursor: default;
@@ -238,16 +252,12 @@
     outline-offset: 2px;
 }
 
-.linea-lista.is-sacudida {
-    animation: linea-sacudida 0.5s ease;
-}
-
-@keyframes linea-sacudida {
-    20% { transform: translateX(-5px); }
-    40% { transform: translateX(5px); }
-    60% { transform: translateX(-3px); }
-    80% { transform: translateX(3px); }
-}
+/* `.linea-lista.is-sacudida` y sus `@keyframes linea-sacudida` se ELIMINARON
+   en la Etapa D. Eran CSS muerto —el JSX nunca aplicó esa clase, ítem 42 del
+   MASTER_PLAN— y el plan inicial de esta etapa era revivirlos por estar ya
+   escritos. Se descartó: una sacudida comunica error o rechazo, y la emoción
+   de la Línea del tiempo es ORDEN. Reutilizar la animación habría ahorrado
+   trabajo a costa de decirle al niño lo contrario de lo que ocurre. */
 
 .linea-btn-comprobar {
     margin-top: 1rem;
@@ -509,6 +519,7 @@
 
 @media (prefers-reduced-motion: reduce) {
     .memorama-carta-interior { transition: none; }
-    .linea-lista.is-sacudida { animation: none; }
+    /* `.linea-lista.is-sacudida` se retiró de aquí junto con la animación que
+       neutralizaba: la regla sobrevivía a su propio objetivo (Etapa D). */
     .completar-opcion:hover:not(:disabled) { transform: none; }
 }

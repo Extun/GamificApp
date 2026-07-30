@@ -74,7 +74,7 @@ Cada etapa es un **commit independiente** y **ninguna empieza sin aprobación ex
 | **B** | Verdadero/Falso y Completar espacios: la confirmación se siente | ✅ Hecha |
 | **B-bis** | Diferenciar el tempo de V/F (ágil) y Completar (construcción) — ver §4-quater | ⬜ Pendiente |
 | **C** | Transición entre ítems, **con el tempo propio de cada juego** (§4-quater) | ⬜ Pendiente |
-| **D** | Línea del tiempo: movimiento real al reordenar | ⬜ Pendiente |
+| **D** | Línea del tiempo: movimiento real al reordenar | ✅ Hecha |
 | **E** | Quiz: sensación de avance (barra de progreso + ir a la siguiente) | ⬜ Pendiente |
 
 **Orden recomendado: A → B → D → C → E.** A y B son el mayor salto con el menor riesgo y tocan un reproductor cada uno. D revive keyframes ya escritos (ítem 42). C y E van al final por transversales: C toca tres reproductores y E comparte las clases `.opcion-*` con la Misión Narrativa.
