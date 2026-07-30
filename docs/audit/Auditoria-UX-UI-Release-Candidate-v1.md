@@ -1,5 +1,13 @@
 # Auditoría UI/UX de acabado profesional — camino a la v1.0
 
+> **ESTADO (añadido 2026-07-30, tras el commit `b5f1dc3`).** Este documento es la **foto del diagnóstico** y **no se reescribe**: los hallazgos se conservan tal como se midieron. Lo que cambió después:
+>
+> - **Los 4 🔴 y los 10 🟠 están implementados y verificados funcionalmente** en el bloque P1 de la fase RC. El plan de ejecución y su estado viven en `RC-Plan-Limpieza-Y-Backlog-v1.0.md`; la bitácora con evidencia, en `CURRENT_STATE.md`.
+> - **Veredicto actualizado: GamificApp está en Release Candidate.** El «~85 % / no está en RC» del §1 y del §10 corresponde al estado *previo* a P1.
+> - **Tres cifras del informe resultaron distintas al ejecutar:** C4 se estimó en 7 archivos y ~150 kB de fuentes y salieron **4 archivos y 76 kB** (Inter es variable); la línea base de lint que menciona el §0 es **29 (26+3) medida con `npx eslint src server`**, no 58 (ver la corrección en el plan); y los cuatro «**[verificar en runtime]**» del §0 se verificaron el 2026-07-30 en el entorno local contra el build de distribución.
+> - **La auditoría no detectó dos bugs que sí encontró la verificación funcional:** el cierre de sesión silencioso al teclear mal el PIN (crítico, preexistente) y el estado de error inalcanzable por los servicios que devuelven `[]`. Es la limitación declarada en el §0 —auditoría de código, no de ejecución— confirmada en la práctica.
+> - **P2 y P3 siguen sin implementar.**
+
 **Fecha:** 2026-07-30
 **Alcance:** exclusivamente experiencia de usuario y acabado visual. **Cero** arquitectura, backend, BD, `configuracion_json`, fórmulas de calificación/XP o refactors estructurales.
 **Punto de partida:** SPEC-018 (pulido integral) cerrada el 2026-07-29 con sus 8 fases. Esta auditoría **no la repite**: parte de su resultado y busca lo que quedó fuera, lo que se implementó a medias y la deuda nueva.

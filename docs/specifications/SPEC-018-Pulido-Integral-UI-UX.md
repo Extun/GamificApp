@@ -106,6 +106,7 @@ Navegar de nuevo los 3 roles completos con Docker/MySQL local; verificar regresi
 
 1. **Build** (`npm run build`) sin errores.
 2. **Lint** comparado contra baseline (**28 problemas: 25 errores + 3 warnings** al 2026-07-20; cero nuevos).
+   > **Nota del 2026-07-30 (spec cerrada, no se reescribe su historia).** El número correcto es **29 (26 errores + 3 warnings)**, ya corregido en `CURRENT_STATE.md` el 2026-07-29 tras comprobar que es determinista y que el lock no ha cambiado. Y hay que medirlo con **`npx eslint src server`**: `npm run lint` ejecuta `eslint .` y, si existe la carpeta `release/`, entra en la copia del código que deja el empaquetador y **duplica el recuento a 58** —`.gitignore` no se aplica al flat config de ESLint—. Ver ítem **62** del `MASTER_PLAN`.
 3. **Pruebas funcionales afectadas** (contra la BD local).
 4. **Navegación real** en navegador (entorno local).
 5. **Pruebas responsive** cuando corresponda (320–1024 + escritorio).

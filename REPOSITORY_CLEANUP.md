@@ -2,6 +2,21 @@
 
 Fecha de auditoria: 2026-07-30.
 
+> **ESTADO DE EJECUCION (anadido 2026-07-30, tras el commit `b5f1dc3`).** Este documento es el inventario original y se conserva como tal. Lo que se decidio y ejecuto:
+>
+> **Ejecutado — 4 archivos, los unicos borrados:** `src/assets/react.svg`, `src/assets/vite.svg`, `src/assets/hero.png` y `public/icons.svg`. Cero referencias verificadas antes de borrar. `src/assets/` queda vacia.
+>
+> **NO ejecutado, por decision de Fabrizio: las 10 categorias de la seccion «Eliminar» que no estan versionadas.** Se comprobo con `git ls-files` que `.env`, `server/.env`, `CREDENCIALES.txt`, `logs/`, `.run/`, `.claude/`, `node_modules/`, `server/node_modules/`, `dist/`, `release/` y `runtime/` **ya estan fuera del repositorio** porque `.gitignore` las cubre. La limpieza archivistica que propone este documento **ya estaba hecha**; borrarlas del disco no mejoraria el repositorio y destruiria el entorno de trabajo justo antes de validar el instalador (`server/.env` apunta al MySQL portable 3308, `runtime/` son 1,25 GB de Node y MySQL portables, `release/` es el paquete a probar).
+>
+> **NO ejecutado, conservado a proposito:** `src/pages/admin/asistenteIA.jsx` y `respuestaIA.jsx` (el endpoint `/api/ia/asistente` sigue intacto); `tools/build_auditoria_docx.py` y los DOCX de auditoria (evidencia de tesis).
+>
+> **Tres correcciones a este documento, verificadas:**
+> 1. **`.asistente-*` de `adminDashboard.css` NO es CSS huerfano.** Lo usan 6 modulos del panel admin (`ModuloMaterias`, `ModuloMisiones`, `ModuloCursos`, `ModuloInstitucion`, `ModuloAdministradores` y el asistente de docentes de `AdminDashboard.jsx`). Borrar `asistenteIA.jsx` no habria dejado CSS sin uso, y borrar ese CSS habria roto medio panel.
+> 2. **`server/lib/totalEsperado.js` se mantiene.** Es un shim sin importadores, cierto, pero su nombre figura en la lista de formulas congeladas de SPEC-018 §3 y `totalEsperado` es un control de seguridad de `POST /api/progreso`: beneficio nulo frente a riesgo de tocar area congelada.
+> 3. **`server/lib/iaCliente.js` queda para post-1.0.** Tiene 0 importadores, pero borrarlo obliga a corregir `CLAUDE.md §3`, que lo documentaba como el camino de la IA cuando el real es `server/lib/ia/` (ese texto **si** se corrigio el 2026-07-30).
+>
+> **Cambio del arbol posterior a este inventario:** existe `public/fonts/` con **4 archivos `.woff2` (76 kB)** — Inter y Poppins autoalojadas, que antes venian del CDN de Google. Son parte de la fuente y **no** son candidatos de limpieza: sin ellas la app instalada en Windows pierde su tipografia al no haber internet.
+
 Rol aplicado: Repository Maintainer / Software Archivist. No se elimino nada, no se refactorizo codigo, no se cambiaron dependencias y no se modifico documentacion existente.
 
 ## Resumen Ejecutivo

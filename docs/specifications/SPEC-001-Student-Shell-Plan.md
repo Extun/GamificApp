@@ -8,9 +8,15 @@ Plan de implementación (sin código) del nuevo "cascarón" del estudiante: ruta
 
 🟡 Propuesto — pendiente de aprobación como RFC.
 
+> **ALCANCE PARCIALMENTE ENTREGADO FUERA DE ESTA SPEC (2026-07-30, bloque P1 de la fase RC, commit `b5f1dc3`).** Leer antes de implementar, para no hacer el trabajo dos veces:
+>
+> - ✅ **`ModalCambiarPin` (§3 de la Fase 3 y commit 4 del §Plan) YA EXISTE**: `src/pages/estudiante/ModalCambiarPin.jsx`, sobre `ModalPanel`. **Con `window.prompt` a cero en todo el proyecto** (los `window.alert` de ese flujo ya eran toasts desde SPEC-018 Fase 4). **Divergencia deliberada respecto a lo planeado aquí:** la spec preveía **dos** campos y se implementaron **tres** (actual / nuevo / **repetir**), porque sin confirmación el niño puede cambiar el PIN a algo que no sabe. Añade además contador «N de 6», mostrar/ocultar los tres a la vez y error inline con `role="alert"`.
+> - ⛔ **El resto del alcance sigue sin aprobar y sin implementar**: rutas anidadas, retiro del sidebar, Inicio nuevo y menú de avatar. El estudiante sigue usando `SidebarLayout` con navegación por `useState`.
+> - 🔧 **Contexto que esta spec no podía prever:** la implementación del modal descubrió un bug **crítico y preexistente** —`PUT /api/auth/cambiar-pin` responde 401 y `authFetch` lo tomaba por sesión caducada, así que **equivocarse al teclear el PIN desconectaba al estudiante en silencio**—. Corregido en el cliente; ver ítems **29** y **63** del `MASTER_PLAN`.
+
 # Última actualización
 
-2026-07-06
+2026-07-30 (nota de alcance ya entregado; el plan en sí no se ha modificado desde 2026-07-06)
 
 ---
 

@@ -5,6 +5,25 @@
 
 ---
 
+## ESTADO DE EJECUCIÓN (actualizado 2026-07-30, tras el commit `b5f1dc3`)
+
+| Bloque | Estado |
+|---|---|
+| **Fase 1 · Limpieza** | ✅ **Ejecutada parcialmente por decisión de Fabrizio: solo los 4 assets.** `src/assets/react.svg`, `vite.svg`, `hero.png` y `public/icons.svg` borrados (`src/assets/` queda vacía). **`asistenteIA.jsx` y `respuestaIA.jsx` se conservan** — el endpoint `/api/ia/asistente` sigue intacto. Ninguna de las 10 categorías no versionadas se tocó. |
+| **Fase 2 · Backlog** | ✅ Vigente. Es la lista de trabajo de la fase. |
+| **Fase 3 · P1** | ✅ **13/13 completados y verificados funcionalmente**, incluidos los dos que estaban bloqueados: **P1-B1 (modal de PIN) y P1-B2 (fuentes autoalojadas) fueron autorizados por Fabrizio** y están hechos. |
+| **P2** | ⛔ **No implementado**, pendiente de autorización. |
+
+**Correcciones a este propio documento, encontradas al ejecutar:**
+
+1. **La nota final sobre la línea base de lint era incorrecta.** Decía que la base operativa era **58** y que la diferencia con el 29 documentado se debía a una actualización del plugin de React Hooks. **Las dos afirmaciones son falsas.** El utillaje coincide con el lock (`eslint 10.4.1`, `eslint-plugin-react-hooks 7.1.1`, `eslint-plugin-react-refresh 0.5.2`). La causa real: `npm run lint` ejecuta `eslint .`, que **recorre `release/GamificApp/` —una copia completa del código fuente generada por el empaquetador— porque `.gitignore` no se aplica al flat config de ESLint**. Cada problema se contaba dos veces. **`npx eslint src server` = 29 (26 errores + 3 warnings)**, que es exactamente la línea base ya fijada en `CURRENT_STATE.md` el 2026-07-29 y repetida en `MASTER_PLAN §3`. La conclusión de P1 no cambia (cero problemas nuevos: el ×2 afectaba igual a las dos mediciones). Anotado como ítem **62** del MASTER_PLAN.
+2. **P1-B2 costó menos de lo estimado:** se preveían 7 archivos y ~150 kB; salieron **4 archivos y 76 kB**, porque Inter es una fuente **variable** y un solo fichero cubre 400-700.
+3. **Dos bugs aparecieron en la verificación funcional, no en la lectura de código** (detalle en `CURRENT_STATE.md`): uno **crítico y preexistente** —equivocarse al teclear el PIN cerraba la sesión del estudiante en silencio— y uno **introducido por P1**, el estado de error inalcanzable porque los servicios devolvían `[]` ante un fallo. Ambos corregidos y verificados. Se registraron los ítems **62** y **63** del MASTER_PLAN.
+
+---
+
+---
+
 ## FASE 1 — Plan de limpieza (requiere aprobación)
 
 ### Hallazgo que reduce la Fase 1 casi a cero
@@ -146,10 +165,10 @@ Code splitting del bundle de 1,6 MB · Zod o cualquier validación nueva · rees
 
 ---
 
-## Nota de calidad: la línea base de lint no es la documentada
+## Nota de calidad: la línea base de lint
 
-`npm run lint` sobre el árbol limpio (sin cambios míos) da hoy **58 problemas: 52 errores y 6 warnings**.
+> ⚠️ **Esta sección se escribió con un diagnóstico equivocado y queda corregida.** Ver «ESTADO DE EJECUCIÓN → Correcciones» al principio del documento. Se conserva el texto original abajo porque explica de dónde salió el número 58 que aparece en el reporte de P1.
 
-`SPEC-018 §6` documenta 28 (25 + 3) y el `MASTER_PLAN` habla de 29 preexistentes. La diferencia no es código nuevo: el árbol estaba limpio al medir. Lo más probable es una actualización del plugin de React Hooks, que añadió reglas como `react-hooks/set-state-in-effect`.
+**Lo correcto:** la línea base es **29 problemas (26 errores + 3 warnings)** y se mide con **`npx eslint src server`**. El criterio de calidad de cada fase es *«cero problemas nuevos respecto a 29»*. El `58` sale de `npm run lint` (`eslint .`) **solo cuando existe la carpeta `release/` en el disco**, porque ESLint entra en la copia del código que dejó el empaquetador y cuenta todo dos veces. Es un artefacto del entorno, no del código.
 
-**Decisión de Release Manager:** la línea base operativa para esta fase es **58**. El criterio de calidad es *"cero problemas nuevos respecto a 58"*, no bajar a 28 — reducirlos exigiría tocar efectos de los paneles, que es justo lo que no se debe hacer ahora. Queda anotado para corregir el número en la documentación.
+*Texto original (incorrecto):* `npm run lint` sobre el árbol limpio (sin cambios míos) da hoy **58 problemas: 52 errores y 6 warnings**. `SPEC-018 §6` documenta 28 (25 + 3) y el `MASTER_PLAN` habla de 29 preexistentes. La diferencia no es código nuevo: el árbol estaba limpio al medir. Lo más probable es una actualización del plugin de React Hooks, que añadió reglas como `react-hooks/set-state-in-effect`. **Decisión de Release Manager:** la línea base operativa para esta fase es **58**.

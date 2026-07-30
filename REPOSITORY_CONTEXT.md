@@ -4,6 +4,14 @@ Fecha de auditoria: 2026-07-30.
 
 Este documento resume GamificApp para que otra IA o mantenedor entienda el repositorio sin depender del historial del chat. No sustituye a `CLAUDE.md`, `START_HERE.md` ni a `docs/architecture/CURRENT_STATE.md`; sirve como mapa inicial.
 
+> **ACTUALIZACION 2026-07-30 (commit `b5f1dc3`, bloque P1 de la fase Release Candidate).** Cambios de este mapa:
+>
+> - **`src/assets/` ya no existe**: sus tres archivos (`react.svg`, `vite.svg`, `hero.png`) eran restos de la plantilla de Vite sin ninguna referencia y se borraron, junto con `public/icons.svg`.
+> - **Carpeta nueva `public/fonts/`**: Inter y Poppins **autoalojadas** (4 `.woff2`, 76 kB, subset latin; Inter es variable y un solo fichero cubre 400-700), declaradas con `@font-face` en `src/index.css`. Antes venian del CDN de Google, lo que dejaba la app instalada en Windows sin su tipografia cuando no habia internet. **La app ya no hace ninguna peticion externa para renderizar.**
+> - **Componente nuevo `src/pages/estudiante/ModalCambiarPin.jsx`**: cambio de PIN del estudiante sobre `ModalPanel`, en sustitucion de dos `window.prompt`. **El proyecto queda a cero `window.prompt`.** Usa el mismo `authService.cambiarPin` y el mismo endpoint: no cambia autenticacion.
+> - **Tres servicios ganaron una opcion opt-in** que no altera su comportamiento por defecto: `authService.authFetch` acepta `conservarSesionEn401` (solo la usa `cambiarPin`, porque en ese endpoint un 401 describe el PIN enviado y no la sesion); `retosService.obtenerRetosPublicados` y `materialesService.obtenerMaterial` aceptan `propagarError` (por defecto siguen devolviendo `[]` ante un fallo, como esperan los consumidores historicos).
+> - **Nota sobre lint, para no repetir un diagnostico erroneo:** la linea base es **29 problemas (26 errores + 3 warnings)** medida con **`npx eslint src server`**. `npm run lint` ejecuta `eslint .` y, si existe la carpeta `release/`, entra en la copia del codigo que dejo el empaquetador y **duplica el recuento a 58**; `.gitignore` no se aplica al flat config de ESLint. Anotado como item 62 del MASTER_PLAN.
+
 ## Proposito
 
 GamificApp es una plataforma web de gamificacion educativa para ninos de 6 a 9 anos, creada como proyecto de tesis para la Unidad Educativa Fiscal Clemencia Coronel de Pincay, en Guayaquil, Ecuador. Tiene tres roles:
@@ -55,7 +63,6 @@ src/                    Frontend React.
   components/            Componentes compartidos, juegos, quiz, mision, dashboard.
   services/              Clientes HTTP por dominio.
   hooks/                 Hooks reutilizables.
-  assets/                Assets de plantilla o visuales locales.
 
 server/                 Backend Express.
   routes/                Endpoints REST.
@@ -68,7 +75,7 @@ server/                 Backend Express.
 database/               SQL base y migraciones documentales.
 docs/                   Documentacion viva, specs, auditorias y archivo historico.
 instalador/             Instalacion local Windows y empaquetado.
-public/                 Assets publicos de Vite.
+public/                 Assets publicos de Vite (favicon + fonts/ autoalojadas).
 scripts/                Verificaciones de mantenimiento.
 tools/                  Generadores auxiliares de documentos.
 ```

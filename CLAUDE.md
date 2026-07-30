@@ -26,7 +26,7 @@ Roles: **Administrador** (Principal y Administrador — gestiona docentes, estud
 - **Retos polimórficos**: la tabla `retos` guarda cualquier mecánica en `configuracion_json` con un `tipo` slug libre; añadir un juego nuevo no requiere migrar la BD.
 - **Materias son un catálogo 100% dinámico en BD** (no hay lista fija en el código; `src/services/materiasService.js`).
 - Estructura de carpetas: `src/` (frontend: componentes, páginas por rol, services/, hooks/), `server/` (backend Express: routes/, lib/, middleware/, scripts/), `database/` (esquema SQL + migraciones), `docs/` (documentación).
-- Toda generación de contenido con IA pasa por `server/lib/iaCliente.js` (cliente Gemini + reintentos) y `server/lib/actividadesIA.js` (registro por tipo de juego). La API key de Gemini vive **solo** en el servidor.
+- Toda generación de contenido con IA pasa por `server/lib/ia/` (adaptadores por proveedor —Gemini y OpenAI— con selección de modelo y reintentos, SPEC-016) y `server/lib/actividadesIA.js` (registro por tipo de juego). Las API keys viven **solo** en el servidor. *(Corregido el 2026-07-30: este punto citaba `server/lib/iaCliente.js`, que desde SPEC-016 es solo un shim de compatibilidad sin importadores; el camino real es `server/lib/ia/index.js`.)*
 - XP transaccional e idempotente: `POST /api/progreso` con `FOR UPDATE`, nunca duplica XP en reintentos.
 - Detalle completo (principios de arquitectura y UX, filosofía de gamificación "siempre se termina ganando"): `docs/architecture/PROJECT_CONTEXT.md` y `docs/architecture/VISION.md`.
 
