@@ -72,13 +72,42 @@ Cada etapa es un **commit independiente** y **ninguna empieza sin aprobación ex
 |---|---|---|
 | **A** | Memorama: celebración al emparejar y negación suave al fallar | ✅ Hecha |
 | **B** | Verdadero/Falso y Completar espacios: la confirmación se siente | ✅ Hecha |
-| **C** | Transición entre ítems en los juegos de uno-en-uno | ⬜ Pendiente |
+| **B-bis** | Diferenciar el tempo de V/F (ágil) y Completar (construcción) — ver §4-quater | ⬜ Pendiente |
+| **C** | Transición entre ítems, **con el tempo propio de cada juego** (§4-quater) | ⬜ Pendiente |
 | **D** | Línea del tiempo: movimiento real al reordenar | ⬜ Pendiente |
 | **E** | Quiz: sensación de avance (barra de progreso + ir a la siguiente) | ⬜ Pendiente |
 
 **Orden recomendado: A → B → D → C → E.** A y B son el mayor salto con el menor riesgo y tocan un reproductor cada uno. D revive keyframes ya escritos (ítem 42). C y E van al final por transversales: C toca tres reproductores y E comparte las clases `.opcion-*` con la Misión Narrativa.
 
 **Descartado a propósito, no por olvido:** sonido (no hay sistema de audio y en un aula compartida es contraproducente), librerías de animación, canvas, y confeti durante la partida — agotaría el efecto que hoy premia la nota 100. Todo lo implementado es CSS + estado local de presentación.
+
+## 4-quater. Criterio rector de la Vía 2 — personalidad por juego
+
+**Añadido por Fabrizio el 2026-07-30, después de cerrar A y B. Gobierna C, D y E, y obliga a revisar A y B.**
+
+Cada juego debe tener **personalidad propia: no exagerada, pero reconocible**. La regla de trabajo se invierte respecto a como se venía haciendo:
+
+> **Primero se decide la emoción que el juego debe transmitir. La animación se elige después, como consecuencia.** Es preferible una animación pequeña que comunique bien la emoción que una vistosa que no la comunique.
+
+| Juego | Emoción que debe transmitir | Consecuencia de diseño |
+|---|---|---|
+| **Clasificador** | *(la referencia — ya la tiene)* | No se toca. Es el patrón del que salen los demás. |
+| **Memorama** | **satisfacción al descubrir** | El premio va en el instante del hallazgo, no en el recuento. |
+| **Línea del tiempo** | **movimiento y orden** | Las cosas encuentran su sitio: recorrido real, nunca teletransporte. |
+| **Quiz** | **progreso constante** | Siempre se avanza, nunca se está atascado. |
+| **Verdadero/Falso** | **agilidad** | Tempo rápido: decidir, confirmar, siguiente. Nada que frene. |
+| **Completar espacios** | **construcción** | Algo se arma pieza a pieza: tempo deliberado, no veloz. |
+
+**Restricción que no cambia:** la personalidad se expresa dentro del **mismo lenguaje visual** (curvas, duraciones y tokens ya establecidos). Personalidad es **tempo e intención**, no una paleta ni un set de efectos por juego — eso rompería la coherencia que el sprint viene construyendo.
+
+### Revisión de A y B a la luz de este criterio
+
+- **Memorama (A): alineado.** El saltito premia el instante del hallazgo, que es exactamente «satisfacción al descubrir».
+- **Verdadero/Falso y Completar (B): parcialmente desalineados.** Ambos recibieron **el mismo tratamiento y el mismo tempo** porque comparten el bloque `.completar-feedback`. Pero deben sentirse **distintos**: V/F pide agilidad y Completar pide construcción. **Corrección pendiente (B-bis):** diferenciar el tempo acotando por la clase raíz de cada reproductor —`.juego-vf` y `.juego-completar`, que ya existen— sin duplicar animaciones ni tocar el otro juego.
+
+### Corrección al plan de la Etapa D
+
+El plan original proponía **revivir los `@keyframes linea-sacudida`** que hoy son CSS muerto (ítem 42 del MASTER_PLAN). **Bajo este criterio se descarta:** una sacudida comunica error o rechazo, y la emoción de la Línea del tiempo es *orden*, no error. El CSS muerto se **elimina** en la etapa de limpieza en vez de revivirse.
 
 ## 4-ter. Auditoría de la experiencia de juego (2026-07-30)
 
