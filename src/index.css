@@ -114,6 +114,26 @@
   --bp-mobile: 480px;
   --bp-tablet: 768px;
   --bp-desktop: 1024px;
+
+  /* ===== POLISH SPRINT v1.0.1 Etapa 1 — Escala de movimiento =====
+     Auditoría 2026-07-30: 11 duraciones distintas conviviendo (0.1 / 0.12 /
+     0.15 / 0.18 / 0.2 / 0.25 / 0.3 / 0.4 / 0.6s) y 216 de 245 transiciones
+     cayendo en la curva por defecto `ease`. Estos tokens fijan la escala.
+     Los CSS ya escritos NO se migran aquí —eso es una etapa posterior, por
+     grupos y verificando cada uno—: hoy solo los consumen los controles
+     compartidos que estrenan estado de pulsación. */
+  --duration-fast: 120ms;   /* pulsación y microcambios de color */
+  --duration-base: 180ms;   /* hover, foco, bordes — el valor más usado hoy */
+  --duration-slow: 260ms;   /* entradas de paneles y overlays */
+
+  /* `ease` acelera y frena por igual, y por eso todo se siente igual de
+     genérico. Esta curva arranca rápido y frena largo: el control parece
+     responder en el instante del toque aunque dure lo mismo. */
+  --ease-standard: cubic-bezier(0.2, 0, 0.2, 1);
+
+  /* Cuánto se hunde un control al pulsarlo. Un único valor para todos: si
+     cada botón elige el suyo, la interfaz se siente ensamblada por piezas. */
+  --press-scale: 0.97;
 }
 
 * {
@@ -131,6 +151,42 @@ body {
 h1, h2, h3 {
   font-family: var(--font-head);
   letter-spacing: -0.01em;
+}
+
+/* ===== POLISH SPRINT v1.0.1 Etapa 1 — Base de interacción táctil =====
+   El público objetivo usa tablets compartidas de la escuela, donde `:hover`
+   no existe: el niño toca y no ve NADA hasta que la acción responde. La
+   auditoría midió 109 reglas `:hover` frente a 4 `:active` en toda la app.
+   Dos correcciones de base, antes de cualquier estado de pulsación por
+   control:
+
+   1. `-webkit-tap-highlight-color`: al tocar, Android pinta un recuadro gris
+      azulado del sistema, ajeno a la identidad visual. Se sustituye por el
+      verde de marca al 12%, NO por `transparent`: quitarlo dejaría cero
+      respuesta al toque en los controles que todavía no tienen `:active`.
+   2. `touch-action: manipulation`: desactiva el doble-toque para hacer zoom,
+      que es lo que obliga al navegador a esperar ~300 ms antes de disparar
+      el click. Se aplica SOLO a controles, nunca al contenido, así que el
+      zoom sigue disponible donde importa para accesibilidad. Es el mismo
+      valor que `.juego-ficha` del Clasificador ya usaba desde antes.
+
+   Ambas son invisibles con ratón: no cambian nada en escritorio. */
+button,
+a,
+summary,
+label,
+input,
+select,
+textarea,
+[role="button"] {
+  -webkit-tap-highlight-color: rgba(15, 118, 110, 0.12);
+}
+
+button,
+a,
+summary,
+[role="button"] {
+  touch-action: manipulation;
 }
 
 /* ===== SPEC-018 Fase 8 — Menos movimiento, global =====

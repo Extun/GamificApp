@@ -80,12 +80,22 @@
     border: 1px solid var(--color-border);
     border-radius: 999px;
     cursor: pointer;
-    transition: background 0.18s ease, border-color 0.18s ease;
+    transition: background var(--duration-base) var(--ease-standard),
+                border-color var(--duration-base) var(--ease-standard),
+                transform var(--duration-fast) var(--ease-standard);
 }
 
 .section-accion:hover {
     background: var(--color-primary-soft);
     border-color: var(--color-primary-light);
+}
+
+/* Pulsación (POLISH SPRINT v1.0.1 Etapa 1). En tablet es la ÚNICA señal de
+   «te he oído» entre el toque y la respuesta de la acción; con ratón añade el
+   clic que faltaba. `:not(:disabled)` para que un control apagado no simule
+   estar respondiendo. */
+.section-accion:active:not(:disabled) {
+    transform: scale(var(--press-scale));
 }
 
 /* ===== EmptyState ===== */
@@ -139,12 +149,19 @@
     border: 1px solid var(--color-primary-light);
     border-radius: 999px;
     cursor: pointer;
-    transition: transform 0.15s ease, filter 0.18s ease;
+    transition: transform var(--duration-fast) var(--ease-standard),
+                filter var(--duration-base) var(--ease-standard);
 }
 
 .empty-state-btn:hover {
     transform: translateY(-1px);
     filter: brightness(0.97);
+}
+
+/* Baja del levantamiento del hover y además se hunde: el recorrido completo
+   se lee como un botón físico que se aprieta. */
+.empty-state-btn:active:not(:disabled) {
+    transform: translateY(0) scale(var(--press-scale));
 }
 
 /* ===== QuickActionCard ===== */
@@ -428,11 +445,18 @@
     color: var(--color-text);
     font-size: 1.1rem;
     cursor: pointer;
+    transition: background var(--duration-base) var(--ease-standard),
+                border-color var(--duration-base) var(--ease-standard),
+                transform var(--duration-fast) var(--ease-standard);
 }
 
 .tablapro-paginas button:hover:not(:disabled) {
     background: var(--color-primary-soft);
     border-color: var(--color-primary-light);
+}
+
+.tablapro-paginas button:active:not(:disabled) {
+    transform: scale(var(--press-scale));
 }
 
 .tablapro-paginas button:disabled {
@@ -545,8 +569,12 @@
     color: var(--color-text-muted);
     cursor: pointer;
     border-radius: var(--radius-sm);
+    transition: background var(--duration-base) var(--ease-standard),
+                color var(--duration-base) var(--ease-standard),
+                transform var(--duration-fast) var(--ease-standard);
 }
 .toast-cerrar:hover { color: var(--color-text); background: var(--color-surface-soft, #f1f5f9); }
+.toast-cerrar:active { transform: scale(var(--press-scale)); }
 
 @keyframes toast-sube {
     from { opacity: 0; transform: translateY(10px); }
