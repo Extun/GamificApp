@@ -5,7 +5,12 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // `.gitignore` NO se aplica al flat config de ESLint: solo obedece a estos
+  // `ignores`. Sin `release` y `runtime`, `npm run lint` entra en la copia del
+  // código que deja `instalador/empaquetar.ps1` y en el Node/MySQL portables,
+  // y devuelve el recuento duplicado (58 en vez de 29) — la línea base de
+  // calidad deja de ser comparable. Ver MASTER_PLAN, ítem 62.
+  globalIgnores(['dist', 'release', 'runtime']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
