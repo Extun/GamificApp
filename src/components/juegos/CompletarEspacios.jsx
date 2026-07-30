@@ -11,6 +11,14 @@ import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import { mezclar, useRecompensa, useReporteIntento, PantallaFinal, LogroToast } from './juegosComunes';
 import './juegos.css';
 
+// Confirmaciones que rotan por frase (POLISH SPRINT v1.0.1 Etapa B). Antes
+// había una sola: «¡Respuesta guardada!», que suena a formulario y se repetía
+// idéntica en cada frase. Todas son NEUTRAS a propósito: la corrección es
+// diferida, así que ninguna puede insinuar si acertó o no («¡Bien!» estaría
+// prohibido). Rotan por índice, no al azar: dentro de un intento la misma
+// frase siempre dice lo mismo aunque React vuelva a renderizar.
+const CONFIRMACIONES = ['¡Anotado! ✏️', '¡Listo! 👍', '¡Guardado! 🌟', '¡Ahí va! 🚀'];
+
 // Pinta la frase con el espacio como hueco o con la palabra elegida.
 const Frase = ({ texto, relleno, estado }) => {
     const [antes, despues] = texto.split('___');
@@ -102,7 +110,14 @@ export function CompletarEspacios({ reto, estudianteId, onSalir, onCompletado, s
                                 style={{ width: `${(terminadas / total) * 100}%` }}
                             />
                         </div>
-                        <span>{terminadas} / {total}</span>
+                        {/* `key` cambia al avanzar de frase: React remonta el
+                            contador y la animación se reproduce otra vez. */}
+                        <span
+                            key={terminadas}
+                            className={`avance-cuenta ${terminadas > 0 ? 'is-pulso' : ''}`}
+                        >
+                            {terminadas} / {total}
+                        </span>
                     </div>
 
                     <div className="completar-tarjeta">
@@ -137,7 +152,9 @@ export function CompletarEspacios({ reto, estudianteId, onSalir, onCompletado, s
 
                         {respondida && (
                             <div className="completar-feedback" role="status">
-                                <strong>¡Respuesta guardada!</strong>
+                                <strong className="completar-sello">
+                                    {CONFIRMACIONES[terminadas % CONFIRMACIONES.length]}
+                                </strong>
                                 <button type="button" className="completar-btn-siguiente" onClick={siguiente}>
                                     {terminadas + 1 === total ? 'Ver mi resultado' : 'Siguiente frase'}
                                     <ArrowForwardRoundedIcon sx={{ fontSize: '1.05rem' }} />

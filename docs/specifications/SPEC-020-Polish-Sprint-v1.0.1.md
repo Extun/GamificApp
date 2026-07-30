@@ -1,6 +1,6 @@
 # SPEC-020 — POLISH SPRINT v1.0.1
 
-**Estado:** 🟡 **EN CURSO.** Etapa 0 y Etapa 1 implementadas y verificadas (2026-07-30). Etapas 2-6 pendientes de aprobación una por una.
+**Estado:** 🟡 **EN CURSO.** Dos vías. **Vía 1 (sistema de diseño):** etapas 0 y 1 hechas; **2-6 SUSPENDIDAS** por decisión de Fabrizio el 2026-07-30. **Vía 2 (experiencia de juego):** etapas A y B hechas; C, D y E pendientes de aprobación una por una.
 **Fecha:** 2026-07-30
 **Origen:** v1.0 publicada y repositorio limpio. Etapa posterior a la entrega, dedicada exclusivamente a **calidad visual, experiencia de uso, animaciones y calidad técnica del frontend**.
 **Alcance:** **Solo presentación.** Ninguna funcionalidad nueva, ninguna lógica de negocio, ninguna arquitectura, ningún modelo de datos, ninguna API, ninguna navegación, ningún cambio de marca ni de colores principales. Las capturas usadas en la tesis deben seguir siendo válidas.
@@ -62,6 +62,44 @@ Cada etapa es un **commit independiente** y **ninguna empieza sin aprobación ex
 
 **Orden y justificación:** 0 primero porque hace fiable la verificación de todo lo demás. 1 antes que 5 porque el estado de pulsación debe existir *antes* de acotar el hover a los dispositivos que lo tienen. 3 antes que 4-6 para no pulir código que va a desaparecer.
 
+> **Vía 1 SUSPENDIDA el 2026-07-30 por decisión de Fabrizio.** «La infraestructura visual ya quedó suficientemente sólida»: las etapas **2 a 6 quedan en pausa, no canceladas**, y el sprint se concentra en la **Vía 2** (§4-bis). Se retoman cuando Fabrizio lo indique.
+
+## 4-bis. Vía 2 — Experiencia de juego
+
+**Origen:** auditoría específica de los 7 reproductores del 2026-07-30 (§4-ter). **Encargo textual:** «que jugar se sienta mucho más divertido», pensando siempre desde un niño de educación básica, priorizando **satisfacción** sobre animación — cada interacción debe dejar la sensación de que ocurrió algo. **Pequeños detalles bien ejecutados antes que grandes efectos**, manteniendo la app ligera, elegante y coherente. Cero cambios de mecánica.
+
+| Etapa | Contenido | Estado |
+|---|---|---|
+| **A** | Memorama: celebración al emparejar y negación suave al fallar | ✅ Hecha |
+| **B** | Verdadero/Falso y Completar espacios: la confirmación se siente | ✅ Hecha |
+| **C** | Transición entre ítems en los juegos de uno-en-uno | ⬜ Pendiente |
+| **D** | Línea del tiempo: movimiento real al reordenar | ⬜ Pendiente |
+| **E** | Quiz: sensación de avance (barra de progreso + ir a la siguiente) | ⬜ Pendiente |
+
+**Orden recomendado: A → B → D → C → E.** A y B son el mayor salto con el menor riesgo y tocan un reproductor cada uno. D revive keyframes ya escritos (ítem 42). C y E van al final por transversales: C toca tres reproductores y E comparte las clases `.opcion-*` con la Misión Narrativa.
+
+**Descartado a propósito, no por olvido:** sonido (no hay sistema de audio y en un aula compartida es contraproducente), librerías de animación, canvas, y confeti durante la partida — agotaría el efecto que hoy premia la nota 100. Todo lo implementado es CSS + estado local de presentación.
+
+## 4-ter. Auditoría de la experiencia de juego (2026-07-30)
+
+**Método:** lectura de los 7 reproductores y la capa compartida, **más juego real instrumentado** con un escucha de `animationstart` sobre toda la página, para no opinar de memoria.
+
+**Diagnóstico:** *el final está muy cuidado; el durante está mudo.* El overlay de cierre tiene contador 0→nota, confeti a 100, trofeo, estrellas y retroalimentación por rango — toda la celebración concentrada en una pantalla que el niño ve **una vez**, tras 10 interacciones que no le dieron nada.
+
+| Juego | Al acertar | Al fallar | Cambio de ítem | Animaciones |
+|---|---|---|---|---|
+| Clasificador | canasta celebra + ficha aterriza | ficha rebota | — | **4** |
+| Misión Narrativa | texto de éxito | pista amable | instantáneo | 1 |
+| Memorama | nada (color fijo) | nada | volteo 0,4 s | **0** *(medido)* |
+| Quiz | ámbar «Tu respuesta» | ídem | scroll manual | **0** |
+| Verdadero/Falso | «¡Respuesta guardada!» | ídem | instantáneo | **0** |
+| Completar espacios | «¡Respuesta guardada!» | ídem | instantáneo | **0** |
+| Línea del tiempo | — (evalúa al enviar) | — | los eventos teletransportan | **0** |
+
+**Hallazgos:** (H1) el Memorama no celebra su única recompensa; (H2) «¡Respuesta guardada!» suena a formulario; (H3) los ítems se sustituyen sin transición; (H4) la Línea del tiempo teletransporta y tiene `linea-sacudida` como CSS muerto; (H5) el Quiz es el único de los 7 **sin barra de progreso**; (H6) el acierto no se acumula durante la partida; (H7) la asimetría con el Clasificador demuestra que el lenguaje existe pero se aplicó una sola vez; (H8) `LogroToast` solo aparece al final.
+
+**Restricción que condiciona todo el diseño:** la **corrección diferida está congelada** (§3 heredado de SPEC-018). En Quiz, V/F y Completar **no se puede revelar el acierto durante el intento**. Consecuencia: el feedback ahí es de **reconocimiento, no de corrección** — y por eso **no** se propone racha ni marcador en vivo en esos tres juegos, que filtrarían la respuesta. Sí sería legítimo en Clasificador, Memorama y Misión, donde la corrección ya es inmediata por diseño.
+
 ## 5. Hallazgos abiertos durante el sprint
 
 Se registran aquí y se resuelven en la etapa que corresponda; ninguno se implementa fuera de su etapa.
@@ -89,4 +127,5 @@ Implementar y verificar; **entregar el reporte y esperar aprobación antes de pa
 
 ## Registro de cambios
 
+- **2026-07-30** — **Giro del sprint a la Vía 2.** Fabrizio da por suficiente la infraestructura visual y suspende las etapas 2-6. Se añade la **auditoría de la experiencia de juego** (§4-ter, con juego real instrumentado) y la **Vía 2** (§4-bis). **Etapas A y B implementadas y verificadas** el mismo día; evidencia en `CURRENT_STATE.md`.
 - **2026-07-30** — Redacción inicial con la auditoría de partida medida. **Etapas 0 y 1 implementadas y verificadas** en el mismo día; detalle y evidencia en `CURRENT_STATE.md`. Etapas 2-6 sin empezar.

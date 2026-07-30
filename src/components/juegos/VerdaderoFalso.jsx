@@ -21,6 +21,12 @@ import './verdaderoFalso.css';
 
 const ETIQUETA = { true: 'Verdadero', false: 'Falso' };
 
+// Mismas confirmaciones que Completar espacios (POLISH SPRINT v1.0.1 Etapa B):
+// los dos juegos comparten el bloque `.completar-feedback`, así que también
+// comparten la voz. Neutras a propósito — la corrección es diferida y ninguna
+// puede insinuar el acierto.
+const CONFIRMACIONES = ['¡Anotado! ✏️', '¡Listo! 👍', '¡Guardado! 🌟', '¡Ahí va! 🚀'];
+
 export function VerdaderoFalso({ reto, estudianteId, onSalir, onCompletado, soloPrueba, onEstadoIntento }) {
     const originales = reto?.configuracion?.afirmaciones || [];
     const instruccion = reto?.configuracion?.instruccion
@@ -99,7 +105,14 @@ export function VerdaderoFalso({ reto, estudianteId, onSalir, onCompletado, solo
                                 style={{ width: `${(terminadas / total) * 100}%` }}
                             />
                         </div>
-                        <span>{terminadas} / {total}</span>
+                        {/* `key` cambia al avanzar de afirmación: React remonta
+                            el contador y la animación se reproduce otra vez. */}
+                        <span
+                            key={terminadas}
+                            className={`avance-cuenta ${terminadas > 0 ? 'is-pulso' : ''}`}
+                        >
+                            {terminadas} / {total}
+                        </span>
                     </div>
 
                     <div className="vf-tarjeta">
@@ -130,7 +143,9 @@ export function VerdaderoFalso({ reto, estudianteId, onSalir, onCompletado, solo
 
                         {respondida && (
                             <div className="completar-feedback" role="status">
-                                <strong>¡Respuesta guardada!</strong>
+                                <strong className="completar-sello">
+                                    {CONFIRMACIONES[terminadas % CONFIRMACIONES.length]}
+                                </strong>
                                 <button type="button" className="completar-btn-siguiente" onClick={siguiente}>
                                     {terminadas + 1 === total ? 'Ver mi resultado' : 'Siguiente afirmación'}
                                     <ArrowForwardRoundedIcon sx={{ fontSize: '1.05rem' }} />

@@ -66,6 +66,14 @@
     color: #92400e; /* ámbar más oscuro que --color-accent-dark; se conserva el contraste actual */
 }
 
+/* Confirmación instantánea del toque (POLISH SPRINT v1.0.1 Etapa B): la
+   tarjeta se hunde y vuelve, con la misma curva y la misma duración que
+   `.completar-opcion` en Completar espacios — los dos juegos comparten el
+   bloque de confirmación, así que también comparten el gesto. */
+.vf-opcion.is-elegida {
+    animation: eleccion-confirma 0.36s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
 .vf-opcion.is-atenuada { opacity: 0.45; }
 
 .vf-revision-texto {
