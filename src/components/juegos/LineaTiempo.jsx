@@ -198,7 +198,11 @@ export function LineaTiempo({ reto, estudianteId, onSalir, onCompletado, soloPru
                         <CheckCircleRoundedIcon sx={{ fontSize: '1.15rem' }} />
                         Comprobar orden
                     </button>
-                    <p className="linea-pista" role="status">
+                    {/* Sin `role="status"` (SPEC-021 P3-13): este texto es una
+                        pista FIJA que nunca cambia, así que la región viva solo
+                        servía para que el lector de pantalla la leyera de más al
+                        montar el juego, compitiendo con el enunciado. */}
+                    <p className="linea-pista">
                         Acomoda todos los eventos y pulsa «Comprobar orden» cuando estés listo.
                     </p>
                 </>

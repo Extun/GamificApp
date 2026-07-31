@@ -12,6 +12,11 @@ import { useEffect, useRef, useState } from 'react';
 import { calificacionDe, retroalimentacionDe } from './calificacion';
 import './resultadoActividad.css';
 
+// Elementos enfocables dentro del diálogo (mismo selector que `ModalPanel`,
+// para que el ciclo de Tab se comporte igual en toda la aplicación).
+const SELECTOR_ENFOCABLES =
+    'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
+
 const prefiereMenosMovimiento = () =>
     typeof window !== 'undefined' &&
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -223,9 +228,40 @@ export function ResultadoOverlay({
         return () => window.removeEventListener('keydown', onTecla);
     }, [onRevisar]);
 
+    // Foco atrapado dentro del diálogo (SPEC-021 P3-9). Declaraba
+    // `aria-modal="true"` —que promete que NADA de fuera es alcanzable— pero
+    // sin ciclo de Tab, así que a la tercera pulsación el foco se escapaba al
+    // contenido de detrás, que el lector de pantalla considera oculto: el
+    // usuario quedaba navegando a ciegas. `ModalPanel` ya hacía esto bien; es
+    // el mismo patrón, con el mismo selector.
+    const onTabulador = (e) => {
+        if (e.key !== 'Tab') return;
+        const dialogo = dialogoRef.current;
+        if (!dialogo) return;
+        const enfocables = [...dialogo.querySelectorAll(SELECTOR_ENFOCABLES)]
+            .filter((el) => el.offsetParent !== null);
+        if (enfocables.length === 0) {
+            e.preventDefault();
+            return;
+        }
+        const primero = enfocables[0];
+        const ultimo = enfocables[enfocables.length - 1];
+        const activo = document.activeElement;
+        if (e.shiftKey) {
+            if (activo === primero || activo === dialogo || !dialogo.contains(activo)) {
+                e.preventDefault();
+                ultimo.focus();
+            }
+        } else if (activo === ultimo || !dialogo.contains(activo)) {
+            e.preventDefault();
+            primero.focus();
+        }
+    };
+
     return (
         <div
             className="resultado-overlay"
+            onKeyDown={onTabulador}
             // Clic en el fondo (fuera de la tarjeta) = misma acción que
             // "Revisar respuestas": cerrar el popup sin navegar. Los clics
             // dentro de la tarjeta no llegan aquí (target !== currentTarget).

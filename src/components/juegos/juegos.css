@@ -107,7 +107,11 @@
     75%      { transform: rotateY(180deg) translateX(6px); }
 }
 
-.memorama-carta:disabled {
+/* La carta resuelta ya no usa `disabled` sino `aria-disabled` (SPEC-021 P1-5,
+   para no perder el foco de teclado al emparejar), así que el cursor se
+   engancha también al atributo ARIA. El aspecto no cambia. */
+.memorama-carta:disabled,
+.memorama-carta[aria-disabled="true"] {
     cursor: default;
 }
 

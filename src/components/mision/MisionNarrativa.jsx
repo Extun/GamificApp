@@ -34,6 +34,7 @@ export function MisionNarrativa({ reto, estudianteId, onSalir, onCompletado, sol
     const [fallidos, setFallidos] = useState(() => new Set()); // desafíos con algún error
     const [superado, setSuperado] = useState(false); // el desafío activo ya se resolvió
     const [semilla, setSemilla] = useState(0);       // nº de partida (reinicia la recompensa)
+    const [intentosFallidos, setIntentosFallidos] = useState(0); // ver P3-8 en `responder`
 
     const desafio = desafios[capitulo];
     const correcta = String(desafio?.correcta || '').trim().toUpperCase();
@@ -70,6 +71,13 @@ export function MisionNarrativa({ reto, estudianteId, onSalir, onCompletado, sol
         } else {
             // Marca el capítulo como fallado (ya no puntúa) pero deja reintentar.
             setFallidos((prev) => new Set(prev).add(capitulo));
+            // Contador de intentos fallidos del capítulo (SPEC-021 P3-8). Al
+            // volver a tocar LA MISMA opción incorrecta, `setElegida` recibía
+            // el mismo valor: React no re-renderizaba y no ocurría nada visible,
+            // así que el niño creía que el juego se había colgado. El contador
+            // cambia siempre, y con él la `key` de la pista, que vuelve a
+            // entrar y sacude la opción elegida.
+            setIntentosFallidos((n) => n + 1);
         }
     };
 
@@ -131,11 +139,15 @@ export function MisionNarrativa({ reto, estudianteId, onSalir, onCompletado, sol
                             if (superado && letra === correcta) estado = 'opcion-correcta';
                             else if (!superado && elegida === letra) estado = 'opcion-incorrecta';
                             else if (superado) estado = 'opcion-atenuada';
+                            const esFalloActual = !superado && elegida === letra;
                             return (
                                 <button
-                                    key={letra}
+                                    // La `key` incluye el nº de intento SOLO en la opción
+                                    // fallada: React la remonta y la sacudida se repite
+                                    // aunque se vuelva a tocar la misma (P3-8).
+                                    key={esFalloActual ? `${letra}-${intentosFallidos}` : letra}
                                     type="button"
-                                    className={`opcion-quiz ${estado}`}
+                                    className={`opcion-quiz ${estado} ${esFalloActual ? 'is-sacude' : ''}`}
                                     onClick={() => responder(letra)}
                                     disabled={superado}
                                 >
@@ -146,9 +158,10 @@ export function MisionNarrativa({ reto, estudianteId, onSalir, onCompletado, sol
                         })}
                     </div>
 
-                    {/* Error: pista amable y reintento (el capítulo ya no puntúa). */}
+                    {/* Error: pista amable y reintento (el capítulo ya no puntúa).
+                        `key`: ver P3-8 en `responder`. */}
                     {!superado && elegida && elegida !== correcta && (
-                        <div className="pregunta-justificacion mision-pista">
+                        <div className="pregunta-justificacion mision-pista" key={intentosFallidos}>
                             <LightbulbRoundedIcon className="justificacion-icono" />
                             <div>
                                 <strong>¡Casi! Inténtalo otra vez.</strong>

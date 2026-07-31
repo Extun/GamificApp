@@ -16,6 +16,7 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import CancelRoundedIcon from '@mui/icons-material/CancelRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import { mezclar, useRecompensa, useReporteIntento, PantallaFinal, LogroToast } from './juegosComunes';
+import { useFocoConfirmacion } from '../../hooks/useFocoConfirmacion';
 import './juegos.css';
 import './verdaderoFalso.css';
 
@@ -52,6 +53,9 @@ export function VerdaderoFalso({ reto, estudianteId, onSalir, onCompletado, solo
     const total = afirmaciones.length;
     const completado = total > 0 && terminadas === total;
     const respondida = elegida !== null;
+    // Al responder, la opción pulsada pasa a `disabled` y el navegador tira el
+    // foco a <body>; este ref lo recoge en el bloque de confirmación (P1-5).
+    const refConfirmacion = useFocoConfirmacion(respondida);
 
     const { puntosGanados, toast, setToast, xpIntento } = useRecompensa({
         completado, estudianteId, reto, tipo: 'verdadero-falso', aciertos, total, semilla, onCompletado, soloPrueba
@@ -98,7 +102,10 @@ export function VerdaderoFalso({ reto, estudianteId, onSalir, onCompletado, solo
                         {instruccion}
                     </p>
 
-                    <div className="juego-dnd-avance">
+                    {/* role="status": el avance se anunciaba solo visualmente, así
+                        que quien usa lector de pantalla respondía y no recibía
+                        ninguna señal de que había avanzado (SPEC-021 P2-11). */}
+                    <div className="juego-dnd-avance" role="status">
                         <div className="progress-track">
                             <div
                                 className="progress-fill progress-fill-accent"
@@ -148,7 +155,7 @@ export function VerdaderoFalso({ reto, estudianteId, onSalir, onCompletado, solo
                         </div>
 
                         {respondida && (
-                            <div className="completar-feedback" role="status">
+                            <div className="completar-feedback" role="status" ref={refConfirmacion} tabIndex={-1}>
                                 <strong className="completar-sello">
                                     {CONFIRMACIONES[terminadas % CONFIRMACIONES.length]}
                                 </strong>

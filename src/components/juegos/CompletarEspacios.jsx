@@ -9,6 +9,7 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import CancelRoundedIcon from '@mui/icons-material/CancelRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import { mezclar, useRecompensa, useReporteIntento, PantallaFinal, LogroToast } from './juegosComunes';
+import { useFocoConfirmacion } from '../../hooks/useFocoConfirmacion';
 import './juegos.css';
 
 // Confirmaciones que rotan por frase (POLISH SPRINT v1.0.1 Etapa B). Antes
@@ -57,6 +58,8 @@ export function CompletarEspacios({ reto, estudianteId, onSalir, onCompletado, s
     const total = frases.length;
     const completado = total > 0 && terminadas === total;
     const respondida = elegida !== null;
+    // Recoge el foco que se pierde al deshabilitar la opción pulsada (P1-5).
+    const refConfirmacion = useFocoConfirmacion(respondida);
 
     const { puntosGanados, toast, setToast, xpIntento } = useRecompensa({
         completado, estudianteId, reto, tipo: 'completar', aciertos, total, semilla, onCompletado, soloPrueba
@@ -103,7 +106,8 @@ export function CompletarEspacios({ reto, estudianteId, onSalir, onCompletado, s
                         {instruccion}
                     </p>
 
-                    <div className="juego-dnd-avance">
+                    {/* role="status": ver P2-11 en juegosComunes/VerdaderoFalso. */}
+                    <div className="juego-dnd-avance" role="status">
                         <div className="progress-track">
                             <div
                                 className="progress-fill progress-fill-accent"
@@ -155,7 +159,7 @@ export function CompletarEspacios({ reto, estudianteId, onSalir, onCompletado, s
                         </div>
 
                         {respondida && (
-                            <div className="completar-feedback" role="status">
+                            <div className="completar-feedback" role="status" ref={refConfirmacion} tabIndex={-1}>
                                 <strong className="completar-sello">
                                     {CONFIRMACIONES[terminadas % CONFIRMACIONES.length]}
                                 </strong>

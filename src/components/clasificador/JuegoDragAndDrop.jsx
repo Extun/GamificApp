@@ -9,8 +9,13 @@ import './juegoDragAndDrop.css';
 // persiste los puntos con gamificationService.guardarProgreso().
 //
 // Interacción doble para inclusión total:
-//  · Arrastrar y soltar (mouse / pantallas táctiles modernas vía HTML5 DnD).
-//  · Tocar el elemento y luego tocar la canasta (más fácil para los pequeños).
+//  · Tocar el elemento y luego tocar la canasta. Es el modo PRINCIPAL: el
+//    único que funciona en tablet, que es el dispositivo real de la escuela.
+//  · Arrastrar y soltar (HTML5 DnD). Solo con ratón: los navegadores móviles
+//    NO implementan el arrastre de HTML5 sobre eventos táctiles. El comentario
+//    que había aquí afirmaba lo contrario ("pantallas táctiles modernas") y
+//    fue lo que justificó poner el arrastre primero en la instrucción que lee
+//    el niño (SPEC-021 P2-10).
 //
 // Puntaje: cada elemento clasificado bien AL PRIMER INTENTO vale
 // PUNTOS_POR_ACIERTO XP; equivocarse hace "rebotar" el elemento y ya no puntúa,
@@ -112,12 +117,18 @@ export function JuegoDragAndDrop({ reto, estudianteId, onSalir, onCompletado, so
             {!completado && (
                 <p className="juego-dnd-instruccion">
                     <TouchAppRoundedIcon sx={{ fontSize: '1.2rem' }} />
-                    Arrastra cada tarjeta a su canasta (o tócala y luego toca la canasta).
+                    {/* El gesto que SÍ funciona va primero (SPEC-021 P2-10). El
+                        arrastrar-y-soltar de HTML5 no existe en los navegadores
+                        móviles, y la tablet es el dispositivo real de la escuela:
+                        el niño intentaba lo primero que leía, no pasaba nada, y el
+                        modo que funciona estaba entre paréntesis. Solo cambia el
+                        orden de la frase; la mecánica es la misma. */}
+                    Toca una tarjeta y luego toca su canasta (en computadora también puedes arrastrarla).
                 </p>
             )}
 
-            {/* Marcador de avance */}
-            <div className="juego-dnd-avance">
+            {/* Marcador de avance. role="status": ver P2-11. */}
+            <div className="juego-dnd-avance" role="status">
                 <div className="progress-track">
                     <div
                         className="progress-fill progress-fill-accent"

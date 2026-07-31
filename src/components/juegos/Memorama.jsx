@@ -122,7 +122,8 @@ export function Memorama({ reto, estudianteId, onSalir, onCompletado, soloPrueba
                 </p>
             )}
 
-            <div className="juego-dnd-avance">
+            {/* role="status": ver P2-11. */}
+            <div className="juego-dnd-avance" role="status">
                 <div className="progress-track">
                     <div
                         className="progress-fill progress-fill-accent"
@@ -153,7 +154,15 @@ export function Memorama({ reto, estudianteId, onSalir, onCompletado, soloPrueba
                                 className={`memorama-carta ${arriba ? 'is-arriba' : ''} ${emparejadas.has(carta.id) ? 'is-resuelta' : ''} ${recienPareja.includes(carta.id) ? 'is-pareja' : ''} ${fallando.includes(carta.id) ? 'is-fallo' : ''}`}
                                 onClick={() => voltear(carta)}
                                 aria-label={arriba ? carta.texto : 'Carta boca abajo'}
-                                disabled={emparejadas.has(carta.id)}
+                                // `aria-disabled` en vez de `disabled` (SPEC-021 P1-5):
+                                // al emparejar, ambas cartas se deshabilitaban y, como
+                                // una de ellas tenía el foco, el navegador lo tiraba a
+                                // <body> — el siguiente Tab reempezaba en el principio
+                                // del documento, en mitad de la partida. Así la carta
+                                // resuelta conserva el foco y sigue en el recorrido,
+                                // anunciándose como no disponible. `voltear` ya ignora
+                                // las emparejadas, así que la mecánica no cambia.
+                                aria-disabled={emparejadas.has(carta.id) || undefined}
                             >
                                 <span className="memorama-carta-interior">
                                     <span className="memorama-carta-dorso" aria-hidden="true">❓</span>

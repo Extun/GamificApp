@@ -374,7 +374,13 @@ export function AdminDashboard() {
     const invitacionesUsadas = invitaciones.filter((i) => i.estado === 'usado');
     const invitacionesPendientes = invitaciones.filter((i) => i.estado === 'pendiente').length;
 
-    const nombreAdmin = authService.getUsuario()?.username || 'admin';
+    // Misma corrección que P2-1 en el panel del docente: el sidebar mostraba
+    // "Administrador" con el `username` como detalle, mientras la cabecera de
+    // la propia pantalla ya conoce a la persona. Nombre real arriba, rol como
+    // detalle, igual que en los otros dos paneles.
+    const usuarioAdmin = authService.getUsuario();
+    const nombreAdmin = usuarioAdmin?.nombre_completo || usuarioAdmin?.username || 'Administrador';
+    const rolAdmin = usuarioAdmin?.es_principal ? 'Administrador principal' : 'Administrador';
 
     return (
         <SidebarLayout
@@ -399,7 +405,11 @@ export function AdminDashboard() {
             ]
                 .filter((item) => !item.permiso || puede(item.permiso))
                 .map((item) => ({ ...item, activo: pagina === item.id, onClick: () => setPagina(item.id) }))}
-            usuario={{ inicial: 'A', nombre: 'Administrador', detalle: nombreAdmin }}
+            usuario={{
+                inicial: nombreAdmin.charAt(0).toUpperCase(),
+                nombre: nombreAdmin,
+                detalle: rolAdmin
+            }}
             accionesFooter={[
                 { label: 'Cerrar sesión', Icon: LogoutRoundedIcon, onClick: cerrarSesion, tono: 'peligro' }
             ]}

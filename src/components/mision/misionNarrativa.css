@@ -120,6 +120,24 @@
 /* --- Feedback --- */
 .mision-pista { border-color: var(--color-accent); }
 
+/* Reintento sobre la MISMA opción incorrecta (SPEC-021 P3-8). Sin esto, volver
+   a tocarla no producía ningún cambio: `setElegida` recibía el mismo valor, no
+   había re-render y el niño creía que el juego se había colgado. La sacudida
+   es el mismo gesto —y la misma duración— que ya usa el Memorama al fallar,
+   así que el "no es esa" se dice igual en toda la aplicación.
+   `prefers-reduced-motion` la anula por la red de seguridad de index.css. */
+/* Selector acotado a la Misión: `.opcion-quiz` es una clase COMPARTIDA con el
+   Quiz, y esta animación es solo de aquí (en el Quiz no se puede reintentar). */
+.mision-opciones .opcion-quiz.is-sacude {
+    animation: mision-sacude 0.45s ease;
+}
+
+@keyframes mision-sacude {
+    0%, 100% { transform: translateX(0); }
+    25%      { transform: translateX(-6px); }
+    75%      { transform: translateX(6px); }
+}
+
 .mision-exito {
     display: flex;
     flex-direction: column;

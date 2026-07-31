@@ -86,7 +86,11 @@ export function PreguntaCard({ pregunta, indice, onResponder, revelar = true }) 
     };
 
     return (
-        <div className="pregunta-card">
+        // tabIndex={-1}: al responder, la alternativa pulsada pasa a `disabled`
+        // y el navegador tira el foco a <body> (SPEC-021 P1-5). El contenedor
+        // acompaña al niño a la siguiente pregunta pendiente y le lleva también
+        // el foco, así el usuario de teclado mira y "está" en el mismo sitio.
+        <div className="pregunta-card" tabIndex={-1}>
             <p className="pregunta-enunciado">
                 <span className="pregunta-num">{indice + 1}</span>
                 {pregunta.pregunta}
@@ -289,6 +293,14 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
         const suave = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
         requestAnimationFrame(() => {
             nodo.scrollIntoView({ behavior: suave ? 'smooth' : 'auto', block: 'center' });
+            // El foco viaja con la vista (P1-5): al deshabilitarse la
+            // alternativa pulsada cayó a <body>, así que el siguiente Tab
+            // reempezaba desde el principio del documento mientras la pantalla
+            // mostraba otra pregunta. Solo se mueve si de verdad se perdió,
+            // para no robárselo a nadie.
+            if (document.activeElement === document.body || document.activeElement === null) {
+                nodo.focus({ preventScroll: true });
+            }
         });
     };
 
@@ -416,8 +428,9 @@ export function QuizInteractivo({ preguntas, mostrarPuntaje = false, estudianteI
                 una página larga y una barra que se pierde al segundo scroll no
                 comunica «progreso CONSTANTE», que es la emoción de este juego.
                 Solo en modo puntaje: fuera de él nadie cuenta respuestas. */}
+            {/* role="status": ver P2-11. El avance se anunciaba solo en lo visual. */}
             {mostrarPuntaje && total > 0 && !completado && (
-                <div className="quiz-avance juego-dnd-avance">
+                <div className="quiz-avance juego-dnd-avance" role="status">
                     <div className="progress-track">
                         <div
                             className="progress-fill progress-fill-accent"
