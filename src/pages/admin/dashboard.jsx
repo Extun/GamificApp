@@ -235,10 +235,18 @@ export function Dashboard() {
 
     const [materias, setMaterias] = useState([]);
     useEffect(() => {
+        // Bandera de vigencia (SPEC-021 P2-12): este efecto depende de
+        // `pagina`, así que CADA clic del sidebar relanza las dos peticiones
+        // encadenadas. Sin cancelar, cinco clics rápidos dejaban cinco cadenas
+        // en vuelo y pintaba la que respondiera ÚLTIMA, no la del destino
+        // actual — con red lenta, que es el escenario esperado en la escuela,
+        // el docente veía contenido de una sección sobre otra.
+        let vigente = true;
         listarMaterias()
             .catch(() => [])
             .then(() => docenteService.misMaterias())
             .then((lista) => {
+                if (!vigente) return;
                 setMaterias((prev) => {
                     const nombres = lista.map((m) => m.nombre);
                     // Misma referencia si nada cambió, para no re-disparar los
@@ -248,9 +256,11 @@ export function Dashboard() {
                 setEstadoMaterias('listo');
             })
             .catch((err) => {
+                if (!vigente) return;
                 setEstadoMaterias('error');
                 setErrorMaterial(`No se pudieron cargar tus materias: ${err.message}`);
             });
+        return () => { vigente = false; };
         // Depende de `pagina`: al cambiar de sección se re-consulta la BD,
         // así una materia recién asignada por el admin aparece sin recargar.
     }, [pagina, intentoInicio]);

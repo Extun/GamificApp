@@ -16,6 +16,7 @@ import { useHistorialRetos, HistorialActividades } from '../juegos/HistorialActi
 import { PreviewJuegoModal } from '../juegos/PreviewJuegoModal';
 import { BarraAccionesEditor } from '../juegos/BarraAccionesEditor';
 import { CampoTema } from '../juegos/CampoTema';
+import { useConfirmacion } from '../../hooks/useConfirmacion';
 import { CamposDificultadCurso } from '../juegos/CamposActividad';
 import { useCursos } from '../juegos/metadatosActividad';
 import './editorClasificador.css';
@@ -38,6 +39,9 @@ const categoriaVacia = (nombre = '') => ({ id: idUnico(), nombre, elementos: [] 
 export const COLORES_CATEGORIA = ['teal', 'amber', 'violet', 'rose'];
 
 export function EditorClasificador({ materia }) {
+    // Confirmaciones con la estética de la casa (SPEC-021 P3-5): sustituyen a
+    // los `window.confirm` que sobrevivieron a la migración de SPEC-018.
+    const { pedirConfirmacion, dialogoConfirmacion } = useConfirmacion();
     const [titulo, setTitulo] = useState('');
     const [categorias, setCategorias] = useState([
         categoriaVacia(), categoriaVacia()
@@ -177,6 +181,11 @@ export function EditorClasificador({ materia }) {
         editarCategoria(cat.id, { elementos: cat.elementos.filter((_, i) => i !== indice) });
     };
 
+    // Generar desde el formulario REEMPLAZA el juego abierto. Se avisa para no
+    // perder trabajo por accidente (para sumar contenido está "Añadir con IA"
+    // en el menú Agregar). El aviso usa ConfirmDialog y no `window.confirm`
+    // (SPEC-021 P3-5): un diálogo del sistema operativo dentro de la app rompe
+    // la identidad visual y no respeta el foco ni los estilos de la casa.
     const generarConIA = async (e) => {
         e.preventDefault();
         if (!temaIA.trim() || generandoIA) return;
@@ -184,14 +193,23 @@ export function EditorClasificador({ materia }) {
             setError('No se reconoce la materia actual; recarga la página.');
             return;
         }
-        // Generar desde el formulario REEMPLAZA el juego abierto. Se avisa para
-        // no perder trabajo por accidente (para sumar contenido está "Añadir
-        // con IA" en el menú Agregar).
-        if (totalElementos > 0 && !window.confirm(
-            'Esto crea un juego NUEVO y cierra el que tienes abierto '
-            + `(${entradaId ? 'queda guardado en «Últimos generados»' : 'sin título no queda guardado'}). `
-            + 'Para sumar categorías o elementos al actual usa el botón «Agregar» de abajo. ¿Continuar?'
-        )) return;
+        if (totalElementos > 0) {
+            pedirConfirmacion({
+                titulo: '¿Crear un juego nuevo?',
+                mensaje: 'Esto crea un juego NUEVO y cierra el que tienes abierto.',
+                detalle: entradaId
+                    ? 'El actual queda guardado en «Últimos generados». Para sumar categorías o elementos al que ya tienes, usa el botón «Agregar» de abajo.'
+                    : 'El actual no tiene título, así que no queda guardado. Para sumar categorías o elementos al que ya tienes, usa el botón «Agregar» de abajo.',
+                confirmarTexto: 'Crear uno nuevo',
+                cancelarTexto: 'Seguir con este',
+                accion: ejecutarGeneracionIA
+            });
+            return;
+        }
+        ejecutarGeneracionIA();
+    };
+
+    const ejecutarGeneracionIA = async () => {
         setGenerandoIA(true);
         setError('');
         setAviso('');
@@ -288,9 +306,22 @@ export function EditorClasificador({ materia }) {
     // Cierra el juego abierto y deja el editor en blanco. Si tiene título, el
     // borrador ya vive en la BD y se reabre desde "Últimos generados".
     const cerrarEditor = () => {
-        if (!entradaId && totalElementos > 0 && !window.confirm(
-            'Este juego no tiene título, así que no quedó guardado. ¿Cerrarlo de todos modos?'
-        )) return;
+        if (!entradaId && totalElementos > 0) {
+            pedirConfirmacion({
+                titulo: '¿Cerrar sin guardar?',
+                mensaje: 'Este juego no tiene título, así que no quedó guardado.',
+                detalle: 'Si le pones un título, el borrador se guarda solo y podrás reabrirlo desde «Últimos generados».',
+                variante: 'peligro',
+                confirmarTexto: 'Cerrar de todos modos',
+                cancelarTexto: 'Seguir editando',
+                accion: ejecutarCierre
+            });
+            return;
+        }
+        ejecutarCierre();
+    };
+
+    const ejecutarCierre = () => {
         cancelarSincronizacion(entradaId);
         setEntradaId(null);
         setPublicadoEnBD(false);
@@ -594,6 +625,7 @@ export function EditorClasificador({ materia }) {
                     }
                 }}
             />
+            {dialogoConfirmacion}
         </section>
     );
 }

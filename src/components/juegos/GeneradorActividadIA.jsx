@@ -30,6 +30,7 @@ import { CampoTema } from './CampoTema';
 import { DIFICULTADES_UI } from './metadatosActividad';
 import { PreviewJuegoModal } from './PreviewJuegoModal';
 import { useHistorialRetos, HistorialActividades } from './HistorialActividades';
+import { useConfirmacion } from '../../hooks/useConfirmacion';
 // Acordeón compartido con el editor del quiz (mismas clases editor-item*).
 import '../quiz/editorQuiz.css';
 
@@ -49,6 +50,8 @@ const clon = (v) => JSON.parse(JSON.stringify(v));
 const CANTIDADES_POR_DEFECTO = [3, 5, 8];
 
 export function GeneradorActividadIA({ materia, tipo }) {
+    // Confirmaciones con la estética de la casa (SPEC-021 P3-5).
+    const { pedirConfirmacion, dialogoConfirmacion } = useConfirmacion();
     // Definición del tipo en el registro: única fuente de las decisiones que
     // antes eran mapas por tipo en este archivo.
     const juego = obtenerJuego(tipo);
@@ -146,12 +149,25 @@ export function GeneradorActividadIA({ materia, tipo }) {
         }
         // Generar desde el formulario REEMPLAZA lo abierto en el editor. Se
         // avisa para no perder trabajo por accidente (para sumar ítems está
-        // "Añadir con IA" en el menú Agregar).
-        if (items > 0 && !window.confirm(
-            'Esto crea una actividad NUEVA y cierra la que tienes abierta '
-            + `(${actividad?.retoId ? 'queda guardada en «Últimos generados»' : 'sin título no queda guardada'}). `
-            + 'Para agregar más ítems a la actual usa el botón «Agregar» de abajo. ¿Continuar?'
-        )) return;
+        // "Añadir con IA" en el menú Agregar). Con ConfirmDialog, no con
+        // `window.confirm` (SPEC-021 P3-5).
+        if (items > 0) {
+            pedirConfirmacion({
+                titulo: '¿Crear una actividad nueva?',
+                mensaje: 'Esto crea una actividad NUEVA y cierra la que tienes abierta.',
+                detalle: actividad?.retoId
+                    ? 'La actual queda guardada en «Últimos generados». Para agregar más ítems a la que ya tienes, usa el botón «Agregar» de abajo.'
+                    : 'La actual no tiene título, así que no queda guardada. Para agregar más ítems a la que ya tienes, usa el botón «Agregar» de abajo.',
+                confirmarTexto: 'Crear una nueva',
+                cancelarTexto: 'Seguir con esta',
+                accion: () => ejecutarGeneracion(materiaId)
+            });
+            return;
+        }
+        ejecutarGeneracion(materiaId);
+    };
+
+    const ejecutarGeneracion = async (materiaId) => {
         setCargando(true);
         setError('');
         setAviso('');
@@ -775,6 +791,7 @@ export function GeneradorActividadIA({ materia, tipo }) {
                 onCerrar={cerrarEditor}
                 onEliminar={quitarDelHistorial}
             />
+            {dialogoConfirmacion}
         </section>
     );
 }

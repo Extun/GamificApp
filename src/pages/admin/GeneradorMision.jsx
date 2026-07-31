@@ -20,6 +20,7 @@ import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import '../../components/mision/misionNarrativa.css';
 // Acordeón compartido con el editor del quiz (mismas clases editor-item*).
 import '../../components/quiz/editorQuiz.css';
+import { useConfirmacion } from '../../hooks/useConfirmacion';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -62,6 +63,8 @@ const desafioCompleto = (d) =>
 // alternativas, añadir/quitar desafíos, dificultad y curso) y la publica como
 // reto tipo 'mision' (tabla `retos`, misma vía que quiz/clasificador).
 export function GeneradorMision({ materia = 'la materia' }) {
+    // Confirmaciones con la estética de la casa (SPEC-021 P3-5).
+    const { pedirConfirmacion, dialogoConfirmacion } = useConfirmacion();
     const [tema, setTema] = useState('');
     const [tematica, setTematica] = useState(TEMATICAS[0].id);
     const [mision, setMision] = useState(null);       // borrador en edición
@@ -233,11 +236,25 @@ export function GeneradorMision({ materia = 'la materia' }) {
         e.preventDefault();
         if (!tema.trim() || cargando) return;
         // Generar REEMPLAZA la misión abierta en el editor; se avisa para no
-        // perder trabajo por accidente (el borrador queda en "Últimos generados").
-        if (mision && !window.confirm(
-            'Esto crea una aventura NUEVA y cierra la que tienes abierta '
-            + `(${entradaId ? 'queda guardada en «Últimos generados»' : 'no alcanzó a guardarse'}). ¿Continuar?`
-        )) return;
+        // perder trabajo por accidente (el borrador queda en "Últimos
+        // generados"). Con ConfirmDialog, no `window.confirm` (SPEC-021 P3-5).
+        if (mision) {
+            pedirConfirmacion({
+                titulo: '¿Crear una aventura nueva?',
+                mensaje: 'Esto crea una aventura NUEVA y cierra la que tienes abierta.',
+                detalle: entradaId
+                    ? 'La actual queda guardada en «Últimos generados».'
+                    : 'La actual no alcanzó a guardarse.',
+                confirmarTexto: 'Crear una nueva',
+                cancelarTexto: 'Seguir con esta',
+                accion: ejecutarGeneracion
+            });
+            return;
+        }
+        ejecutarGeneracion();
+    };
+
+    const ejecutarGeneracion = async () => {
         setCargando(true);
         setError('');
         setAviso('');
@@ -696,6 +713,7 @@ export function GeneradorMision({ materia = 'la materia' }) {
                     }
                 }}
             />
+            {dialogoConfirmacion}
         </section>
     );
 }

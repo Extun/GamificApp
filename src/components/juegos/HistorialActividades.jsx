@@ -59,7 +59,10 @@ export function useHistorialRetos(tipo, materia) {
     const subclave = `${tipo}|${materia}`;
     const [historial, setHistorial] = useState(() => leerCache()[subclave] || []);
     const [cargado, setCargado] = useState(false);
-    const timersRef = useRef({});
+    // Escrituras con debounce a la espera, por id de borrador:
+    // { [id]: { timer, cambios } }. Los `cambios` se guardan junto al
+    // temporizador para poder VOLCARLOS al desmontar (SPEC-021 P2-5).
+    const pendientesRef = useRef({});
 
     const refrescar = useCallback(async () => {
         try {
@@ -80,8 +83,22 @@ export function useHistorialRetos(tipo, materia) {
 
     useEffect(() => {
         refrescar();
-        const timers = timersRef.current;
-        return () => Object.values(timers).forEach(clearTimeout);
+        const pendientes = pendientesRef.current;
+        // Al desmontar (el docente pulsa otra sección del sidebar, cambia de
+        // materia…) la limpieza CANCELABA los temporizadores pendientes, así
+        // que lo escrito dentro de la ventana de debounce se perdía en
+        // silencio: el debounce protege contra ráfagas de teclas, no contra el
+        // desmontaje, y en el panel del docente no hay guardia de salida
+        // (SPEC-021 P2-5). Ahora se vuelca: se cancela el temporizador y se
+        // lanza la escritura en el acto. Sin `refrescar` después, porque el
+        // componente ya no está; el `.catch` evita un rechazo sin manejar.
+        return () => {
+            Object.entries(pendientes).forEach(([id, pendiente]) => {
+                clearTimeout(pendiente.timer);
+                delete pendientes[id];
+                actualizarReto(id, pendiente.cambios).catch(() => {});
+            });
+        };
     }, [refrescar]);
 
     // Crea el borrador en la BD. Lanza si el servidor lo rechaza o no hay red:
@@ -95,10 +112,14 @@ export function useHistorialRetos(tipo, materia) {
         return data;
     };
 
+    // Descarta la escritura pendiente de ese borrador. Es lo correcto cuando
+    // el usuario cierra o elimina la entrada a propósito; el desmontaje, en
+    // cambio, la vuelca (ver el efecto de arriba).
     const cancelarSincronizacion = (id) => {
-        if (timersRef.current[id]) {
-            clearTimeout(timersRef.current[id]);
-            delete timersRef.current[id];
+        const pendiente = pendientesRef.current[id];
+        if (pendiente) {
+            clearTimeout(pendiente.timer);
+            delete pendientesRef.current[id];
         }
     };
 
@@ -108,12 +129,13 @@ export function useHistorialRetos(tipo, materia) {
     const sincronizar = (id, cambios) => {
         if (!id) return;
         cancelarSincronizacion(id);
-        timersRef.current[id] = setTimeout(() => {
-            delete timersRef.current[id];
+        const timer = setTimeout(() => {
+            delete pendientesRef.current[id];
             actualizarReto(id, cambios)
                 .then(refrescar)
                 .catch((err) => console.warn('No se pudo sincronizar el borrador:', err.message));
         }, DEBOUNCE_MS);
+        pendientesRef.current[id] = { timer, cambios };
     };
 
     const eliminar = async (id) => {

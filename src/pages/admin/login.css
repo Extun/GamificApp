@@ -526,6 +526,29 @@
     text-align: center;
 }
 
+/* Copiar / imprimir las credenciales que solo se muestran una vez
+   (SPEC-021 P1-2). Dos acciones secundarias, con el mismo peso visual que
+   el resto de enlaces de la tarjeta: la acción principal sigue siendo
+   "¡Ya los anoté, quiero empezar!". */
+.cred-acciones {
+    display: flex;
+    gap: 18px;
+    justify-content: center;
+    margin: 14px 0 4px;
+    flex-wrap: wrap;
+}
+
+/* En papel sobran el fondo decorativo y los botones: se imprime la tarjeta. */
+@media print {
+    .login-fondo,
+    .cred-acciones,
+    .login-submit,
+    .login-links { display: none !important; }
+
+    .login-page { background: #fff; }
+    .login-card { box-shadow: none; border: 1px solid #ccc; }
+}
+
 /* Explicación bajo el desplegable de cursos: por qué está vacío o
    deshabilitado (SPEC-021 P1-1 / P1-1-bis). Tono de nota, no de error: el
    caso más frecuente —"tu profe aún no preparó la lista"— no es un fallo. */

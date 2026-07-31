@@ -128,6 +128,40 @@ export function RegistroEstudiante() {
         setError('');
     };
 
+    // --- Conservar las credenciales (SPEC-021 P1-2, parte de bajo riesgo) ---
+    const [copiado, setCopiado] = useState(false);
+    const copiarCredenciales = async () => {
+        if (!credenciales) return;
+        const lineas = [
+            'Mis datos para entrar a GamificApp',
+            `Mi nombre: ${credenciales.usuario?.nombre_completo || ''}`,
+            credenciales.pin ? `Mi PIN: ${credenciales.pin}` : null,
+            credenciales.codigo_emergencia ? `Código de emergencia: ${credenciales.codigo_emergencia}` : null
+        ].filter(Boolean).join('\n');
+        try {
+            await navigator.clipboard.writeText(lineas);
+            setCopiado(true);
+            setTimeout(() => setCopiado(false), 3000);
+        } catch {
+            // Sin permiso de portapapeles (o navegador antiguo): no se finge
+            // que funcionó. Los datos siguen en pantalla para copiarlos a mano.
+            setError('No pudimos copiarlos. Anótalos de tu pantalla, por favor.');
+        }
+    };
+
+    // Aviso al cerrar o recargar mientras las credenciales están a la vista:
+    // el código de activación YA se consumió, así que esta pantalla no se
+    // puede volver a pedir.
+    useEffect(() => {
+        if (!credenciales) return undefined;
+        const alSalir = (e) => {
+            e.preventDefault();
+            e.returnValue = '';
+        };
+        window.addEventListener('beforeunload', alSalir);
+        return () => window.removeEventListener('beforeunload', alSalir);
+    }, [credenciales]);
+
     const nombresVisibles = pendientes.filter((p) =>
         p.nombre.toLowerCase().includes(filtro.trim().toLowerCase()));
 
@@ -171,6 +205,22 @@ export function RegistroEstudiante() {
                                         <strong>{credenciales.codigo_emergencia}</strong>
                                     </div>
                                 )}
+                            </div>
+
+                            {/* Copiar e imprimir (SPEC-021 P1-2, parte de bajo
+                                riesgo). Estos dos datos se muestran UNA sola vez y
+                                se le pide a un niño de 6-9 años que los transcriba a
+                                mano bajo presión; si cierra la pestaña aquí, su
+                                cuenta ya está activa pero el camino por el que entró
+                                ya no existe. No se toca autenticación: solo se le dan
+                                dos formas más de conservarlos. */}
+                            <div className="cred-acciones">
+                                <button type="button" className="login-link" onClick={copiarCredenciales}>
+                                    {copiado ? '✅ ¡Copiado!' : '📋 Copiar mis datos'}
+                                </button>
+                                <button type="button" className="login-link" onClick={() => window.print()}>
+                                    🖨️ Imprimir
+                                </button>
                             </div>
 
                             <button className="login-submit" onClick={() => navigate('/dashboard')}>
