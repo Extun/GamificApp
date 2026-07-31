@@ -51,6 +51,7 @@ import {
     TablaPro
 } from '../../components/dashboard/DashboardWidgets';
 import { useConfirmacion } from '../../hooks/useConfirmacion';
+import { useCapasAtras } from '../../hooks/useCapasAtras';
 import estudiantesService from '../../services/estudiantesService';
 
 // Selector de materias como tarjetas pastel (asistente de creación de
@@ -216,6 +217,20 @@ export function AdminDashboard() {
     const [materiasEdicion, setMateriasEdicion] = useState([]);
     const [cursosEdicion, setCursosEdicion] = useState([]);
     const [guardandoMaterias, setGuardandoMaterias] = useState(false);
+
+    // Botón Atrás del navegador (SPEC-021 P0-2, generalizado a los tres
+    // paneles). Sin esto, Atrás desde cualquier módulo salía de /dashboard y
+    // devolvía al administrador al Inicio, perdiendo el módulo abierto y los
+    // filtros de la tabla. Ahora cierra primero el modal y después vuelve al
+    // Inicio, que es el nivel superior de este panel.
+    useCapasAtras([
+        { activo: pagina !== 'inicio', cerrar: () => setPagina('inicio') },
+        { activo: importando, cerrar: () => setImportando(false) },
+        { activo: agregando, cerrar: () => setAgregando(false) },
+        { activo: Boolean(editandoEstudiante), cerrar: () => setEditandoEstudiante(null) },
+        { activo: Boolean(codigoNuevo), cerrar: () => setCodigoNuevo(null) },
+        { activo: Boolean(docenteEditando), cerrar: () => setDocenteEditando(null) },
+    ]);
 
     // `claves` = null → carga COMPLETA (montaje y después de cada escritura).
     // Con una lista de claves solo se piden esos datos: es lo que usa el

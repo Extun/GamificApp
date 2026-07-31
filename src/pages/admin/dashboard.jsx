@@ -33,6 +33,7 @@ import {
     formatearFecha
 } from '../../components/dashboard/DashboardWidgets';
 import estudiantesService from '../../services/estudiantesService';
+import { useCapasAtras } from '../../hooks/useCapasAtras';
 import LocalLibraryRoundedIcon from '@mui/icons-material/LocalLibraryRounded';
 // LibraryBooksRoundedIcon: lo usaba la entrada "Banco de preguntas" del menú,
 // hoy oculta (ver más abajo). Se reimporta al reactivarla.
@@ -412,6 +413,26 @@ export function Dashboard() {
     // dificultad y cantidad, y guarda un BORRADOR (nunca publica sola).
     const [sorpresaCargando, setSorpresaCargando] = useState(false);
     const [sorpresaResultado, setSorpresaResultado] = useState(null);
+
+    // Botón Atrás del navegador (SPEC-021 P0-2, generalizado a los tres
+    // paneles). Toda la navegación del docente vive en `useState` sobre una
+    // sola ruta, así que para el navegador nunca pasa nada y Atrás salía de
+    // /dashboard: el panel se desmontaba y volvía al Inicio, perdiendo el
+    // formulario a medio llenar. Con los centinelas, Atrás cierra el modal
+    // abierto, luego la materia, luego la sección, y solo entonces sale.
+    // Cada `cerrar` es exactamente el mismo manejador que usa el botón de
+    // cerrar del elemento, así que Atrás y la X hacen lo mismo.
+    useCapasAtras([
+        { activo: pagina !== '', cerrar: () => { setPagina(''); setMateriaSeleccionada(null); } },
+        { activo: Boolean(materiaSeleccionada), cerrar: () => setMateriaSeleccionada(null) },
+        { activo: Boolean(archivoPreview), cerrar: () => setArchivoPreview(null) },
+        { activo: Boolean(fichaEstudiante), cerrar: () => setFichaEstudiante(null) },
+        { activo: importando, cerrar: () => setImportando(false) },
+        { activo: agregando, cerrar: () => setAgregando(false) },
+        { activo: Boolean(editandoEstudiante), cerrar: () => setEditandoEstudiante(null) },
+        { activo: Boolean(codigoNuevo), cerrar: () => setCodigoNuevo(null) },
+    ]);
+
     const generarSorpresa = async () => {
         const materiaId = materiaIdPorNombre(materiaSeleccionada);
         if (!materiaId || sorpresaCargando) return;

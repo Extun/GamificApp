@@ -29,7 +29,7 @@ import { EmptyState } from '../../components/dashboard/DashboardWidgets';
 import { PanelMisiones } from './PanelMisiones';
 import { ModalCambiarPin } from './ModalCambiarPin';
 import { useGuardiaActividad } from '../../hooks/useGuardiaActividad';
-import { useSalidaAtras } from '../../hooks/useSalidaAtras';
+import { useCapasAtras } from '../../hooks/useCapasAtras';
 
 export function DashboardEstudiante() {
     const navigate = useNavigate();
@@ -99,20 +99,7 @@ export function DashboardEstudiante() {
     // los desmonta pasa por `proteger` (confirmación amigable si hace falta).
     const { marcar: marcarIntento, proteger, dialogo: dialogoSalida } = useGuardiaActividad();
 
-    // Botón Atrás del navegador (SPEC-021 P0-2). Mientras hay un reproductor
-    // abierto, Atrás cierra la ACTIVIDAD en vez de salir de /dashboard, y pasa
-    // por la misma guardia que los botones internos: si el intento tiene
-    // progreso real, pregunta; si no, cierra directo. Antes desmontaba el
-    // panel entero y devolvía al formulario de login con el intento perdido.
     const hayActividadAbierta = Boolean(quizActivo || juegoActivo || misionActiva);
-    useSalidaAtras(
-        hayActividadAbierta,
-        proteger(() => {
-            setQuizActivo(null);
-            setJuegoActivo(null);
-            setMisionActiva(null);
-        })
-    );
 
     // Contador que fuerza releer el progreso del servidor tras completar una
     // actividad (lo disparan los reproductores mediante onCompletado).
@@ -338,6 +325,27 @@ export function DashboardEstudiante() {
     // los dos window.prompt encadenados que había antes. Mismo servicio, mismo
     // endpoint: solo cambia la interfaz.
     const [modalPin, setModalPin] = useState(false);
+
+    // Botón Atrás del navegador (SPEC-021 P0-2, generalizado). Cada capa
+    // abierta pone un centinela en el historial, así que Atrás SUBE UN NIVEL
+    // dentro del panel en vez de salir de /dashboard: cierra el modal, luego
+    // la actividad, luego la materia y por último vuelve al Inicio. La salida
+    // de una actividad pasa por la misma guardia que los botones internos
+    // (`proteger`), así que si el intento tiene progreso real se pregunta
+    // igual que siempre; si no, cierra directo. Antes, un solo Atrás
+    // desmontaba el panel entero y devolvía al formulario de login con el
+    // intento perdido.
+    useCapasAtras([
+        { activo: pagina !== '', cerrar: () => { setPagina(''); setMateriaSeleccionada(null); } },
+        { activo: Boolean(materiaSeleccionada), cerrar: () => volver() },
+        { activo: hayActividadAbierta, cerrar: proteger(() => {
+            setQuizActivo(null);
+            setJuegoActivo(null);
+            setMisionActiva(null);
+        }) },
+        { activo: Boolean(archivoPreview), cerrar: () => setArchivoPreview(null) },
+        { activo: modalPin, cerrar: () => setModalPin(false) },
+    ]);
 
     return (
         <SidebarLayout
