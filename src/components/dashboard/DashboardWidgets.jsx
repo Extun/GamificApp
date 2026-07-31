@@ -5,12 +5,20 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import './dashboardWidgets.css';
 
-// Fecha corta para listas de actividad ("3 jul").
+// Fecha corta para listas de actividad ("3 jul"), con año solo cuando NO es
+// el año en curso ("3 jul 2025"). Sin el año, una actividad del curso pasado
+// se veía exactamente igual que la de ayer en toda la app (SPEC-021 P3-2), y
+// el docente ordena y decide con estas fechas. Se añade únicamente cuando
+// aporta, para no alargar las listas del año corriente.
 export const formatearFecha = (valor) => {
     const fecha = new Date(valor);
-    return Number.isNaN(fecha.getTime())
-        ? ''
-        : fecha.toLocaleDateString('es-EC', { day: 'numeric', month: 'short' });
+    if (Number.isNaN(fecha.getTime())) return '';
+    const esOtroAno = fecha.getFullYear() !== new Date().getFullYear();
+    return fecha.toLocaleDateString('es-EC', {
+        day: 'numeric',
+        month: 'short',
+        ...(esOtroAno ? { year: 'numeric' } : {})
+    });
 };
 
 // Encabezado de bienvenida: título + subtítulo + chips con datos reales
@@ -167,8 +175,26 @@ export function ModalPanel({ titulo, subtitulo, avatar, onCerrar, pie, children,
         }
     };
 
+    // Cierre por fondo: solo si el gesto EMPEZÓ y TERMINÓ en el fondo
+    // (SPEC-021 P2-6). El `click` se dispara al soltar el ratón, así que
+    // seleccionar texto dentro del panel y soltar fuera cerraba el modal y
+    // se llevaba el formulario a medio llenar —"Añadir estudiante", "Editar
+    // estudiante", "Cambiar mi PIN"— sin preguntar nada.
+    const gestoEnFondo = useRef(false);
+    const alPresionarFondo = (e) => { gestoEnFondo.current = e.target === e.currentTarget; };
+    const alSoltarFondo = (e) => {
+        if (e.target !== e.currentTarget || !gestoEnFondo.current) return;
+        gestoEnFondo.current = false;
+        onCerrar?.();
+    };
+
     return (
-        <div className="preview-backdrop" onClick={onCerrar} onKeyDown={onTecla}>
+        <div
+            className="preview-backdrop"
+            onMouseDown={alPresionarFondo}
+            onClick={alSoltarFondo}
+            onKeyDown={onTecla}
+        >
             <div
                 ref={panelRef}
                 className={`preview-panel ${className}`}
@@ -245,7 +271,15 @@ export function TablaPro({ cabecera, filas, renderFila, buscar, placeholderBusqu
                     </table>
                 </div>
             ) : (
-                <p className="tablapro-vacio">Ningún registro coincide con la búsqueda.</p>
+                /* "No coincide con la búsqueda" y "no hay nada" son cosas
+                   distintas (SPEC-021 P3-1): la tabla decía siempre lo primero,
+                   así que una lista vacía culpaba de un filtro que nadie había
+                   escrito. */
+                <p className="tablapro-vacio">
+                    {texto.trim()
+                        ? 'Ningún registro coincide con la búsqueda.'
+                        : 'Todavía no hay registros que mostrar.'}
+                </p>
             )}
 
             {(totalPaginas > 1 || filtradas.length > TAMANOS_PAGINA[0]) && (

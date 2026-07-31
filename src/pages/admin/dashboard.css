@@ -716,6 +716,15 @@
 .widget-rank-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .widget-rank-points { font-weight: 600; color: var(--color-primary); }
 
+/* Ranking todavía sin datos (SPEC-021 P3-11): antes quedaba un <ol> vacío
+   bajo el encabezado, que se leía como un fallo de carga. */
+.widget-vacio {
+    margin: 4px 0 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--color-text-muted);
+}
+
 .widget-progress {
     position: relative;
     width: 120px;

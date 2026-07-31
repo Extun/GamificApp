@@ -77,17 +77,32 @@ function WidgetsRendimiento({ materia, topEstudiantes, retosPublicados, siguient
                 <Card elevation={0} className="widget-card">
                     <div className="widget-head">
                         <span className="widget-icon widget-icon-gold"><WorkspacePremiumRoundedIcon /></span>
-                        <h4>Top estudiantes</h4>
+                        {/* El dato viene de obtenerRanking(): es el ranking GLOBAL de
+                            la institución, sin filtro de materia ni de curso. Bajo el
+                            título "Top estudiantes", y al lado de "Retos publicados en
+                            {materia}", el docente lo leía como "los mejores de esta
+                            materia": un dato correcto presentado de forma que lo vuelve
+                            falso (SPEC-021 P2-4). El rótulo ahora dice de qué es. */}
+                        <h4>Top de la institución</h4>
                     </div>
-                    <ol className="widget-rank">
-                        {topEstudiantes.slice(0, 3).map((est, i) => (
-                            <li key={i} className="widget-rank-item">
-                                <span className={`rank-pos rank-pos-${i + 1}`}>{i + 1}</span>
-                                <span className="widget-rank-name">{est.nombre}</span>
-                                <span className="widget-rank-points">{est.puntos} pts</span>
-                            </li>
-                        ))}
-                    </ol>
+                    {topEstudiantes.length > 0 ? (
+                        <ol className="widget-rank">
+                            {topEstudiantes.slice(0, 3).map((est, i) => (
+                                <li key={i} className="widget-rank-item">
+                                    <span className={`rank-pos rank-pos-${i + 1}`}>{i + 1}</span>
+                                    <span className="widget-rank-name">{est.nombre}</span>
+                                    <span className="widget-rank-points">{est.puntos} pts</span>
+                                </li>
+                            ))}
+                        </ol>
+                    ) : (
+                        /* Sin datos quedaba un <ol> vacío bajo el encabezado, sin
+                           explicar nada (P3-11). */
+                        <p className="widget-vacio">
+                            Todavía nadie ha ganado XP. En cuanto tus estudiantes jueguen,
+                            aquí aparecerán los tres primeros.
+                        </p>
+                    )}
                 </Card>
             </Grid>
 
@@ -313,8 +328,24 @@ export function Dashboard() {
     // Se unifica en "Resumen" porque en ambos casos el docente está MIRANDO
     // una materia, no creando: caer en un formulario de creación es un destino
     // que él no pidió. Crear sigue a un clic, desde la propia pestaña Resumen.
+    // Punto único de cambio de sección. Limpia el error de página al navegar
+    // (SPEC-021 P2-3): `errorMaterial` es un solo string compartido por
+    // materias, estudiantes, subida de archivos, IA y biblioteca, y NO se
+    // limpiaba nunca, así que un fallo ocurrido en el Inicio —donde ni
+    // siquiera se pinta— reaparecía minutos después dentro de una materia,
+    // sin contexto. Un error que aparece donde no ocurrió destruye la
+    // confianza en todos los demás mensajes de la aplicación.
+    const irAPagina = (id) => {
+        setErrorMaterial('');
+        setAvisoOk('');
+        setPagina(id);
+        setMateriaSeleccionada(null);
+    };
+
     const irAMateria = (nombre, subvista = 'quiz', tab = 'resumen') => {
         if (!nombre) return;
+        setErrorMaterial('');
+        setAvisoOk('');
         setPagina('materias');
         setMateriaSeleccionada(nombre);
         setSubVistaMateria(subvista);
@@ -378,6 +409,11 @@ export function Dashboard() {
     };
 
     const usuarioActual = authService.getUsuario();
+    // El sidebar mostraba la inicial "D" y el nombre "Docente" mientras el Home
+    // saludaba "Buenas tardes, María Pérez" tres centímetros a la derecha
+    // (SPEC-021 P2-1): un marcador de posición que nunca se sustituyó, aunque el
+    // dato correcto ya se calculaba aquí mismo. Ahora ambos usan `nombreDocente`,
+    // igual que el panel del estudiante: nombre real arriba, rol como detalle.
     const nombreDocente = usuarioActual?.nombre_completo || usuarioActual?.username || 'docente';
     const horaActual = new Date().getHours();
     const saludoDia = horaActual < 12 ? 'Buenos días' : horaActual < 19 ? 'Buenas tardes' : 'Buenas noches';
@@ -423,7 +459,7 @@ export function Dashboard() {
     // Cada `cerrar` es exactamente el mismo manejador que usa el botón de
     // cerrar del elemento, así que Atrás y la X hacen lo mismo.
     useCapasAtras([
-        { activo: pagina !== '', cerrar: () => { setPagina(''); setMateriaSeleccionada(null); } },
+        { activo: pagina !== '', cerrar: () => irAPagina('') },
         { activo: Boolean(materiaSeleccionada), cerrar: () => setMateriaSeleccionada(null) },
         { activo: Boolean(archivoPreview), cerrar: () => setArchivoPreview(null) },
         { activo: Boolean(fichaEstudiante), cerrar: () => setFichaEstudiante(null) },
@@ -514,9 +550,13 @@ export function Dashboard() {
             ].map((item) => ({
                 ...item,
                 activo: pagina === item.id,
-                onClick: () => { setPagina(item.id); setMateriaSeleccionada(null); }
+                onClick: () => irAPagina(item.id)
             }))}
-            usuario={{ inicial: 'D', nombre: 'Docente', detalle: authService.getUsuario()?.username }}
+            usuario={{
+                inicial: nombreDocente.charAt(0).toUpperCase(),
+                nombre: nombreDocente,
+                detalle: 'Docente'
+            }}
             accionesFooter={[
                 { label: 'Cerrar sesión', Icon: LogoutRoundedIcon, onClick: cerrarSesion, tono: 'peligro' }
             ]}
@@ -705,32 +745,62 @@ export function Dashboard() {
                 {pagina === "materias" && !materiaSeleccionada && (
                     <div className="home-doc">
                         <div>
-                            <h1 style={{pointerEvents:"none"}}>Tus materias</h1>
-                            <p className="contenido-sub" style={{ pointerEvents: "none" }}>Elige una materia para crear actividades y subir material.</p>
+                            <h1>Tus materias</h1>
+                            <p className="contenido-sub">Elige una materia para crear actividades y subir material.</p>
                         </div>
 
-                        <div className="home-doc-materias-grid">
-                            {materias.map((mat) => {
-                                const ui = uiMateria(mat);
-                                const retos = retosPorMateria[mat] || [];
-                                return (
-                                    <button
-                                        key={mat}
-                                        className="home-doc-materia"
-                                        style={ui.estilo}
-                                        onClick={() => irAMateria(mat)}
-                                    >
-                                        <span className="home-doc-materia-emoji" aria-hidden="true">{ui.icono}</span>
-                                        <span className="home-doc-materia-nombre">{mat}</span>
-                                        <span className="home-doc-materia-detalle">
-                                            {retos.length
-                                                ? `${retos.length} ${retos.length === 1 ? 'actividad publicada' : 'actividades publicadas'}`
-                                                : 'Sin actividades todavía'}
-                                        </span>
-                                    </button>
-                                );
-                            })}
-                        </div>
+                        {/* Esta pantalla existe dos veces: en el Inicio, con esqueleto,
+                            error y vacío; y aquí, que no tenía NADA (SPEC-021 P2-2). Si
+                            la lista tardaba o fallaba se veía un título y un hueco, y el
+                            docente no podía saber si no tenía materias o si la app no
+                            había podido preguntarlo. Se replican los tres estados. */}
+                        {estadoMaterias === 'cargando' ? (
+                            <div className="home-doc-materias-grid" aria-hidden="true">
+                                {[0, 1, 2].map((i) => <span key={i} className="home-doc-materia-esqueleto" />)}
+                            </div>
+                        ) : estadoMaterias === 'error' ? (
+                            <EmptyState
+                                Icon={MenuBookIcon}
+                                titulo="No pudimos cargar tus materias"
+                                mensaje="Revisa tu conexión e inténtalo otra vez."
+                                accion={{ label: 'Intentar de nuevo', onClick: reintentarInicio }}
+                            />
+                        ) : materias.length === 0 ? (
+                            <EmptyState
+                                Icon={MenuBookIcon}
+                                titulo="Aún no tienes materias asignadas"
+                                mensaje="El administrador es quien te asigna las materias y los cursos. Pídeselo y volverán a aparecer aquí."
+                            />
+                        ) : (
+                            <div className="home-doc-materias-grid">
+                                {materias.map((mat) => {
+                                    const ui = uiMateria(mat);
+                                    const retos = retosPorMateria[mat] || [];
+                                    return (
+                                        <button
+                                            key={mat}
+                                            className="home-doc-materia"
+                                            style={ui.estilo}
+                                            onClick={() => irAMateria(mat)}
+                                        >
+                                            <span className="home-doc-materia-emoji" aria-hidden="true">{ui.icono}</span>
+                                            <span className="home-doc-materia-nombre">{mat}</span>
+                                            {/* Igual que en el Inicio: "Sin actividades" solo se
+                                                dice cuando consta que no las hay. */}
+                                            <span className="home-doc-materia-detalle">
+                                                {estadoRetosInicio === 'cargando'
+                                                    ? 'Contando actividades…'
+                                                    : estadoRetosInicio === 'error'
+                                                        ? 'Actividades no disponibles'
+                                                        : retos.length
+                                                            ? `${retos.length} ${retos.length === 1 ? 'actividad publicada' : 'actividades publicadas'}`
+                                                            : 'Sin actividades todavía'}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -799,18 +869,25 @@ export function Dashboard() {
                                     materia={materiaSeleccionada}
                                     topEstudiantes={ranking}
                                     retosPublicados={retosMateria.length}
+                                    // El texto y el botón tienen que llevar al MISMO
+                                    // sitio (SPEC-021 P3-3): sin material, la tarjeta
+                                    // decía "súbelo en la pestaña Material" y el botón
+                                    // creaba un quiz.
                                     siguientePaso={
                                         archivosMateria.length > 0
-                                            ? { descripcion: "Ya tienes material cargado. Pon a prueba a tus estudiantes generando un quiz.", label: "Crear un quiz", destino: "quiz" }
-                                            : { descripcion: "Aún no hay material en esta materia. Súbelo en la pestaña Material y luego genera un quiz.", label: "Crear un quiz", destino: "quiz" }
+                                            ? { descripcion: "Ya tienes material cargado. Pon a prueba a tus estudiantes generando un quiz.", label: "Crear un quiz", destino: "crear" }
+                                            : { descripcion: "Aún no hay material en esta materia. Súbelo primero y luego genera actividades a partir de él.", label: "Subir material", destino: "material" }
                                     }
-                                    onAccion={(destino) => { setSubVistaMateria(destino); setTabMateria('crear'); }}
+                                    onAccion={(destino) => {
+                                        if (destino === 'crear') setSubVistaMateria('quiz');
+                                        setTabMateria(destino);
+                                    }}
                                 />
                                 <SectionCard
                                     titulo="Últimas actividades publicadas"
                                     Icon={TaskAltRoundedIcon}
                                     tag={retosMateria.length ? `${retosMateria.length}` : undefined}
-                                    accion={{ label: 'Ver todas en la Biblioteca', onClick: () => setPagina('biblioteca') }}
+                                    accion={{ label: 'Ver todas en la Biblioteca', onClick: () => irAPagina('biblioteca') }}
                                 >
                                     {retosMateria.length ? (
                                         <ul className="actividad-lista">
@@ -955,7 +1032,7 @@ export function Dashboard() {
                 {pagina === "estudiantes" && (
                     <div className="home-doc">
                         <div>
-                            <h1 style={{pointerEvents:"none"}}>Mis Estudiantes</h1>
+                            <h1>Mis Estudiantes</h1>
                             <p className="contenido-sub" style={{ marginBottom: 0 }}>Todos tus estudiantes en una sola lista: añádelos uno a uno o importa el curso completo desde Excel, y ayúdalos si olvidan su PIN o su código.</p>
                         </div>
 
@@ -992,7 +1069,7 @@ export function Dashboard() {
                                             </button>
                                         </>
                                     )}
-                                    <button type="button" className="section-accion" onClick={() => setPagina('ranking')}>
+                                    <button type="button" className="section-accion" onClick={() => irAPagina('ranking')}>
                                         Ver ranking completo
                                     </button>
                                 </div>

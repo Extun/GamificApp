@@ -104,8 +104,10 @@ export function PanelMisiones() {
 
     return (
         <div className="misiones-panel">
-            <h1 style={{ pointerEvents: 'none' }}>🏆 Mis premios</h1>
-            <p className="contenido-sub" style={{ pointerEvents: 'none' }}>
+            {/* Sin `pointer-events: none` (SPEC-021 P3-7): impedía seleccionar y
+                copiar el título, un truco sin justificación en el código. */}
+            <h1>🏆 Mis premios</h1>
+            <p className="contenido-sub">
                 Completa misiones jugando para ganar insignias y subir de nivel.
             </p>
 

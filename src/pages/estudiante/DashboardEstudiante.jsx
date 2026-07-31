@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../admin/dashboard.css';
 import './dashboardEstudiante.css';
@@ -193,24 +193,6 @@ export function DashboardEstudiante() {
                 setJuegos(retos.filter((r) => JUEGOS_UI[r.tipo] && juegoJugable(r)));
                 setMisionesRetos(retos.filter((r) => r.tipo === 'mision' && r.configuracion?.desafios?.length));
                 setEstadoRetosMateria('listo');
-                // Salto directo a una actividad nombrada en el Home (P1-3).
-                // Se resuelve aquí porque hasta ahora no existía el reto: solo
-                // se conocía su id. Si ya no está publicado, no se abre nada y
-                // el niño se queda en la materia, que es el destino honesto.
-                const pendiente = retoPendienteRef.current;
-                retoPendienteRef.current = null;
-                const objetivo = pendiente ? retos.find((r) => r.id === pendiente) : null;
-                if (!objetivo) return;
-                if (objetivo.tipo === 'quiz') {
-                    setSubVista('quizzes');
-                    setQuizActivo(objetivo);
-                } else if (objetivo.tipo === 'mision') {
-                    setSubVista('misiones');
-                    setMisionActiva(objetivo);
-                } else if (JUEGOS_UI[objetivo.tipo]) {
-                    setSubVista('juegos');
-                    setJuegoActivo(objetivo);
-                }
             })
             .catch(() => { if (vigente) setEstadoRetosMateria('error'); });
         obtenerMaterial(materia.id, { propagarError: true })
@@ -239,6 +221,12 @@ export function DashboardEstudiante() {
     // 100 % (SPEC-021 P1-3). Si todo está terminado, no hay nada que seguir y
     // el Home cae al camino de "tu primera aventura" / estado vacío.
     const ultimaActividad = actividadReciente.find((p) => !p.completado) || null;
+    // El reto completo de esa actividad, para poder abrirlo de un toque. Si ya
+    // no está publicado (el docente lo retiró), el botón sigue llevando a la
+    // materia, que es el destino honesto cuando la actividad ya no existe.
+    const retoDeUltimaActividad = ultimaActividad
+        ? retosDisponibles.find((r) => r.id === ultimaActividad.reto_id) || null
+        : null;
 
     // Fallback sin progreso: la actividad publicada más antigua es la
     // "primera" disponible (la API las devuelve de más nueva a más vieja).
@@ -249,11 +237,7 @@ export function DashboardEstudiante() {
         ? catalogoMaterias.find((m) => m.id === primerRetoDisponible.materia_id)?.nombre
         : null;
 
-    // Actividad que el Home pidió abrir en cuanto lleguen los retos (P1-3).
-    const retoPendienteRef = useRef(null);
-
     const abrirMateria = (mat) => {
-        retoPendienteRef.current = null;
         setMateriaSeleccionada(mat);
         setEstadoRetosMateria('cargando');
         setEstadoMaterial('cargando');
@@ -268,20 +252,29 @@ export function DashboardEstudiante() {
     };
 
     // Salto directo desde el Home a una materia (sugerencias del dashboard).
-    // `retoId` opcional: cuando el Home nombra UNA actividad concreta
-    // ("Te espera «Los animales»"), abrirla es lo que promete el botón. Antes
+    // `reto` opcional: cuando el Home nombra UNA actividad concreta ("Te
+    // espera «Los animales»"), abrirla es lo que promete el botón. Antes
     // aterrizaba en la pestaña "Material de estudio" y el niño tenía que
     // buscarla solo, con lo que la tarjeta principal del Home rompía su
     // promesa dos veces (SPEC-021 P1-3).
-    // El reto no está cargado todavía —depende de la petición que dispara
-    // `abrirMateria`—, así que se anota como pendiente y lo abre el efecto de
-    // carga en cuanto llega. En una ref, no en estado: no debe provocar
-    // render ni re-disparar el efecto.
-    const irAMateria = (nombre, retoId = null) => {
+    // No hace falta esperar a la carga de la materia: el Home ya tiene el reto
+    // completo —con su `configuracion`— en `retosDisponibles`, así que el
+    // reproductor abre en el acto y la lista de la pestaña se rellena detrás.
+    const irAMateria = (nombre, reto = null) => {
         if (!nombre) return;
         setPagina('materias');
         abrirMateria(nombre);
-        retoPendienteRef.current = retoId;
+        if (!reto) return;
+        if (reto.tipo === 'quiz' && reto.configuracion?.preguntas?.length) {
+            setSubVista('quizzes');
+            setQuizActivo(reto);
+        } else if (reto.tipo === 'mision' && reto.configuracion?.desafios?.length) {
+            setSubVista('misiones');
+            setMisionActiva(reto);
+        } else if (JUEGOS_UI[reto.tipo] && juegoJugable(reto)) {
+            setSubVista('juegos');
+            setJuegoActivo(reto);
+        }
     };
 
 
@@ -475,7 +468,7 @@ export function DashboardEstudiante() {
                                     accion={{ label: 'Intentar de nuevo', onClick: reintentar }}
                                 />
                             ) : ultimaActividad ? (
-                                <button className="home-hero" onClick={() => irAMateria(ultimaActividad.materia, ultimaActividad.reto_id)}>
+                                <button className="home-hero" onClick={() => irAMateria(ultimaActividad.materia, retoDeUltimaActividad)}>
                                     <span className="home-hero-emoji" aria-hidden="true">🚀</span>
                                     <span className="home-hero-texto">
                                         <strong>¡Seguir jugando!</strong>
@@ -484,7 +477,7 @@ export function DashboardEstudiante() {
                                     <ArrowForwardRoundedIcon className="home-hero-flecha" />
                                 </button>
                             ) : materiaPrimerReto ? (
-                                <button className="home-hero" onClick={() => irAMateria(materiaPrimerReto, primerRetoDisponible.id)}>
+                                <button className="home-hero" onClick={() => irAMateria(materiaPrimerReto, primerRetoDisponible)}>
                                     <span className="home-hero-emoji" aria-hidden="true">🎁</span>
                                     <span className="home-hero-texto">
                                         <strong>¡Tu primera aventura!</strong>
@@ -530,8 +523,8 @@ export function DashboardEstudiante() {
                     {pagina === "materias" && !materiaSeleccionada && (
                         <div className="home-nino">
                             <div>
-                                <h1 style={{ pointerEvents: "none" }}>Mis mundos</h1>
-                                <p className="contenido-sub" style={{ pointerEvents: "none" }}>Elige un mundo para repasar y jugar lo que preparó tu docente.</p>
+                                <h1>Mis mundos</h1>
+                                <p className="contenido-sub">Elige un mundo para repasar y jugar lo que preparó tu docente.</p>
                             </div>
                             {rejillaMundos(abrirMateria)}
                         </div>
