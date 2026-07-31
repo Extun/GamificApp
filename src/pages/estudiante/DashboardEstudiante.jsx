@@ -361,7 +361,7 @@ export function DashboardEstudiante() {
             }}
             accionesFooter={[
                 { label: 'Cambiar mi PIN', Icon: LockRoundedIcon, onClick: () => setModalPin(true) },
-                { label: 'Cerrar sesión', Icon: LogoutRoundedIcon, onClick: proteger(cerrarSesion) }
+                { label: 'Cerrar sesión', Icon: LogoutRoundedIcon, onClick: proteger(cerrarSesion), tono: 'peligro' }
             ]}
         >
 

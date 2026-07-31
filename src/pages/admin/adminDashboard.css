@@ -151,30 +151,9 @@
     font-weight: 700;
 }
 
-/* Botón de cierre de sesión (compartido por los paneles admin y docente;
-   replica el del panel del estudiante). */
-.logout-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
-    padding: 11px 16px;
-    border: 1px solid var(--color-border, #e2e8f0);
-    border-radius: var(--radius-sm, 10px);
-    background: var(--color-surface, #fff);
-    color: var(--color-text-muted, #64748b);
-    font-family: inherit;
-    font-weight: 600;
-    cursor: pointer;
-    margin-top: 10px;
-}
-
-.logout-btn:hover {
-    background: var(--color-danger-soft);
-    border-color: #fecaca;
-    color: var(--color-danger);
-}
+/* SPEC-023: `.logout-btn` y `.nav-item-activo` vivían aquí duplicados (y otra
+   vez en `dashboardEstudiante.css`) compitiendo con `dashboard.css`. Ahora el
+   sidebar se define en un solo sitio: `dashboard.css`. */
 
 /* ===== Rediseño del panel Admin (sprint final) =====
    Misma identidad que los Home de estudiante y docente:
@@ -184,12 +163,6 @@
     width: 100%;
     max-width: 1100px;
     margin: 0 auto;
-}
-
-/* Ítem activo del menú lateral */
-.nav-item-activo {
-    background: var(--color-primary-soft) !important;
-    color: var(--color-primary-dark) !important;
 }
 
 /* Cabecera-hero del Inicio (espejo del saludo del docente) */

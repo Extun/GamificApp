@@ -497,7 +497,7 @@ export function Dashboard() {
             }))}
             usuario={{ inicial: 'D', nombre: 'Docente', detalle: authService.getUsuario()?.username }}
             accionesFooter={[
-                { label: 'Cerrar sesión', Icon: LogoutRoundedIcon, onClick: cerrarSesion }
+                { label: 'Cerrar sesión', Icon: LogoutRoundedIcon, onClick: cerrarSesion, tono: 'peligro' }
             ]}
         >
 

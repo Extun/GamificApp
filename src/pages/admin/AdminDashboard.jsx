@@ -369,13 +369,13 @@ export function AdminDashboard() {
                 // la sesión tiene su permiso (el servidor revalida en cada
                 // endpoint: la UI oculta, nunca protege).
                 { id: 'inicio', label: 'Inicio', Icon: HomeFilledIcon },
-                { id: 'docentes', label: 'Docentes', Icon: SchoolRoundedIcon, grupo: 'Gestión Académica', permiso: 'docentes' },
-                { id: 'estudiantes', label: 'Estudiantes', Icon: GroupsRoundedIcon, grupo: 'Gestión Académica', permiso: 'estudiantes' },
-                { id: 'materias', label: 'Materias', Icon: MenuBookRoundedIcon, grupo: 'Gestión Académica', permiso: 'materias' },
-                { id: 'cursos', label: 'Cursos', Icon: Diversity3RoundedIcon, grupo: 'Gestión Académica', permiso: 'cursos' },
-                { id: 'misiones', label: 'Misiones', Icon: EmojiEventsRoundedIcon, grupo: 'Gestión Académica', permiso: 'materias' },
-                { id: 'invitaciones', label: 'Invitaciones', Icon: VpnKeyRoundedIcon, grupo: 'Gestión Institucional', permiso: 'invitaciones' },
-                { id: 'institucion', label: 'Institución', Icon: ApartmentRoundedIcon, grupo: 'Gestión Institucional', permiso: 'institucion' },
+                { id: 'docentes', label: 'Docentes', Icon: SchoolRoundedIcon, grupo: 'Gestión académica', permiso: 'docentes' },
+                { id: 'estudiantes', label: 'Estudiantes', Icon: GroupsRoundedIcon, grupo: 'Gestión académica', permiso: 'estudiantes' },
+                { id: 'materias', label: 'Materias', Icon: MenuBookRoundedIcon, grupo: 'Gestión académica', permiso: 'materias' },
+                { id: 'cursos', label: 'Cursos', Icon: Diversity3RoundedIcon, grupo: 'Gestión académica', permiso: 'cursos' },
+                { id: 'misiones', label: 'Misiones', Icon: EmojiEventsRoundedIcon, grupo: 'Gestión académica', permiso: 'materias' },
+                { id: 'invitaciones', label: 'Invitaciones', Icon: VpnKeyRoundedIcon, grupo: 'Gestión institucional', permiso: 'invitaciones' },
+                { id: 'institucion', label: 'Institución', Icon: ApartmentRoundedIcon, grupo: 'Gestión institucional', permiso: 'institucion' },
                 { id: 'administradores', label: 'Administradores', Icon: AdminPanelSettingsRoundedIcon, grupo: 'Seguridad', permiso: 'administradores' },
                 { id: 'auditoria', label: 'Auditoría', Icon: HistoryEduRoundedIcon, grupo: 'Seguridad', permiso: 'auditoria' },
                 { id: 'papelera', label: 'Papelera', Icon: DeleteSweepRoundedIcon, grupo: 'Seguridad', permiso: 'papelera' },
@@ -386,7 +386,7 @@ export function AdminDashboard() {
                 .map((item) => ({ ...item, activo: pagina === item.id, onClick: () => setPagina(item.id) }))}
             usuario={{ inicial: 'A', nombre: 'Administrador', detalle: nombreAdmin }}
             accionesFooter={[
-                { label: 'Cerrar sesión', Icon: LogoutRoundedIcon, onClick: cerrarSesion }
+                { label: 'Cerrar sesión', Icon: LogoutRoundedIcon, onClick: cerrarSesion, tono: 'peligro' }
             ]}
         >
                     <div className="admin-vista">

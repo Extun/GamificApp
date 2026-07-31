@@ -9,6 +9,12 @@ import { getInstitucionCache } from '../../services/institucionService';
 // de dashboard.css; var() no funciona en @media, así que se repite aquí).
 const ANCHO_BARRA_MOVIL = 760;
 
+// A partir de cuántas secciones vale la pena rotular los grupos (SPEC-023).
+// Por debajo, el rótulo cuesta más de lo que ayuda: con 3 o 7 destinos a la
+// vista basta un separador para marcar el corte. Hoy solo Admin (13) lo cruza;
+// si Docente creciera, recupera los rótulos solo, sin tocar su código.
+const MINIMO_ITEMS_PARA_ROTULOS = 8;
+
 /**
  * Layout base compartido por los paneles de Administrador, Docente y
  * Estudiante. El sidebar ocupa siempre el alto de la ventana y se divide
@@ -29,14 +35,21 @@ const ANCHO_BARRA_MOVIL = 760;
  * cambia permisos, ítems del menú ni el menú móvil, que sigue mandando por
  * media query en ≤760px.
  *
- * - titulo: texto bajo el logo institucional.
+ * Piel (SPEC-023): la cabecera es una sola fila (logo + nombre institucional
+ * truncado + botón de ocultar), la navegación son filas de ancho completo
+ * alineadas a un mismo borde izquierdo, y el pie no dibuja cajas. El objetivo
+ * es que el sidebar pese menos que el contenido que acompaña.
+ *
+ * - titulo: nombre institucional; se muestra en UNA línea con «…» y `title`
+ *   completo. Es un dato fijo y no accionable, así que no compite con el menú.
  * - items: [{ id, label, Icon, activo, onClick, grupo? }] para la navegación.
- *   `grupo` (SPEC-003) es opcional: los ítems consecutivos con el mismo
- *   grupo se encabezan con su rótulo y un separador. Sin grupo, el sidebar
- *   se ve exactamente igual que antes (Docente y Estudiante no cambian).
+ *   `grupo` (SPEC-003) es opcional y marca dónde cambia de bloque la lista.
+ *   Cómo se dibuja ese cambio depende de la densidad (SPEC-023): con muchas
+ *   secciones se rotula el grupo; con pocas basta un separador fino.
  * - usuario: { inicial, nombre, detalle } mostrado en el footer.
- * - accionesFooter: [{ label, Icon, onClick }] botones bajo el usuario
- *   (p. ej. "Cerrar sesión").
+ * - accionesFooter: [{ label, Icon, onClick, tono? }] botones bajo el usuario
+ *   (p. ej. "Cerrar sesión"). `tono: 'peligro'` los tiñe de rojo al pasar por
+ *   encima; sin él, el hover es neutro.
  * - children: contenido principal del panel.
  * - extra: nodos fuera del layout (modales de pantalla completa).
  */
@@ -46,6 +59,7 @@ export function SidebarLayout({ titulo, items, usuario, accionesFooter = [], chi
     // Sidebar oculto en tablet/escritorio (Fase 8). Arranca visible siempre.
     const [colapsado, setColapsado] = useState(false);
     const asideRef = useRef(null);
+    const cabeceraRef = useRef(null);
     const botonMenuRef = useRef(null);
     const botonOcultarRef = useRef(null);
     const botonMostrarRef = useRef(null);
@@ -108,6 +122,22 @@ export function SidebarLayout({ titulo, items, usuario, accionesFooter = [], chi
         if (menuAbierto) menuRef.current?.focus();
     }, [menuAbierto]);
 
+    // El panel desplegable móvil cuelga justo debajo de la barra superior, así
+    // que su alto máximo es "lo que queda de pantalla". Antes ese hueco estaba
+    // escrito a mano en el CSS (62px) y no cuadraba en cuanto la barra crecía
+    // o el móvil se giraba: en apaisado el menú se salía de la ventana. Aquí se
+    // publica el alto REAL de la cabecera y el CSS resta ese valor.
+    useEffect(() => {
+        const cabecera = cabeceraRef.current;
+        if (!cabecera || typeof ResizeObserver === 'undefined') return undefined;
+        const observador = new ResizeObserver(([entrada]) => {
+            const alto = Math.round(entrada.target.getBoundingClientRect().height);
+            asideRef.current?.style.setProperty('--alto-cabecera', `${alto}px`);
+        });
+        observador.observe(cabecera);
+        return () => observador.disconnect();
+    }, []);
+
     // Al ocultar o restaurar el sidebar, el botón pulsado desaparece de la
     // pantalla: el foco pasa a su relevo para que el teclado no lo pierda.
     // El primer render no mueve el foco (nadie ha pulsado nada todavía).
@@ -121,13 +151,21 @@ export function SidebarLayout({ titulo, items, usuario, accionesFooter = [], chi
     const alternarMenu = () => setMenuAbierto((v) => !v);
     const cerrarMenu = () => setMenuAbierto(false);
 
+    // Con pocas secciones el rótulo del grupo es más ruido que ayuda: se
+    // sustituye por un separador mudo, que marca el mismo corte sin texto.
+    const rotularGrupos = items.length >= MINIMO_ITEMS_PARA_ROTULOS;
+
     return (
         <div className="dashboard">
             <div className={`sidebar-container ${colapsado ? 'is-colapsado' : ''}`}>
                 <aside className="sidebar" id={asideId} ref={asideRef}>
-                    <div className="sidebar-header">
+                    <div className="sidebar-header" ref={cabeceraRef}>
                         {logo && <img className="sidebar-logo" src={logo} alt="" />}
-                        <h2 style={{ pointerEvents: 'none' }}>{titulo}</h2>
+                        {/* `title` porque el nombre se trunca: quien necesite
+                            leerlo entero lo tiene a un hover de distancia. Por
+                            eso ya no lleva `pointer-events: none`, que impedía
+                            que el navegador mostrara ese tooltip. */}
+                        <h2 title={titulo}>{titulo}</h2>
                         <button
                             type="button"
                             ref={botonMenuRef}
@@ -170,8 +208,12 @@ export function SidebarLayout({ titulo, items, usuario, accionesFooter = [], chi
                                     const nuevoGrupo = grupo && grupo !== items[indice - 1]?.grupo;
                                     return (
                                         <ListItem disablePadding key={id} className="nav-item-wrap">
-                                            {nuevoGrupo && (
-                                                <span className="sidebar-grupo" aria-hidden="true">{grupo}</span>
+                                            {/* Marca visual del cambio de bloque. Sigue fuera del
+                                                árbol de accesibilidad: metido dentro del <li>, el
+                                                lector lo leería pegado al nombre del ítem. */}
+                                            {nuevoGrupo && (rotularGrupos
+                                                ? <span className="sidebar-grupo" aria-hidden="true">{grupo}</span>
+                                                : <span className="sidebar-separador" aria-hidden="true" />
                                             )}
                                             <ListItemButton
                                                 className={`nav-item ${activo ? 'nav-item-activo' : ''}`}
@@ -199,16 +241,17 @@ export function SidebarLayout({ titulo, items, usuario, accionesFooter = [], chi
 
                         <div className="sidebar-footer">
                             <div className="aside-content-user">
-                                <div className="user-avatar">{usuario.inicial}</div>
+                                <div className="user-avatar" aria-hidden="true">{usuario.inicial}</div>
                                 <div className="user-meta">
-                                    <span className="user-name">{usuario.nombre}</span>
-                                    <span className="email-user-account">{usuario.detalle}</span>
+                                    <span className="user-name" title={usuario.nombre}>{usuario.nombre}</span>
+                                    <span className="email-user-account" title={usuario.detalle}>{usuario.detalle}</span>
                                 </div>
                             </div>
-                            {accionesFooter.map(({ label, Icon, onClick }) => (
+                            {accionesFooter.map(({ label, Icon, onClick, tono }) => (
                                 <button
                                     key={label}
-                                    className="logout-btn"
+                                    type="button"
+                                    className={`logout-btn ${tono === 'peligro' ? 'es-peligro' : ''}`}
                                     onClick={() => {
                                         cerrarMenu();
                                         onClick?.();

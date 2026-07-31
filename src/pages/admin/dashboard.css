@@ -15,11 +15,16 @@
     overflow: hidden;
 }
 
-/* ===== Sidebar (rediseño sobrio/académico, compartido por los 3 roles) =====
+/* ===== Sidebar (SPEC-023, compartido por los 3 roles) =====
    Se conservan las tres zonas y sus garantías: header fijo, navegación con
-   scroll propio si no cabe, footer siempre visible. Solo cambia la piel. */
+   scroll propio si no cabe, footer siempre visible. Cambia la piel: una sola
+   superficie, un solo borde y un único peso tipográfico dominante (el menú).
+
+   El ancho es fluido entre 761px y ~1100px: a 768px el sidebar cede 44px al
+   contenido sin obligar a colapsarlo a mano. Por debajo de 761px manda la
+   barra superior móvil y este ancho no se aplica. */
 .sidebar {
-    width: 264px;
+    width: clamp(220px, 24vw, 264px);
     flex-shrink: 0;
     height: 100%;
     background: var(--color-surface);
@@ -29,40 +34,45 @@
     transition: width 0.18s ease;
 }
 
-/* Zona 1 · Header del sidebar (logo + nombre institucional) */
+/* Zona 1 · Header: una sola fila — logo, nombre institucional y el botón de
+   ocultar. El nombre es un dato fijo y no accionable, así que va en una línea
+   truncada y en tono apagado en vez de ser el titular del panel. Sin fondo ni
+   borde propios: la separación ya la da el aire hasta el primer ítem. */
 .sidebar-header {
-    position: relative;
     flex-shrink: 0;
-    padding: 22px 20px 14px;
-    border-bottom: 1px solid var(--color-border);
-    background: var(--color-surface-alt);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 12px 12px 14px;
+    min-height: 52px;
 }
 
 /* ===== Colapso del sidebar en tablet/escritorio (SPEC-018 Fase 8) =====
    Recomendación de dos revisores: poder ganar el ancho del sidebar (264px,
    decisivos a 768px). Oculto el sidebar queda un raíl estrecho con el botón
    para traerlo de vuelta: la navegación nunca se pierde. En ≤760px manda el
-   menú móvil de la Fase 5 y todo esto se desactiva. */
+   menú móvil de la Fase 5 y todo esto se desactiva.
+   SPEC-023: el botón va EN EL FLUJO de la cabecera (antes era
+   `position:absolute`, lo que obligaba a reservarle hueco con un
+   `padding-right` a mano en el título). */
 .sidebar-colapsar {
-    position: absolute;
-    top: 14px;
-    right: 12px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    border: 1px solid var(--color-border);
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border: 0;
     border-radius: var(--radius-sm);
-    background: var(--color-surface);
+    background: transparent;
     color: var(--color-text-muted);
     cursor: pointer;
     transition: background 0.15s ease, color 0.15s ease;
 }
 
 .sidebar-colapsar:hover {
-    background: var(--color-primary-soft);
-    color: var(--color-primary-dark);
+    background: var(--color-surface-alt);
+    color: var(--color-text);
 }
 
 /* El raíl solo existe con el sidebar oculto. */
@@ -150,85 +160,109 @@
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 10px 14px;
+    padding: 4px 10px 12px;
     scrollbar-width: thin;
 }
 
-/* Zona 3 · Footer (usuario + cerrar sesión), siempre visible al fondo */
+.sidebar-nav .MuiList-root { padding: 0; }
+
+/* Zona 3 · Footer (usuario + acciones), siempre visible al fondo. Sin fondo
+   alternativo ni cajas: una hairline basta para separarlo de la navegación. */
 .sidebar-footer {
-    position: sticky;
-    bottom: 0;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 12px 14px 16px;
-    background: var(--color-surface-alt);
+    gap: 2px;
+    padding: 8px 10px 12px;
     border-top: 1px solid var(--color-border);
 }
-
-.sidebar-footer .logout-btn { margin-top: 0; }
 
 /* Logo institucional en la cabecera del sidebar (SPEC-002) */
 .sidebar-logo {
     display: block;
-    max-height: 48px;
-    max-width: 72%;
+    flex-shrink: 0;
+    max-height: 28px;
+    max-width: 44px;
     object-fit: contain;
-    margin: 0 auto 10px 0;
+    margin: 0;
 }
 
-.sidebar-header h2,
-.aside-content-options h2 {
-    font-size: 0.92rem;
-    font-weight: 700;
-    line-height: 1.35;
+/* Nombre institucional: UNA línea, truncada, en tono secundario. El texto
+   completo queda en el `title` que pone SidebarLayout. */
+.sidebar-header h2 {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.3;
     letter-spacing: 0.01em;
-    color: var(--color-text);
+    color: var(--color-text-muted);
     margin: 0;
     padding: 0;
     border-bottom: none;
-    overflow-wrap: break-word;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-/* Hueco para el botón de ocultar, que va absoluto arriba a la derecha: sin
-   esto un nombre institucional largo pasa por debajo del icono. */
-.sidebar-header h2 { padding-right: 34px; }
+/* Cortes entre bloques del menú (SPEC-003 + SPEC-023). El <li> pasa a columna
+   para apilar el corte y el botón.
 
-/* Grupos del sidebar (SPEC-003): rótulo discreto sobre el primer ítem de
-   cada categoría. El <li> pasa a columna para apilar rótulo y botón. */
-.nav-item-wrap {
+   IMPORTANTE: el selector lleva `.MuiListItem-root` a propósito. Con la clase
+   suelta, MUI ganaba con `.MuiListItem-root { align-items: center }` y cada
+   fila se encogía al ancho de su texto: el menú salía descentrado, sin borde
+   izquierdo común, y solo se podía pulsar sobre las letras. */
+.sidebar-nav .nav-item-wrap.MuiListItem-root {
+    display: flex;
     flex-direction: column;
     align-items: stretch;
+    width: 100%;
+    padding: 0;
 }
 
+/* Con muchas secciones (Admin) el bloque se rotula… */
 .sidebar-grupo {
     display: block;
     margin: 14px 10px 4px;
-    font-size: 0.66rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
     color: var(--color-text-muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.nav-item-wrap:first-child .sidebar-grupo { margin-top: 4px; }
+/* …y con pocas (Docente, Estudiante) basta una línea muda. */
+.sidebar-separador {
+    display: block;
+    height: 1px;
+    margin: 10px 12px 11px;
+    background: var(--color-border);
+}
 
-.nav-item {
+.nav-item-wrap:first-child .sidebar-grupo { margin-top: 2px; }
+.nav-item-wrap:first-child .sidebar-separador { margin-top: 2px; }
+
+/* Fila del menú: ancho completo, borde izquierdo común y 40px de alto útil
+   para el dedo. Los selectores se apoyan en la clase de MUI para ganar por
+   especificidad en vez de a golpe de `!important`. */
+.nav-item.MuiListItemButton-root {
     position: relative;
-    border-radius: var(--radius-sm) !important;
+    width: 100%;
+    min-height: 40px;
     margin-bottom: 2px;
-    padding-top: 8px !important;
-    padding-bottom: 8px !important;
-    color: var(--color-text-muted) !important;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
     transition: background 0.15s ease, color 0.15s ease;
 }
 
+.nav-item .MuiListItemText-root { margin: 0; }
+
 .nav-item .MuiListItemText-primary {
-    font-size: 0.88rem;
+    font-size: 0.875rem;
     font-weight: 500;
     line-height: 1.3;
     white-space: nowrap;
@@ -236,50 +270,48 @@
     text-overflow: ellipsis;
 }
 
-.nav-item:hover {
-    background: var(--color-surface-alt) !important;
-    color: var(--color-text) !important;
+.nav-item.MuiListItemButton-root:hover {
+    background: var(--color-surface-alt);
+    color: var(--color-text);
 }
 
 /* Ítem activo: fondo suave + barra de acento a la izquierda (lee mejor en un
    contexto académico que solo el cambio de color). */
-.nav-item-activo,
-.nav-item-activo:hover {
-    background: var(--color-primary-soft) !important;
-    color: var(--color-primary-dark) !important;
+.nav-item-activo.MuiListItemButton-root,
+.nav-item-activo.MuiListItemButton-root:hover {
+    background: var(--color-primary-soft);
+    color: var(--color-primary-dark);
 }
 
 .nav-item-activo::before {
     content: '';
     position: absolute;
     left: 0;
-    top: 6px;
-    bottom: 6px;
+    top: 8px;
+    bottom: 8px;
     width: 3px;
     border-radius: 3px;
     background: var(--color-primary);
 }
 
-.nav-item-activo .MuiListItemText-primary { font-weight: 700; }
+.nav-item-activo .MuiListItemText-primary { font-weight: 600; }
 
-.nav-icon {
-    min-width: 34px !important;
-    color: inherit !important;
+.nav-icon.MuiListItemIcon-root {
+    min-width: 30px;
+    color: inherit;
 }
 
+/* Ficha de usuario: sin caja ni borde, solo la fila. */
 .aside-content-user {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 10px;
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
+    padding: 4px 10px 8px;
 }
 
 .user-avatar {
-    width: 38px;
-    height: 38px;
+    width: 34px;
+    height: 34px;
     flex-shrink: 0;
     border-radius: 50%;
     display: flex;
@@ -287,7 +319,7 @@
     justify-content: center;
     font-family: var(--font-head);
     font-weight: 600;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     color: #fff;
     background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
 }
@@ -300,7 +332,7 @@
 
 .user-name {
     font-weight: 600;
-    font-size: 0.88rem;
+    font-size: 0.85rem;
     color: var(--color-text);
     white-space: nowrap;
     overflow: hidden;
@@ -313,6 +345,57 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* Acciones del pie: mismas filas que el menú, no botones con borde. Definidas
+   AQUÍ y solo aquí — antes `.logout-btn` estaba duplicado en
+   `adminDashboard.css` y `dashboardEstudiante.css` compitiendo consigo mismo. */
+.sidebar-footer .logout-btn {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    width: 100%;
+    min-height: 40px;
+    margin: 0;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-text-muted);
+    font-family: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+/* El icono se alinea con el del menú (30px de columna). */
+.sidebar-footer .logout-btn > svg {
+    flex-shrink: 0;
+    width: 18px;
+    margin-left: 1px;
+    margin-right: -1px;
+}
+
+.sidebar-footer .logout-btn:hover {
+    background: var(--color-surface-alt);
+    color: var(--color-text);
+}
+
+/* Rojo SOLO para la acción destructiva. Antes lo heredaba cualquier botón del
+   pie: en Estudiante, «Cambiar mi PIN» se ponía en rojo de alerta al pasar por
+   encima sin ser nada peligroso. */
+.sidebar-footer .logout-btn.es-peligro:hover {
+    background: var(--color-danger-soft);
+    color: var(--color-danger);
+}
+
+.nav-item.MuiListItemButton-root:focus-visible,
+.sidebar-footer .logout-btn:focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: -3px;
 }
 
 .contenido {
@@ -1274,15 +1357,10 @@
         position: relative;
         z-index: var(--z-dropdown);
     }
-    .sidebar-header {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 10px 14px;
-        border-bottom: none;
-    }
-    .sidebar-header h2 { flex: 1; margin: 0; font-size: 0.85rem; padding-right: 0; }
-    .sidebar-logo { margin: 0; max-height: 34px; max-width: 48px; }
+    /* La cabecera ya es una fila también en escritorio (SPEC-023): aquí solo
+       se ajusta el respiro y se saca la hamburguesa. */
+    .sidebar-header { padding: 10px 12px; gap: 10px; }
+    .sidebar-logo { max-height: 30px; max-width: 46px; }
     .sidebar-hamburguesa { display: inline-flex; }
 
     /* El colapso de escritorio (Fase 8) no aplica en móvil: aquí la barra
@@ -1298,7 +1376,12 @@
     }
 
     /* Menú cerrado por defecto; abierto = panel bajo la barra, con su
-       propio scroll y sombra, por encima del contenido (--z-dropdown). */
+       propio scroll y sombra, por encima del contenido (--z-dropdown).
+
+       El alto disponible es "la ventana menos la barra". `--alto-cabecera` lo
+       publica SidebarLayout con un ResizeObserver, así que el cálculo sigue
+       siendo correcto al girar el móvil o si el nombre institucional hace
+       crecer la barra. El 62px es solo el respaldo del primer pintado. */
     .sidebar-menu { display: none; }
     .sidebar-menu.is-abierto {
         display: flex;
@@ -1307,21 +1390,37 @@
         top: 100%;
         left: 0;
         right: 0;
-        max-height: min(72vh, calc(100dvh - 62px));
+        max-height: calc(100dvh - var(--alto-cabecera, 62px));
         overflow-y: auto;
+        overscroll-behavior: contain;
         background: var(--color-surface);
         border-bottom: 1px solid var(--color-border);
         box-shadow: var(--shadow-lg);
         outline: none;
     }
+    /* La navegación no se lleva el alto sobrante: el panel entero scrollea y
+       el pie queda al final de la lista, no pegado a media pantalla. */
     .sidebar-menu.is-abierto .sidebar-nav {
         flex: 0 0 auto;
         overflow: visible;
     }
-    .sidebar-menu.is-abierto .sidebar-footer { position: static; }
 
     .contenido { padding: 24px 16px; }
 }
+
+/* Pantallas muy estrechas (≈320px): el nombre institucional cede espacio
+   antes que la hamburguesa, que nunca debe salirse de la barra. */
+@media (max-width: 380px) {
+    .sidebar-header { padding: 8px 10px; gap: 8px; }
+    .sidebar-logo { max-height: 26px; max-width: 34px; }
+    .sidebar-header h2 { font-size: 0.72rem; }
+}
+
+/* Móvil apaisado: no hace falta ninguna regla extra. El menú ya se limita al
+   alto real disponible y scrollea COMO UN TODO, con el pie al final de la
+   lista. Se probó darle a la navegación su propio scroll y salía peor: en
+   740×360 se veían 3 de 7 secciones dentro de un scroll anidado sin ninguna
+   pista de que hubiera más abajo. */
 
 /* ===== Generador de Quiz ===== */
 .materia-subvista .quiz-form {
