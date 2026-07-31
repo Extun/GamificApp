@@ -2,7 +2,12 @@
 
 Guion de validación manual del sprint de Release Candidate (`SPEC-021` / `SPEC-022`). **Permanente:** se ejecuta al cerrar cada checkpoint de bloque y, entero, antes de declarar el RC.
 
-Se ejecuta contra el **entorno principal** (MySQL portable 3308 + backend 3001 + frontend 5173), nunca contra una instancia de pruebas.
+Tiene **dos entornos de ejecución**, y las secciones §0–§3 describen el primero:
+
+1. **Local** (MySQL portable 3308 + backend 3001 + frontend 5173): el guion del día a día, el que se corre al terminar cada bloque.
+2. **Desplegado** (§4): además, al cerrar un checkpoint se repite sobre el código realmente publicado. Un fallo que solo existe detrás del proxy de Render o del build de Vercel no aparece en local por definición.
+
+Lo que sigue prohibido es validar contra una instancia con **datos inventados**: en ambos entornos se juega con el esquema y los datos reales.
 
 ## 0. Preparación
 
@@ -123,8 +128,77 @@ JSON.stringify({ sondaDesde: window.__rc.desde, peticionesFallidas: window.__rc.
 
 30 minutos **no** alcanzan a probar la expiración del token. `JWT_EXPIRES_IN=8h` coincide casi exactamente con una jornada escolar, no hay renovación automática ni aviso previo: cuando expira, el primer 401 cierra la sesión sin explicación. **Está fuera del alcance de este checklist y sin bloque asignado**; queda anotado como decisión pendiente para el cierre del RC.
 
-## 4. Registro de ejecuciones
+## 4. Checkpoint sobre el entorno desplegado
 
-| Fecha | Bloques validados | Resultado | Notas |
-|---|---|---|---|
-| | | | |
+Se ejecuta **al cerrar un checkpoint de bloque**, no en cada iteración. Comprueba lo que el entorno local no puede comprobar: el build de producción de Vite, el proxy de Render delante de Express y la latencia real.
+
+### 4.1 Topología
+
+**Producción no se toca en ningún paso**: ni sus variables, ni su `CORS_ORIGIN`, ni su rama.
+
+```
+Vercel preview (rama del sprint)  ──►  Render staging  ──►  Aiven defaultdb
+  VITE_API_URL scope Preview           CORS_ORIGIN = URL del preview   (COMPARTIDA con producción)
+```
+
+La BD es la de producción **a propósito**: una base aparte habría que cargarla desde `database/produccion_defaultdb.sql` más las migraciones, y si el esquema resultante no coincidiera con el real, la evidencia valdría menos que la del entorno local. Se acepta a cambio ensuciar con un estudiante de prueba y algo de XP, que se limpian en §4.5. **Deja de ser válido en cuanto producción tenga datos de un colegio real.**
+
+El servicio de staging es **desechable**: existe solo mientras dure el RC y se elimina tras el merge a `main` (§4.5). Por eso nada del repositorio lo menciona: ni `render.yaml`, ni URLs escritas en el código.
+
+### 4.2 Variables del servicio de staging
+
+| Variable | Valor | Por qué |
+|---|---|---|
+| `DB_*` | idénticas a producción | La BD es la misma |
+| `JWT_SECRET` | **cadena nueva, distinta** | Un token emitido en staging no debe valer en producción |
+| `CORS_ORIGIN` | URL del preview, sin barra final | Único origen autorizado |
+| `ADMIN_PASSWORD` | **sin definir** | Ver el aviso de abajo |
+| `RESET_HABILITADO` | `false` | Es el endpoint que vacía la BD |
+| `GEMINI_API_KEY` / `OPENAI_API_KEY` | **sin definir** | El checkpoint no prueba IA; así no se gasta cuota |
+
+> ⚠️ **`ADMIN_PASSWORD` se deja vacía y no es un descuido.** `asegurarAdmin` (`initDb.js:674`) hace `INSERT … ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash)`. Con la base compartida, un valor distinto en staging **sobrescribiría la contraseña del admin de producción**. Sin la variable, la función solo crea un admin cuando no existe ninguno: cero escrituras.
+
+El resto del arranque sí es seguro: mientras la rama no toque `server/initDb.js`, `inicializarEsquema` es el mismo que producción ya ejecuta en cada despliegue, y es idempotente por diseño (`CREATE TABLE IF NOT EXISTS`, `ALTER` condicionales, `INSERT IGNORE`). **Compruébalo antes de cada checkpoint** con `git diff main..<rama> -- server/`.
+
+### 4.3 Preparación
+
+1. **Salud del backend**: `GET <staging>/api/health` → `200`. La primera petición puede tardar ~1 min: el plan gratuito duerme el servicio a los 15 minutos.
+2. **A dónde habla el preview de verdad.** Este es el paso que más fácil se salta y el que más caro sale: `VITE_API_URL` se hornea en el build, y si falta en el scope *Preview* el bundle queda apuntando a `http://localhost:3001` (`src/services/*.js`). La página **no se rompe a la vista** —la identidad institucional cae a sus valores por defecto—, así que hay que medirlo. Con el preview abierto, en la consola:
+
+   ```js
+   [...new Set(performance.getEntriesByType('resource').map(r => new URL(r.name).origin))]
+   ```
+
+   Debe aparecer el origen del **staging**. Si aparece `http://localhost:3001` o no aparece ninguno, la variable está mal: corrígela y **redespliega** —cambiarla sin reconstruir no hace nada—.
+3. **CORS**: iniciar sesión. Un error de CORS en consola significa que `CORS_ORIGIN` del staging no coincide exactamente con la URL del preview (sobra una barra final, o es la URL con hash del despliegue en vez de la de la rama).
+
+### 4.4 Qué se ejecuta
+
+| Parte | Cómo |
+|---|---|
+| Pruebas 1–13 de §1 | El mismo guion, sobre el preview. §0 no aplica: no hay nada que arrancar a mano |
+| P0-1, el limitador | `checkpoint-b1-desplegado.mjs`. Genera los 401 con **nombres inexistentes y distintos entre sí**, así que no toca `intentos_fallidos` de ninguna cuenta real: con un nombre que no existe, `candidatas` queda vacío y `auth.js:181` responde 401 sin escribir nada |
+| `trust proxy` | Ver abajo |
+
+**Dos cosas que solo pasan desplegado y no cuentan como fallo:** la primera petición tras 15 minutos de inactividad tarda cerca de un minuto (arranque en frío del plan gratuito), y **el limitador vive en memoria**, así que un reinicio del servicio pone el contador a cero. Si el servicio duerme en mitad de la medición del techo, la medición no vale y hay que repetirla.
+
+**`trust proxy` — la comprobación que justifica todo este montaje.** `server.js:32` declara `app.set('trust proxy', 1)`, es decir, un solo salto de proxy. Nunca se ha probado detrás del proxy real de Render. Si hubiera más saltos, `req.ip` resolvería a una IP del proxy y **todos los usuarios del mundo compartirían un único cubo de fallos**: P0-1 quedaría arreglado en local y roto en producción. Se comprueba con el cupo de la IP ya agotado por el script, entrando **desde una segunda red** (el móvil con datos móviles, no la wifi) y escribiendo un PIN incorrecto una vez:
+
+- «Nombre o PIN incorrectos» → ✅ `req.ip` es por cliente.
+- «Demasiados intentos fallidos desde esta red» → ❌ el limitador es global; hallazgo nuevo y bloqueante.
+
+### 4.5 Limpieza y desmontaje
+
+Al terminar el checkpoint:
+
+1. Borrar el estudiante de prueba creado en §2 y anotar en el registro qué se borró.
+2. Las cuentas demo usadas quedan con XP de más: se anota, no se corrige a mano.
+3. Si alguna cuenta quedó bloqueada por los 5 fallos, se desbloquea sola a los 15 minutos.
+
+Tras el **merge a `main`**, eliminar el servicio de staging de Render. No es infraestructura permanente.
+
+## 5. Registro de ejecuciones
+
+| Fecha | Entorno | Bloques validados | Resultado | Notas |
+|---|---|---|---|---|
+| | | | | |
