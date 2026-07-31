@@ -76,6 +76,7 @@ Cada etapa es un **commit independiente** y **ninguna empieza sin aprobación ex
 | **C** | Transición entre ítems, **con el tempo propio de cada juego** (§4-quater) | ✅ Hecha |
 | **D** | Línea del tiempo: movimiento real al reordenar | ✅ Hecha |
 | **E** | Quiz: sensación de avance (barra de progreso + ir a la siguiente) | ✅ Hecha |
+| **QW** | Quick Wins de cierre: confirmación del toque en Quiz y Misión, contador del Clasificador, `.mision-exito` sin `opacity`, CSS muerto | ✅ Hecha |
 
 **Orden recomendado: A → B → D → C → E.** A y B son el mayor salto con el menor riesgo y tocan un reproductor cada uno. D revive keyframes ya escritos (ítem 42). C y E van al final por transversales: C toca tres reproductores y E comparte las clases `.opcion-*` con la Misión Narrativa.
 

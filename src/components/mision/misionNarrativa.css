@@ -128,7 +128,17 @@
     border: 1px solid var(--color-primary-light);
     border-radius: var(--radius-sm);
     background: var(--color-primary-soft);
-    animation: modal-rise 0.25s ease;
+    /* QW3 del POLISH SPRINT v1.0.1: antes `modal-rise`, que anima `opacity`
+       desde 0. Este bloque es justo el que celebra haber superado el capítulo
+       —y el que lleva el botón para continuar—, así que era el peor sitio
+       posible para el patrón que SPEC-018 dejó documentado como peligroso:
+       con el reloj de animaciones congelado se quedaría invisible y la
+       aventura parecería haberse trabado. Ahora usa la entrada compartida
+       `item-entra`, solo `transform`, y sube 10 px con el mismo ritmo de
+       0,3 s que el resto de la Misión: la recompensa pertenece a la historia,
+       no a un panel que aparece. */
+    --entra-y: 10px;
+    animation: item-entra 0.3s var(--ease-standard);
 }
 
 /* --- Botones --- */

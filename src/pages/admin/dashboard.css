@@ -1538,6 +1538,36 @@
     cursor: default;
 }
 
+/* ===== POLISH SPRINT v1.0.1 QW1 — el toque acusa recibo en Quiz y Misión =====
+   La Etapa B dio esta confirmación a Completar espacios y a Verdadero/Falso,
+   pero dejó fuera `.opcion-quiz` por ser la clase COMPARTIDA por el Quiz y la
+   Misión Narrativa. Resultado: en el juego más representativo de la app, el
+   instante de responder no devolvía nada — la opción se ponía ámbar y ya.
+
+   Reutiliza `eleccion-confirma` (definida en juegos.css), sin efecto nuevo, y
+   cada juego conserva su ritmo:
+
+     · Quiz   → 0.22s, el tempo ágil. Se van encadenando preguntas y la
+                confirmación no debe hacer esperar a la siguiente.
+     · Misión → 0.30s, su mismo ritmo de capítulo. Cada elección es una
+                decisión de la historia y pesa algo más.
+
+   ACOTADO con cuidado en los dos casos:
+   · `.quiz-interactivo … .opcion-elegida` existe SOLO durante el intento: en
+     la revisión final la elegida pasa a `-correcta`/`-incorrecta`. Así la
+     corrección diferida sigue intacta y el gesto no insinúa acierto.
+   · La Misión se acota a `.mision-opciones` porque su corrección SÍ es
+     inmediata y usa `-correcta`/`-incorrecta`; sin ese ancla, al terminar un
+     quiz se animarían de golpe todas las respuestas correctas de la revisión. */
+.quiz-interactivo .opcion-quiz.opcion-elegida {
+    animation: eleccion-confirma 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mision-opciones .opcion-quiz.opcion-correcta,
+.mision-opciones .opcion-quiz.opcion-incorrecta {
+    animation: eleccion-confirma 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
 .opcion-letra {
     flex-shrink: 0;
     width: 28px;

@@ -2,6 +2,20 @@
 
 # Última actualización
 
+2026-07-30 (**POLISH SPRINT v1.0.1 — LOS CUATRO QUICK WINS DE CIERRE.** Última tanda de trabajo del sprint, salida de la auditoría comparativa de los 7 juegos: dos de ellos —**Quiz y Misión Narrativa**— seguían sin devolver nada en el instante de responder, porque `.opcion-quiz` es la clase que ambos comparten y se apartó a propósito de la Etapa B para no hacer un cambio transversal sin autorización. **Cero cambios de mecánica, puntuación, XP, corrección diferida, backend o navegación.** Cinco archivos.
+
+**QW1 · EL TOQUE ACUSA RECIBO EN LOS DOS JUEGOS QUE FALTABAN.** Reutiliza `eleccion-confirma` —sin efecto nuevo— con el ritmo propio de cada uno: **Quiz 0,22 s** (tempo ágil: se encadenan preguntas y la confirmación no debe hacer esperar) y **Misión 0,3 s** (su mismo ritmo de capítulo: cada elección es una decisión de la historia). **El acotado es la parte delicada y se verificó midiendo:** `.quiz-interactivo .opcion-quiz.opcion-elegida` existe **solo durante el intento** —en la revisión la elegida pasa a `-correcta`/`-incorrecta`—, así que la corrección diferida sigue intacta; y la Misión se ancla a `.mision-opciones` porque su corrección **sí** es inmediata, ya que sin ese ancla al terminar un quiz se habrían animado de golpe todas las respuestas correctas de la revisión. **Medido en una partida completa: al responder, 1 confirmación; al completar el quiz, `oleadaDeConfirmaciones: 0` pese a revelarse 2 correctas.**
+
+**QW2 · EL CONTADOR DEL CLASIFICADOR YA LATE.** Era el único de los cinco juegos con barra cuyo número no reaccionaba. Solo cambia con un acierto —una ficha mal colocada rebota y sigue pendiente—, así que el latido siempre celebra algo real. Medido: colocar «Árbol» en «Seres vivos» dispara ahora los tres gestos, `canasta-feliz` + **`avance-late`** + `ficha-aterriza`.
+
+**QW3 · `.mision-exito` DEJA DE ANIMAR `opacity`.** Usaba `modal-rise`, que arranca en `opacity: 0`. Era el peor sitio posible para ese patrón: es el bloque que celebra haber superado el capítulo **y el que lleva el botón para continuar**, así que con el reloj de animaciones congelado la aventura habría parecido trabada. Ahora usa `item-entra` (solo `transform`), 10 px y 0,3 s, el ritmo de la Misión. Verificado en juego: `item-entra 0.3s`.
+
+**QW4 · CSS MUERTO ELIMINADO.** `.quiz-puntaje` + sus 3 reglas hijas (30 líneas; el marcador migró a `ResultadoOverlay`), `.linea-evento.is-correcto` —que además se llevó el `#f0fdf4` suelto sin token del ítem 40— y `.linea-evento-check`. **Comprobado antes de borrar que ninguna se construye dinámicamente**: `.completar-hueco.is-correcto` sí se arma con plantilla `is-${estado}` y **no se tocó**. Auditado en el CSSOM del navegador: **cero restos**. Con la `linea-sacudida` de la Etapa D, **cierra el ítem 42 del MASTER_PLAN por completo**.
+
+**LIMITACIÓN CONOCIDA, DECLARADA:** la **última** pregunta de un quiz no recibe la confirmación del toque, porque al responderla el intento se completa en el mismo instante y la opción pasa directamente a `-correcta`/`-incorrecta`. No se compensó: el overlay de resultado entra en ese mismo momento y taparía el gesto.
+
+**CALIDAD:** `npm run build` limpio (5,82 s). **Lint 29 (26 errores + 3 warnings) = línea base exacta.** Consola tras recargar: `hot updated` sin fallos, `connecting/connected` y el aviso de React DevTools; ningún error.)
+
 2026-07-30 (**POLISH SPRINT v1.0.1 — ETAPA C: UNA SOLA ANIMACIÓN DE ENTRADA, TRES RITMOS.** Primera etapa **transversal** del sprint (toca tres reproductores), con la condición explícita de Fabrizio de **no introducir una capa compartida que haga que todos los juegos se sientan iguales**. **Cero cambios de mecánica, puntuación, XP, corrección diferida, backend o navegación.** Seis archivos: `VerdaderoFalso.jsx`, `CompletarEspacios.jsx`, `MisionNarrativa.jsx`, `juegos.css`, `verdaderoFalso.css` y `misionNarrativa.css`.
 
 **EL PROBLEMA.** Avanzar de afirmación, de frase o de capítulo **sustituía el texto en el sitio**. No había sensación de haber avanzado, solo de que el contenido cambió.

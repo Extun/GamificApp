@@ -124,7 +124,16 @@ export function JuegoDragAndDrop({ reto, estudianteId, onSalir, onCompletado, so
                         style={{ width: `${total ? ((total - pendientes.length) / total) * 100 : 0}%` }}
                     />
                 </div>
-                <span>{total - pendientes.length} / {total}</span>
+                {/* QW2 del POLISH SPRINT: era el único de los cinco juegos con
+                    barra cuyo contador no latía al subir. Solo cambia con un
+                    acierto —una ficha mal colocada rebota y sigue pendiente—,
+                    así que el latido siempre celebra algo real. */}
+                <span
+                    key={total - pendientes.length}
+                    className={`avance-cuenta ${pendientes.length < total ? 'is-pulso' : ''}`}
+                >
+                    {total - pendientes.length} / {total}
+                </span>
             </div>
 
             {/* Canastas (zonas de drop) */}

@@ -205,10 +205,9 @@
     transition: border-color 0.2s ease, background 0.2s ease;
 }
 
-.linea-evento.is-correcto {
-    border-color: var(--color-success);
-    background: #f0fdf4;
-}
+/* QW4: aquí vivía `.linea-evento.is-correcto`. Eliminada — el JSX nunca la
+   aplicó (la Línea del tiempo evalúa AL ENVIAR y no marca nada durante el
+   intento), y de paso se va el `#f0fdf4` suelto sin token del ítem 40. */
 
 .linea-evento-num {
     flex-shrink: 0;
@@ -235,9 +234,9 @@
     color: var(--color-text-soft, #64748b);
 }
 
-.linea-evento-check {
-    color: var(--color-success);
-}
+/* QW4: aquí vivía `.linea-evento-check`, también sin consumidor en el JSX.
+   Con estas dos y `linea-sacudida` (borrada en la Etapa D), la Línea del
+   tiempo queda sin CSS muerto: cierra su parte del ítem 42. */
 
 .linea-evento-flechas {
     display: flex;
