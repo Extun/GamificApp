@@ -29,6 +29,7 @@ Con esos 3 documentos ya se puede trabajar. No leer nada más salvo que la tarea
 - **Esquema BD**: `database/gamificapp.sql` (dev) y `database/produccion_defaultdb.sql` (producción Aiven); los `.sql` de `database/migraciones/` son **referencia/versionado documental**, mientras que las migraciones que realmente se aplican en cada arranque son **funciones idempotentes de `server/initDb.js`** (ver `docs/architecture/MASTER_PLAN.md` §6). Escribir solo el `.sql` no aplica nada.
 - **Servicios frontend**: `src/services/` (uno por dominio).
 - **Componentes compartidos**: `src/components/dashboard/DashboardWidgets.jsx`, `src/components/archivos/`, etc.
+- **Rutas del frontend y despliegue**: `src/App.jsx` define las 4 rutas (`/`, `/registro`, `/descargar`, `/dashboard`) y **`vercel.json` es lo que hace que el hosting las sirva**. Sin ese archivo, cualquier URL distinta de `/` devuelve el 404 de Vercel al recargar o al entrar directo. Los tres paneles se cargan con `React.lazy`.
 
 Si un documento contradice al código, **el código es la fuente de verdad** — y hay que corregir el documento.
 
@@ -87,6 +88,8 @@ Detalles importantes:
 | **Empezar de cero a propósito** | Con GamificApp detenida, **mueve** (no borres, por si acaso) `%LOCALAPPDATA%\GamificApp` a otro sitio y reinstala. El instalador **nunca** borra un datadir existente por su cuenta |
 
 ### Preparar el paquete de entrega (Fase Local 2.3)
+
+> **Dónde lo consigue el revisor:** el ZIP se publica como **asset de una Release de GitHub** del repositorio (`Extun/GamificApp`) y la página pública **`https://gamificapp.com/descargar`** lo enlaza con `releases/latest/download/GamificApp.zip`. Esa URL apunta siempre a la última Release, así que **publicar una versión nueva no obliga a tocar el frontend**: basta con adjuntar el ZIP con ese mismo nombre. El archivo no viaja en el despliegue de Vercel.
 
 ```bash
 powershell -NoProfile -ExecutionPolicy Bypass -File instalador\empaquetar.ps1

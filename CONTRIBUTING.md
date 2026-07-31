@@ -22,7 +22,7 @@ Roles: **Administrador** (Principal y Administrador — gestiona docentes, estud
 
 ## 3. Arquitectura general
 
-- SPA con 3 rutas planas: `/`, `/registro`, `/dashboard` (navegación interna con `useState`, no sub-rutas — deuda conocida, ver SPEC-001).
+- SPA con 4 rutas planas: `/`, `/registro`, `/descargar` (pública, versión offline) y `/dashboard`. La navegación **dentro** de un panel sigue en `useState`, no en sub-rutas — deuda conocida, ver SPEC-001. El botón Atrás del navegador está cubierto por `useCapasAtras` (sube un nivel en vez de salir del panel) y el hosting sirve todas las rutas gracias a `vercel.json`; **sin ese archivo, cualquier URL distinta de `/` devuelve 404**.
 - Backend REST en `server/routes/` (auth, admin, docente, materias, materiales, retos, progreso, ranking, ia).
 - **Retos polimórficos**: la tabla `retos` guarda cualquier mecánica en `configuracion_json` con un `tipo` slug libre; añadir un juego nuevo no requiere migrar la BD.
 - **Materias son un catálogo 100% dinámico en BD** (no hay lista fija en el código; `src/services/materiasService.js`).
