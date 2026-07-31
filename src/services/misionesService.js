@@ -45,16 +45,25 @@ export const HORIZONTE_LABEL = {
 export const categoriaUI = (cat) => CATEGORIAS_MISION[cat] || { emoji: '🎖️', label: cat, color: '#64748b' };
 export const tierUI = (tier) => TIERS_MISION[tier] || { label: tier, color: '#64748b', emoji: '🎖️' };
 
-// GET /api/misiones — catálogo del estudiante con progreso y estado. Devuelve
-// { misiones, nuevas } o { misiones: [], nuevas: [] } si la red falla, para que
-// la vista muestre su estado vacío en vez de romperse.
-export const obtenerMisiones = async () => {
+// GET /api/misiones — catálogo del estudiante con progreso y estado.
+//
+// `propagarError` (opt-in, mismo contrato que `retosService`): por defecto un
+// fallo se traga y devuelve `{ misiones: [], nuevas: [] }`, que es lo que
+// esperan los consumidores que solo usan el resumen como respaldo (el Home cae
+// al caché local). Quien tenga que DISTINGUIR "aún no has ganado nada" de "no
+// pude preguntarlo" —la pantalla de premios— pide la excepción explícitamente.
+//
+// Sin esa distinción, un corte de red le decía «Aún no hay misiones» a un niño
+// con doce insignias ganadas: el error más caro de la app, porque borra lo
+// único que el producto promete conservar.
+export const obtenerMisiones = async ({ propagarError = false } = {}) => {
     try {
         const res = await authFetch(`${API_URL}/api/misiones`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return await res.json();
     } catch (err) {
         console.warn('No se pudieron obtener las misiones:', err.message);
+        if (propagarError) throw err;
         return { misiones: [], nuevas: [] };
     }
 };

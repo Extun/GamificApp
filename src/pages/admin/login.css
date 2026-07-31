@@ -526,6 +526,20 @@
     text-align: center;
 }
 
+/* Explicación bajo el desplegable de cursos: por qué está vacío o
+   deshabilitado (SPEC-021 P1-1 / P1-1-bis). Tono de nota, no de error: el
+   caso más frecuente —"tu profe aún no preparó la lista"— no es un fallo. */
+.registro-aviso {
+    margin: -6px 0 4px;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    color: var(--color-text-muted);
+}
+
+.registro-aviso .login-link {
+    font-size: inherit;
+}
+
 /* "Hola, Ana 👋 / No soy yo" */
 .act-elegido {
     display: flex;

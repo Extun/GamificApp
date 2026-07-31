@@ -35,23 +35,55 @@ export function RegistroEstudiante() {
     const [credenciales, setCredenciales] = useState(null);
     const navigate = useNavigate();
 
+    // Estado de las dos cargas públicas de esta pantalla (SPEC-021 P1-1 y
+    // P1-1-bis): 'cargando' | 'listo' | 'error'. Es la primerísima pantalla
+    // del producto y el día de más concurrencia; antes el `.catch()` vaciaba
+    // la lista, así que un fallo de red y "todavía no hay nadie" se veían
+    // exactamente igual: un desplegable muerto, sin explicación, y un mensaje
+    // que mandaba al niño a molestar al docente cuando no pasaba nada.
+    const [estadoCursos, setEstadoCursos] = useState('cargando');
+    const [estadoPendientes, setEstadoPendientes] = useState('listo');
+    const [intento, setIntento] = useState(0);
+    const reintentar = () => {
+        setEstadoCursos('cargando');
+        if (cursoId) setEstadoPendientes('cargando');
+        setIntento((n) => n + 1);
+    };
+
     // Cursos con estudiantes por activar (público, mínimo: id + etiqueta).
     useEffect(() => {
-        if (modo !== 'lista') return;
-        authService.cursosPendientes().then(setCursos).catch(() => setCursos([]));
-    }, [modo]);
+        if (modo !== 'lista') return undefined;
+        let vigente = true;
+        authService.cursosPendientes()
+            .then((lista) => {
+                if (!vigente) return;
+                setCursos(lista);
+                setEstadoCursos('listo');
+            })
+            .catch(() => { if (vigente) setEstadoCursos('error'); });
+        return () => { vigente = false; };
+    }, [modo, intento]);
 
     // Nombres pendientes del curso elegido (público, mínimo: id + nombre).
     useEffect(() => {
-        if (!cursoId) return;
-        authService.estudiantesPendientes(cursoId).then(setPendientes).catch(() => setPendientes([]));
-    }, [cursoId]);
+        if (!cursoId) return undefined;
+        let vigente = true;
+        authService.estudiantesPendientes(cursoId)
+            .then((lista) => {
+                if (!vigente) return;
+                setPendientes(lista);
+                setEstadoPendientes('listo');
+            })
+            .catch(() => { if (vigente) setEstadoPendientes('error'); });
+        return () => { vigente = false; };
+    }, [cursoId, intento]);
 
     // Cambiar de curso reinicia la selección (los resets van en el evento,
     // no en el efecto, para no encadenar renders).
     const elegirCurso = (id) => {
         setCursoId(id);
         setPendientes([]);
+        setEstadoPendientes(id ? 'cargando' : 'listo');
         setSeleccionado(null);
         setFiltro('');
     };
@@ -183,13 +215,42 @@ export function RegistroEstudiante() {
                                 <form onSubmit={handleActivar} noValidate autoComplete="off">
                                     <label className="login-field">
                                         <span>¿En qué curso estás?</span>
-                                        <select value={cursoId} onChange={(e) => elegirCurso(e.target.value)}>
-                                            <option value="">Toca para elegir tu curso…</option>
+                                        {/* El desplegable se deshabilita mientras no haya nada
+                                            que elegir, y debajo se dice POR QUÉ. Antes quedaba
+                                            vacío y activo, indistinguible de un fallo de red. */}
+                                        <select
+                                            value={cursoId}
+                                            onChange={(e) => elegirCurso(e.target.value)}
+                                            disabled={estadoCursos !== 'listo' || cursos.length === 0}
+                                        >
+                                            <option value="">
+                                                {estadoCursos === 'cargando'
+                                                    ? 'Buscando los cursos…'
+                                                    : estadoCursos === 'error'
+                                                        ? 'No pudimos cargar los cursos'
+                                                        : cursos.length === 0
+                                                            ? 'Todavía no hay cursos preparados'
+                                                            : 'Toca para elegir tu curso…'}
+                                            </option>
                                             {cursos.map((c) => (
                                                 <option key={c.id} value={c.id}>{c.etiqueta}</option>
                                             ))}
                                         </select>
                                     </label>
+                                    {estadoCursos === 'error' && (
+                                        <p className="registro-aviso" role="alert">
+                                            No pudimos conectarnos. Revisa el internet y toca{' '}
+                                            <button type="button" className="login-link" onClick={reintentar}>
+                                                Intentar de nuevo
+                                            </button>.
+                                        </p>
+                                    )}
+                                    {estadoCursos === 'listo' && cursos.length === 0 && (
+                                        <p className="registro-aviso" role="status">
+                                            Tu profe aún no ha preparado la lista de tu clase. Si tienes un
+                                            código de invitación, usa la otra opción de arriba.
+                                        </p>
+                                    )}
                                     {cursoId && !seleccionado && (
                                         <div className="login-field">
                                             <span>Busca tu nombre y tócalo</span>
@@ -202,7 +263,13 @@ export function RegistroEstudiante() {
                                                     onChange={(e) => setFiltro(e.target.value)}
                                                 />
                                             )}
-                                            <div className="act-nombres" role="listbox" aria-label="Estudiantes de tu curso">
+                                            {/* Sin `role="listbox"`: sus hijos son <button>, no
+                                                `role="option"`, así que un lector de pantalla
+                                                anunciaba un cuadro de lista SIN opciones y el
+                                                niño con lector no encontraba su nombre
+                                                (SPEC-021 P2-9). Un grupo de botones con nombre
+                                                accesible describe exactamente lo que es. */}
+                                            <div className="act-nombres" role="group" aria-label="Estudiantes de tu curso">
                                                 {nombresVisibles.map((p) => (
                                                     <button
                                                         key={p.estudiante_id}
@@ -213,12 +280,23 @@ export function RegistroEstudiante() {
                                                         {p.nombre}
                                                     </button>
                                                 ))}
+                                                {/* Cuatro situaciones distintas que antes se
+                                                    contaban como una sola (P1-1). */}
                                                 {!nombresVisibles.length && (
-                                                    <p className="act-vacio">
-                                                        {pendientes.length
-                                                            ? 'No encontramos ese nombre. Revisa cómo lo escribiste.'
-                                                            : 'No hay nadie por entrar en este curso. Pregúntale a tu profe.'}
-                                                    </p>
+                                                    estadoPendientes === 'cargando' ? (
+                                                        <p className="act-vacio" role="status">Buscando los nombres de tu clase…</p>
+                                                    ) : estadoPendientes === 'error' ? (
+                                                        <p className="act-vacio" role="alert">
+                                                            No pudimos traer la lista. Revisa el internet y toca{' '}
+                                                            <button type="button" className="login-link" onClick={reintentar}>
+                                                                Intentar de nuevo
+                                                            </button>.
+                                                        </p>
+                                                    ) : pendientes.length ? (
+                                                        <p className="act-vacio">No encontramos ese nombre. Revisa cómo lo escribiste.</p>
+                                                    ) : (
+                                                        <p className="act-vacio">No hay nadie por entrar en este curso. Pregúntale a tu profe.</p>
+                                                    )
                                                 )}
                                             </div>
                                         </div>

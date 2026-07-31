@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../admin/dashboard.css';
 import './dashboardEstudiante.css';
@@ -62,7 +62,15 @@ export function DashboardEstudiante() {
     // tragaba en silencio. Ahora cada estado se dice tal cual es.
     const [estadoCatalogo, setEstadoCatalogo] = useState('cargando');
     const [estadoRetos, setEstadoRetos] = useState('cargando');
-    const [estadoMateria, setEstadoMateria] = useState('cargando');
+    // Dentro de una materia hay DOS cargas independientes: los retos (que
+    // alimentan Quizzes, Juegos y Misiones) y el material de estudio. Antes
+    // compartían un solo estado, así que si fallaba una —lo más probable, el
+    // material, que son archivos pesados en base64— las cuatro pestañas
+    // decían "No pudimos cargar esto" aunque tres de ellas tuvieran sus datos
+    // ya en memoria (SPEC-021 P1-7). Un fallo parcial dejaba inaccesible un
+    // mundo entero.
+    const [estadoRetosMateria, setEstadoRetosMateria] = useState('cargando');
+    const [estadoMaterial, setEstadoMaterial] = useState('cargando');
 
     // Reintento sin recargar la página: vuelve a disparar los efectos de carga.
     // El paso a 'cargando' va aquí (en el manejador) y no dentro del efecto,
@@ -71,7 +79,8 @@ export function DashboardEstudiante() {
     const reintentar = () => {
         setEstadoCatalogo('cargando');
         setEstadoRetos('cargando');
-        setEstadoMateria('cargando');
+        setEstadoRetosMateria('cargando');
+        setEstadoMaterial('cargando');
         setIntento((n) => n + 1);
     };
 
@@ -172,27 +181,45 @@ export function DashboardEstudiante() {
         // Juegos = todo reto cuyo tipo esté en el registro JUEGOS_UI
         // (clasificador, memorama, línea del tiempo, completar…): un solo
         // despacho por tipo, sin pedir tipo por tipo.
-        // allSettled: las pestañas solo salen de 'cargando' cuando AMBAS
-        // peticiones terminan, y un fallo de red deja 'error' en lugar de un
-        // "no hay nada" falso (antes ni siquiera había .catch: el rechazo
-        // quedaba sin manejar).
-        Promise.allSettled([
-            // propagarError: los servicios devuelven [] ante un fallo por
-            // defecto, así que sin esto un error de red llegaba aquí disfrazado
-            // de "no hay contenido" y el estado 'error' era inalcanzable.
-            obtenerRetosPublicados({ materiaId: materia.id, propagarError: true })
-                .then((retos) => {
-                    if (!vigente) return;
-                    setQuizzes(retos.filter((r) => r.tipo === 'quiz' && r.configuracion?.preguntas?.length));
-                    setJuegos(retos.filter((r) => JUEGOS_UI[r.tipo] && juegoJugable(r)));
-                    setMisionesRetos(retos.filter((r) => r.tipo === 'mision' && r.configuracion?.desafios?.length));
-                }),
-            obtenerMaterial(materia.id, { propagarError: true })
-                .then((lista) => { if (vigente) setArchivos(lista); })
-        ]).then((resultados) => {
-            if (!vigente) return;
-            setEstadoMateria(resultados.some((r) => r.status === 'rejected') ? 'error' : 'listo');
-        });
+        // Cada carga resuelve SU propio estado (P1-7): el material y los retos
+        // fallan por separado, así que se informan por separado.
+        // propagarError: los servicios devuelven [] ante un fallo por
+        // defecto, así que sin esto un error de red llegaba aquí disfrazado
+        // de "no hay contenido" y el estado 'error' era inalcanzable.
+        obtenerRetosPublicados({ materiaId: materia.id, propagarError: true })
+            .then((retos) => {
+                if (!vigente) return;
+                setQuizzes(retos.filter((r) => r.tipo === 'quiz' && r.configuracion?.preguntas?.length));
+                setJuegos(retos.filter((r) => JUEGOS_UI[r.tipo] && juegoJugable(r)));
+                setMisionesRetos(retos.filter((r) => r.tipo === 'mision' && r.configuracion?.desafios?.length));
+                setEstadoRetosMateria('listo');
+                // Salto directo a una actividad nombrada en el Home (P1-3).
+                // Se resuelve aquí porque hasta ahora no existía el reto: solo
+                // se conocía su id. Si ya no está publicado, no se abre nada y
+                // el niño se queda en la materia, que es el destino honesto.
+                const pendiente = retoPendienteRef.current;
+                retoPendienteRef.current = null;
+                const objetivo = pendiente ? retos.find((r) => r.id === pendiente) : null;
+                if (!objetivo) return;
+                if (objetivo.tipo === 'quiz') {
+                    setSubVista('quizzes');
+                    setQuizActivo(objetivo);
+                } else if (objetivo.tipo === 'mision') {
+                    setSubVista('misiones');
+                    setMisionActiva(objetivo);
+                } else if (JUEGOS_UI[objetivo.tipo]) {
+                    setSubVista('juegos');
+                    setJuegoActivo(objetivo);
+                }
+            })
+            .catch(() => { if (vigente) setEstadoRetosMateria('error'); });
+        obtenerMaterial(materia.id, { propagarError: true })
+            .then((lista) => {
+                if (!vigente) return;
+                setArchivos(lista);
+                setEstadoMaterial('listo');
+            })
+            .catch(() => { if (vigente) setEstadoMaterial('error'); });
         return () => { vigente = false; };
         // catalogoMaterias entra en las dependencias: al llegar el catálogo
         // de la API se resuelve el id y recién ahí se cargan los retos.
@@ -206,7 +233,12 @@ export function DashboardEstudiante() {
         ),
         [progresoDetalle]
     );
-    const ultimaActividad = actividadReciente[0] || null;
+    // "¡Seguir jugando!" solo puede ofrecer algo que de verdad se pueda
+    // seguir: antes era el progreso MÁS RECIENTE sin mirar si estaba
+    // terminado, así que invitaba a continuar una actividad completada al
+    // 100 % (SPEC-021 P1-3). Si todo está terminado, no hay nada que seguir y
+    // el Home cae al camino de "tu primera aventura" / estado vacío.
+    const ultimaActividad = actividadReciente.find((p) => !p.completado) || null;
 
     // Fallback sin progreso: la actividad publicada más antigua es la
     // "primera" disponible (la API las devuelve de más nueva a más vieja).
@@ -217,9 +249,14 @@ export function DashboardEstudiante() {
         ? catalogoMaterias.find((m) => m.id === primerRetoDisponible.materia_id)?.nombre
         : null;
 
+    // Actividad que el Home pidió abrir en cuanto lleguen los retos (P1-3).
+    const retoPendienteRef = useRef(null);
+
     const abrirMateria = (mat) => {
+        retoPendienteRef.current = null;
         setMateriaSeleccionada(mat);
-        setEstadoMateria('cargando');
+        setEstadoRetosMateria('cargando');
+        setEstadoMaterial('cargando');
         setSubVista('material');
         setQuizActivo(null);
         setJuegoActivo(null);
@@ -231,11 +268,22 @@ export function DashboardEstudiante() {
     };
 
     // Salto directo desde el Home a una materia (sugerencias del dashboard).
-    const irAMateria = (nombre) => {
+    // `retoId` opcional: cuando el Home nombra UNA actividad concreta
+    // ("Te espera «Los animales»"), abrirla es lo que promete el botón. Antes
+    // aterrizaba en la pestaña "Material de estudio" y el niño tenía que
+    // buscarla solo, con lo que la tarjeta principal del Home rompía su
+    // promesa dos veces (SPEC-021 P1-3).
+    // El reto no está cargado todavía —depende de la petición que dispara
+    // `abrirMateria`—, así que se anota como pendiente y lo abre el efecto de
+    // carga en cuanto llega. En una ref, no en estado: no debe provocar
+    // render ni re-disparar el efecto.
+    const irAMateria = (nombre, retoId = null) => {
         if (!nombre) return;
         setPagina('materias');
         abrirMateria(nombre);
+        retoPendienteRef.current = retoId;
     };
+
 
     const volver = () => {
         setMateriaSeleccionada(null);
@@ -251,17 +299,21 @@ export function DashboardEstudiante() {
         navigate('/');
     };
 
-    // Las 4 pestañas de materia comparten los mismos tres estados. Antes todas
-    // usaban `<p class="vacio-msg">` —texto gris plano— mientras el resto del
-    // producto usa `EmptyState` con icono y mensaje; ahora comparten componente
-    // y, sobre todo, distinguen "todavía no sé" de "no hay nada".
+    // Las 4 pestañas de materia comparten el mismo patrón de tres estados.
+    // Antes todas usaban `<p class="vacio-msg">` —texto gris plano— mientras
+    // el resto del producto usa `EmptyState` con icono y mensaje; ahora
+    // comparten componente y, sobre todo, distinguen "todavía no sé" de "no
+    // hay nada".
+    // `estado` llega por parámetro (P1-7): la pestaña de material mira el
+    // estado del material y las tres de actividades el de los retos, así que
+    // un fallo en una no contagia a las otras.
     // Es una función que devuelve JSX, no un componente anidado: así las
     // pestañas no se remontan en cada render.
-    const contenidoMateria = ({ hayDatos, Icon, titulo, mensaje, contenido }) => {
-        if (estadoMateria === 'cargando') {
+    const contenidoMateria = ({ estado, hayDatos, Icon, titulo, mensaje, contenido }) => {
+        if (estado === 'cargando') {
             return <p className="materia-estado" role="status">Buscando…</p>;
         }
-        if (estadoMateria === 'error') {
+        if (estado === 'error') {
             return (
                 <EmptyState
                     Icon={CloudOffRoundedIcon}
@@ -423,7 +475,7 @@ export function DashboardEstudiante() {
                                     accion={{ label: 'Intentar de nuevo', onClick: reintentar }}
                                 />
                             ) : ultimaActividad ? (
-                                <button className="home-hero" onClick={() => irAMateria(ultimaActividad.materia)}>
+                                <button className="home-hero" onClick={() => irAMateria(ultimaActividad.materia, ultimaActividad.reto_id)}>
                                     <span className="home-hero-emoji" aria-hidden="true">🚀</span>
                                     <span className="home-hero-texto">
                                         <strong>¡Seguir jugando!</strong>
@@ -432,7 +484,7 @@ export function DashboardEstudiante() {
                                     <ArrowForwardRoundedIcon className="home-hero-flecha" />
                                 </button>
                             ) : materiaPrimerReto ? (
-                                <button className="home-hero" onClick={() => irAMateria(materiaPrimerReto)}>
+                                <button className="home-hero" onClick={() => irAMateria(materiaPrimerReto, primerRetoDisponible.id)}>
                                     <span className="home-hero-emoji" aria-hidden="true">🎁</span>
                                     <span className="home-hero-texto">
                                         <strong>¡Tu primera aventura!</strong>
@@ -542,11 +594,12 @@ export function DashboardEstudiante() {
                                         <h3>Material de estudio</h3>
                                         {/* El contador solo se muestra cuando es un dato y no
                                             un "0" provisional mientras carga. */}
-                                        {estadoMateria === 'listo' && (
+                                        {estadoMaterial === 'listo' && (
                                             <span className="card-tag">{archivos.length} recursos</span>
                                         )}
                                     </div>
                                     {contenidoMateria({
+                                        estado: estadoMaterial,
                                         hayDatos: archivos.length > 0,
                                         Icon: MenuBookIcon,
                                         titulo: 'Todavía no hay material',
@@ -566,11 +619,12 @@ export function DashboardEstudiante() {
                                 <section className="card materia-cards">
                                     <div className="card-head">
                                         <h3>Quizzes disponibles</h3>
-                                        {estadoMateria === 'listo' && (
+                                        {estadoRetosMateria === 'listo' && (
                                             <span className="card-tag">{quizzes.length} quizzes</span>
                                         )}
                                     </div>
                                     {contenidoMateria({
+                                        estado: estadoRetosMateria,
                                         hayDatos: quizzes.length > 0,
                                         Icon: QuizRoundedIcon,
                                         titulo: 'Todavía no hay quizzes',
@@ -620,11 +674,12 @@ export function DashboardEstudiante() {
                                 <section className="card materia-cards">
                                     <div className="card-head">
                                         <h3>Juegos disponibles</h3>
-                                        {estadoMateria === 'listo' && (
+                                        {estadoRetosMateria === 'listo' && (
                                             <span className="card-tag">{juegos.length} juegos</span>
                                         )}
                                     </div>
                                     {contenidoMateria({
+                                        estado: estadoRetosMateria,
                                         hayDatos: juegos.length > 0,
                                         Icon: ExtensionRoundedIcon,
                                         titulo: 'Todavía no hay juegos',
@@ -662,11 +717,12 @@ export function DashboardEstudiante() {
                                 <section className="card materia-cards">
                                     <div className="card-head">
                                         <h3>Misiones narrativas</h3>
-                                        {estadoMateria === 'listo' && (
+                                        {estadoRetosMateria === 'listo' && (
                                             <span className="card-tag">{misionesRetos.length} aventuras</span>
                                         )}
                                     </div>
                                     {contenidoMateria({
+                                        estado: estadoRetosMateria,
                                         hayDatos: misionesRetos.length > 0,
                                         Icon: AutoStoriesRoundedIcon,
                                         titulo: 'Todavía no hay misiones',

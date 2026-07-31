@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import './misionesPanel.css';
 import { LogroToast } from '../../components/quiz/QuizInteractivo';
 import { EmptyState } from '../../components/dashboard/DashboardWidgets';
+import CloudOffRoundedIcon from '@mui/icons-material/CloudOffRounded';
 import {
     obtenerMisiones, categoriaUI, tierUI,
     ORDEN_CATEGORIAS, HORIZONTE_LABEL
@@ -58,22 +59,35 @@ function MisionCard({ mision }) {
 // Panel de Misiones del estudiante (SPEC-007, Fase 1). Todo viene del backend.
 export function PanelMisiones() {
     const [data, setData] = useState(null);
-    const [cargando, setCargando] = useState(true);
+    // Tres estados explícitos (SPEC-021 P1-4). Antes solo había `cargando`, así
+    // que un fallo de red aterrizaba en la misma rama que "no tienes misiones"
+    // y esta pantalla —la de las recompensas— le decía a un niño con insignias
+    // ganadas que aún no había ganado nada.
+    const [estado, setEstado] = useState('cargando');
     const [filtro, setFiltro] = useState('todas');
     const [toast, setToast] = useState(null);
+    // Reintento sin recargar la página. El paso a 'cargando' vive aquí, en el
+    // manejador, y no dentro del efecto (mismo criterio que el resto del panel).
+    const [intento, setIntento] = useState(0);
+    const reintentar = () => {
+        setEstado('cargando');
+        setIntento((n) => n + 1);
+    };
 
     useEffect(() => {
         let vigente = true;
-        obtenerMisiones().then((res) => {
-            if (!vigente) return;
-            setData(res);
-            setCargando(false);
-            if (res.nuevas?.length) {
-                setToast({ titulo: '¡Misión completada!', mensaje: res.nuevas[0].titulo });
-            }
-        });
+        obtenerMisiones({ propagarError: true })
+            .then((res) => {
+                if (!vigente) return;
+                setData(res);
+                setEstado('listo');
+                if (res.nuevas?.length) {
+                    setToast({ titulo: '¡Misión completada!', mensaje: res.nuevas[0].titulo });
+                }
+            })
+            .catch(() => { if (vigente) setEstado('error'); });
         return () => { vigente = false; };
-    }, []);
+    }, [intento]);
 
     const misiones = data?.misiones || [];
     const resumen = data?.resumen;
@@ -104,7 +118,7 @@ export function PanelMisiones() {
                 </div>
             )}
 
-            {!cargando && categorias.length > 0 && (
+            {estado === 'listo' && categorias.length > 0 && (
                 <div className="misiones-filtros">
                     {/* aria-pressed: el chip activo se distinguía SOLO por color. */}
                     <button
@@ -131,8 +145,15 @@ export function PanelMisiones() {
                 </div>
             )}
 
-            {cargando ? (
-                <p className="contenido-sub">Cargando tus misiones…</p>
+            {estado === 'cargando' ? (
+                <p className="contenido-sub" role="status">Cargando tus misiones…</p>
+            ) : estado === 'error' ? (
+                <EmptyState
+                    Icon={CloudOffRoundedIcon}
+                    titulo="No pudimos traer tus premios"
+                    mensaje="Tus insignias están guardadas: es la conexión la que falló. Revisa el internet y vuelve a intentarlo."
+                    accion={{ label: 'Intentar de nuevo', onClick: reintentar }}
+                />
             ) : visibles.length === 0 ? (
                 <EmptyState
                     titulo="Aún no hay misiones"
