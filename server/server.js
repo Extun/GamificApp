@@ -44,29 +44,73 @@ app.use((_req, res, next) => {
     next();
 });
 
-// Rate limiting por IP para las rutas públicas de auth (login, registro,
-// emergencia): frena fuerza bruta de PINs y de códigos de invitación.
+// Rate limiting por IP para las rutas públicas de auth (SPEC-022 §1).
+//
+// Cuenta CREDENCIALES RECHAZADAS, no peticiones. La versión anterior contaba
+// toda petición —éxitos incluidos— con un techo de 30 cada 5 minutos, y como
+// una escuela entera sale a internet por una sola IP pública (NAT), el niño
+// nº 31 de la jornada recibía un 429 indistinguible de "la app está caída".
+// Un inicio de sesión correcto ahora no consume nada.
+//
+// Esta capa NO es la defensa principal contra fuerza bruta: esa es el bloqueo
+// POR CUENTA de routes/auth.js (5 fallos → 15 min) y el limitador por nombre,
+// ambos intactos. Aquí solo se frena el ROCIADO (un intento en muchas
+// cuentas), que es lo único que el bloqueo por cuenta no ve.
+//
 // En memoria: suficiente para una sola instancia como la de Render.
 const VENTANA_MS = 5 * 60 * 1000;
-const MAX_PETICIONES = 30;
-const intentosPorIp = new Map();
+// 400 = colegio completo (600 alumnos) llegando a la vez con 2 de cada 3
+// tecleando mal el PIN. El uso normal no se acerca; el rociado sí topa.
+const MAX_FALLOS = 400;
+const fallosPorIp = new Map();
+
+// Rutas de /api/auth que no consumen cupo. `req.path` llega ya sin el prefijo
+// del montaje, así que son sub-rutas ("/login", "/cursos-pendientes"…).
+//  · Los dos GET del alta por Excel (SPEC-014) son catálogo público y no
+//    llevan credencial: solo listan cursos y nombres para poder elegir.
+//    Consumían cupo por estar bajo el mismo router, y son justo las que más
+//    se piden el primer día de clase.
+//  · cambiar-pin ya pasa por `autenticar` con un JWT válido: limitarla por IP
+//    no añade defensa, solo castiga a un aula que comparte salida.
+const RUTAS_SIN_LIMITE = new Set(['/cursos-pendientes', '/cambiar-pin']);
+const sinLimite = (ruta) =>
+    RUTAS_SIN_LIMITE.has(ruta) || /^\/curso\/\d+\/estudiantes-pendientes$/.test(ruta);
+
 const limitarAuth = (req, res, next) => {
-    const ahora = Date.now();
-    const registro = intentosPorIp.get(req.ip);
-    if (!registro || ahora - registro.desde > VENTANA_MS) {
-        intentosPorIp.set(req.ip, { desde: ahora, cuenta: 1 });
-        return next();
+    if (sinLimite(req.path)) return next();
+
+    const registro = fallosPorIp.get(req.ip);
+    const vigente = registro && Date.now() - registro.desde <= VENTANA_MS;
+    if (vigente && registro.cuenta >= MAX_FALLOS) {
+        return res.status(429).json({
+            error: 'Demasiados intentos fallidos desde esta red. Espera unos minutos.'
+        });
     }
-    if (++registro.cuenta > MAX_PETICIONES) {
-        return res.status(429).json({ error: 'Demasiadas peticiones. Espera unos minutos.' });
-    }
+
+    // El conteo ocurre AL TERMINAR la respuesta, porque solo entonces se sabe
+    // si la credencial se rechazó. Se cuenta 401 y NADA MÁS:
+    //  · 403 describe el ESTADO de la cuenta con la credencial correcta
+    //    (desactivada, o importada por Excel y aún sin activar). Contarlo
+    //    gastaría cupo con el error más previsible del día de estreno.
+    //  · 429 es el bloqueo por cuenta ya actuando; contarlo alargaría solo.
+    //  · 400/409 son datos mal formados, no intentos de adivinar.
+    res.on('finish', () => {
+        if (res.statusCode !== 401) return;
+        const ahora = Date.now();
+        const actual = fallosPorIp.get(req.ip);
+        if (!actual || ahora - actual.desde > VENTANA_MS) {
+            fallosPorIp.set(req.ip, { desde: ahora, cuenta: 1 });
+        } else {
+            actual.cuenta += 1;
+        }
+    });
     next();
 };
 // Poda periódica para que el mapa no crezca sin límite.
 setInterval(() => {
     const ahora = Date.now();
-    for (const [ip, r] of intentosPorIp) {
-        if (ahora - r.desde > VENTANA_MS) intentosPorIp.delete(ip);
+    for (const [ip, r] of fallosPorIp) {
+        if (ahora - r.desde > VENTANA_MS) fallosPorIp.delete(ip);
     }
 }, VENTANA_MS).unref();
 
