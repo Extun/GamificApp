@@ -1,0 +1,35 @@
+/* Espera de la carga diferida de los paneles (React.lazy en App.jsx).
+   Ocupa la pantalla entera para que no haya un salto de layout cuando el panel
+   real entra, y usa los mismos tokens que el resto de la aplicación. */
+.app-cargando {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: var(--color-bg);
+    color: var(--color-text-muted);
+}
+
+.app-cargando p {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+/* Un solo punto que late. Anima `transform` y `opacity` (nunca `width` ni
+   `top`), y la red de seguridad de `prefers-reduced-motion` de index.css lo
+   deja quieto y visible para quien pidió menos movimiento. */
+.app-cargando-punto {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    animation: app-cargando-late 1s ease-in-out infinite;
+}
+
+@keyframes app-cargando-late {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%      { transform: scale(0.6); opacity: 0.55; }
+}

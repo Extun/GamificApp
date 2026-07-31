@@ -1,12 +1,39 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import './App.css'
 import {Login} from './pages/admin/login.jsx'
-import {Dashboard} from './pages/admin/dashboard.jsx'
-import {DashboardEstudiante} from './pages/estudiante/DashboardEstudiante.jsx'
 import {RegistroEstudiante} from './pages/estudiante/RegistroEstudiante.jsx'
-import {AdminDashboard} from './pages/admin/AdminDashboard.jsx'
 import {ToastHost} from './components/dashboard/Toast.jsx'
 import authService from './services/authService'
+
+// Los tres paneles se cargan BAJO DEMANDA, no en el arranque.
+//
+// Cada sesión usa exactamente uno de ellos, pero todos viajaban en el mismo
+// archivo: un niño de segundo de básica descargaba —sobre la red de la
+// escuela, antes de ver la pantalla de acceso— el editor de actividades del
+// docente, los generadores de IA, el lector de Excel de la carga masiva y los
+// módulos de administración que nunca va a abrir. El arranque es justo el
+// momento en que el producto no puede permitirse ser lento.
+//
+// El login y el registro NO se dividen a propósito: son la primera pantalla,
+// y diferirlos cambiaría un arranque grande por un arranque en blanco.
+const Dashboard = lazy(() => import('./pages/admin/dashboard.jsx').then((m) => ({ default: m.Dashboard })))
+const DashboardEstudiante = lazy(() => import('./pages/estudiante/DashboardEstudiante.jsx').then((m) => ({ default: m.DashboardEstudiante })))
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard.jsx').then((m) => ({ default: m.AdminDashboard })))
+const DescargarApp = lazy(() => import('./pages/DescargarApp.jsx').then((m) => ({ default: m.DescargarApp })))
+
+// Espera de la carga diferida. Con la caché del navegador o una red decente no
+// llega a verse; en la red de la escuela evita el susto de una pantalla en
+// blanco sin explicación. No inventa una estética nueva: es el mismo fondo de
+// la aplicación con un mensaje comprensible por un niño.
+function CargandoPanel() {
+  return (
+    <div className="app-cargando" role="status">
+      <span className="app-cargando-punto" aria-hidden="true" />
+      <p>Preparando todo…</p>
+    </div>
+  )
+}
 
 // Solo entra quien tiene un JWT emitido por el servidor; si el token expira,
 // authFetch lo descarta en el primer 401 y esta guardia devuelve al login.
@@ -47,19 +74,24 @@ function DashboardPorRol() {
 function App() {
   return (
     <>
-      <Routes>
-        <Route path="/" element={<RutaDeAcceso><Login /></RutaDeAcceso>} />
-        <Route path="/registro" element={<RegistroEstudiante />} />
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <DashboardPorRol />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <Suspense fallback={<CargandoPanel />}>
+        <Routes>
+          <Route path="/" element={<RutaDeAcceso><Login /></RutaDeAcceso>} />
+          <Route path="/registro" element={<RegistroEstudiante />} />
+          {/* Pública y sin guardia: el docente o el revisor tiene que poder
+              llegar a la descarga sin una cuenta y sin sesión abierta. */}
+          <Route path="/descargar" element={<DescargarApp />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardPorRol />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
       {/* Notificaciones transitorias (SPEC-018 Fase 4): un solo host para
           toda la app; sobrevive a la navegación interna de la SPA. */}
       <ToastHost />

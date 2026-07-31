@@ -526,6 +526,13 @@
     text-align: center;
 }
 
+/* Enlace a la versión descargable, en el pie de la pantalla de acceso. */
+.login-descargar {
+    margin-top: 2px;
+    font-size: 0.85rem;
+    text-align: center;
+}
+
 /* Copiar / imprimir las credenciales que solo se muestran una vez
    (SPEC-021 P1-2). Dos acciones secundarias, con el mismo peso visual que
    el resto de enlaces de la tarjeta: la acción principal sigue siendo

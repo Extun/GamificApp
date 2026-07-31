@@ -1,13 +1,36 @@
 // Procesamiento real de PDF en el navegador con pdfjs-dist.
 // Extrae el número de páginas y genera una miniatura (dataURL) de la primera
 // página, sin depender de ningún backend. El worker se resuelve vía Vite.
-import * as pdfjsLib from 'pdfjs-dist';
-// Vite empaqueta el worker como módulo con el sufijo `?worker`. Usar `workerPort`
-// con una instancia real evita el fallback a "fake worker" (que en Vite deja el
-// render colgado al no poder cargar el .mjs por la ruta `?url`).
-import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker';
+//
+// CARGA PEREZOSA (rendimiento). Antes, la librería y el worker se importaban
+// arriba y `new PdfWorker()` se ejecutaba al cargar el módulo. Como
+// `ArchivoChip` importa este servicio, y el panel del estudiante importa
+// `ArchivoChip`, TODO niño se descargaba `pdf.worker.min` —1,27 MB, el archivo
+// más pesado de la aplicación— nada más entrar, sin abrir un solo PDF. Medido
+// en el navegador: era el 49 % de todo el JavaScript de esa pantalla.
+//
+// Ahora la librería y el worker se piden la primera vez que de verdad se va a
+// leer un PDF, y una sola vez (la promesa queda memorizada). Las tres
+// funciones exportadas ya eran asíncronas, así que ningún consumidor cambia.
+let pdfjsPromesa = null;
 
-pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker();
+const cargarPdfjs = () => {
+    if (!pdfjsPromesa) {
+        pdfjsPromesa = (async () => {
+            // Vite empaqueta el worker como módulo con el sufijo `?worker`. Usar
+            // `workerPort` con una instancia real evita el fallback a "fake
+            // worker" (que en Vite deja el render colgado al no poder cargar el
+            // .mjs por la ruta `?url`).
+            const [pdfjsLib, { default: PdfWorker }] = await Promise.all([
+                import('pdfjs-dist'),
+                import('pdfjs-dist/build/pdf.worker.min.mjs?worker')
+            ]);
+            pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker();
+            return pdfjsLib;
+        })();
+    }
+    return pdfjsPromesa;
+};
 
 /**
  * Procesa un PDF y devuelve sus metadatos reales.
@@ -15,6 +38,7 @@ pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker();
  * @returns {Promise<{ pageCount: number, thumbnail: string|null }>}
  */
 export async function procesarPdf(file) {
+    const pdfjsLib = await cargarPdfjs();
     const buffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
     const pageCount = pdf.numPages;
@@ -63,7 +87,8 @@ const dataUrlToBytes = (dataUrl) => {
  * @param {string} dataUrl
  * @returns {Promise<import('pdfjs-dist').PDFDocumentProxy>}
  */
-export function cargarDocumentoPdf(dataUrl) {
+export async function cargarDocumentoPdf(dataUrl) {
+    const pdfjsLib = await cargarPdfjs();
     return pdfjsLib.getDocument({ data: dataUrlToBytes(dataUrl) }).promise;
 }
 

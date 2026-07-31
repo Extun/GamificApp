@@ -310,6 +310,14 @@ export function Login(){
                     )}
                 </div>
 
+                {/* Puerta a la versión sin internet. Va en el pie y no en la
+                    tarjeta a propósito: el camino principal de esta pantalla es
+                    entrar, y quien descarga (el docente, el revisor) lo hace una
+                    sola vez. */}
+                <Link className="login-link login-descargar" to="/descargar">
+                    ⬇ Usar GamificApp sin internet en tu computadora
+                </Link>
+
                 <span className="login-pie">{institucion?.nombre || NOMBRE_INSTITUCION_DEFECTO}</span>
             </main>
         </div>

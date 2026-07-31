@@ -1,0 +1,181 @@
+/* Página de descarga (gamificapp.com/descargar).
+   Se apoya entera en `login.css` y en los tokens de tema: no introduce colores
+   ni formas nuevas, solo el ancho extra que pide una página de lectura (la
+   tarjeta del login es un formulario corto; esta explica un procedimiento). */
+
+.descargar-page {
+    /* La tarjeta es larga: el login centra verticalmente, aquí sobra. */
+    align-items: flex-start;
+    padding-top: 40px;
+    padding-bottom: 40px;
+}
+
+.descargar-centro {
+    max-width: 640px;
+}
+
+.descargar-card {
+    gap: 22px;
+}
+
+/* --- Acción principal --- */
+.descargar-boton {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 18px;
+    border-radius: var(--radius-md);
+    background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
+    color: #fff;
+    text-decoration: none;
+    box-shadow: var(--shadow-md);
+    transition: transform 0.15s var(--ease-standard), box-shadow 0.15s var(--ease-standard);
+}
+
+.descargar-boton:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.descargar-boton:active { transform: translateY(0); }
+
+.descargar-boton svg { font-size: 2rem; flex-shrink: 0; }
+
+.descargar-boton-texto {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.descargar-boton-texto strong { font-size: 1.05rem; }
+.descargar-boton-texto span { font-size: 0.86rem; opacity: 0.9; }
+
+.descargar-nota {
+    margin: -10px 0 0;
+    font-size: 0.86rem;
+    color: var(--color-text-muted);
+}
+
+/* --- Secciones de contenido --- */
+.descargar-seccion {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 18px;
+    border-top: 1px solid var(--color-border);
+}
+
+.descargar-seccion h2 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.descargar-intro {
+    margin: 0;
+    font-size: 0.92rem;
+    line-height: 1.6;
+    color: var(--color-text-muted);
+}
+
+.descargar-lista {
+    margin: 0;
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 0.92rem;
+    line-height: 1.6;
+    color: var(--color-text-muted);
+}
+
+/* --- Los tres pasos --- */
+.descargar-pasos {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    counter-reset: paso;
+}
+
+.descargar-paso {
+    display: flex;
+    gap: 14px;
+    padding: 14px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-alt);
+}
+
+.descargar-paso-num {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--color-primary-soft);
+    color: var(--color-primary-dark);
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.descargar-paso-cuerpo {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.descargar-paso-cuerpo h3 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.descargar-paso-icono { font-size: 1.15rem; color: var(--color-primary); }
+
+.descargar-paso-cuando {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    padding: 2px 10px;
+}
+
+.descargar-paso-cuerpo p {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: var(--color-text-muted);
+}
+
+/* Nombres de archivo y rutas: se leen como lo que son, sin parecer un enlace. */
+.descargar-archivo {
+    display: inline-block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.84rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 2px 7px;
+    color: var(--color-text);
+}
+
+.descargar-volver { align-items: center; }
+
+@media (max-width: 560px) {
+    .descargar-page { padding-top: 24px; }
+    .descargar-paso { flex-direction: column; gap: 10px; }
+}
