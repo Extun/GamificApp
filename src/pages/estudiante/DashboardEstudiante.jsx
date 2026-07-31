@@ -29,6 +29,7 @@ import { EmptyState } from '../../components/dashboard/DashboardWidgets';
 import { PanelMisiones } from './PanelMisiones';
 import { ModalCambiarPin } from './ModalCambiarPin';
 import { useGuardiaActividad } from '../../hooks/useGuardiaActividad';
+import { useSalidaAtras } from '../../hooks/useSalidaAtras';
 
 export function DashboardEstudiante() {
     const navigate = useNavigate();
@@ -97,6 +98,21 @@ export function DashboardEstudiante() {
     // reproductores marcan su estado (onEstadoIntento) y toda navegación que
     // los desmonta pasa por `proteger` (confirmación amigable si hace falta).
     const { marcar: marcarIntento, proteger, dialogo: dialogoSalida } = useGuardiaActividad();
+
+    // Botón Atrás del navegador (SPEC-021 P0-2). Mientras hay un reproductor
+    // abierto, Atrás cierra la ACTIVIDAD en vez de salir de /dashboard, y pasa
+    // por la misma guardia que los botones internos: si el intento tiene
+    // progreso real, pregunta; si no, cierra directo. Antes desmontaba el
+    // panel entero y devolvía al formulario de login con el intento perdido.
+    const hayActividadAbierta = Boolean(quizActivo || juegoActivo || misionActiva);
+    useSalidaAtras(
+        hayActividadAbierta,
+        proteger(() => {
+            setQuizActivo(null);
+            setJuegoActivo(null);
+            setMisionActiva(null);
+        })
+    );
 
     // Contador que fuerza releer el progreso del servidor tras completar una
     // actividad (lo disparan los reproductores mediante onCompletado).

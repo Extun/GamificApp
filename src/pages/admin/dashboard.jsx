@@ -305,7 +305,14 @@ export function Dashboard() {
         ? retosRecientes
         : retosRecientes.filter((r) => r.tipo === filtroReciente);
 
-    const irAMateria = (nombre, subvista = 'quiz', tab = 'crear') => {
+    // Punto ÚNICO de entrada a una materia (SPEC-021 P3-4). Antes había dos
+    // caminos con destinos distintos: desde el Inicio se aterrizaba en "Crear
+    // actividad" y desde la sección Materias en "Resumen", así que la misma
+    // pantalla se comportaba de dos maneras según por dónde se llegara.
+    // Se unifica en "Resumen" porque en ambos casos el docente está MIRANDO
+    // una materia, no creando: caer en un formulario de creación es un destino
+    // que él no pidió. Crear sigue a un clic, desde la propia pestaña Resumen.
+    const irAMateria = (nombre, subvista = 'quiz', tab = 'resumen') => {
         if (!nombre) return;
         setPagina('materias');
         setMateriaSeleccionada(nombre);
@@ -690,7 +697,7 @@ export function Dashboard() {
                                         key={mat}
                                         className="home-doc-materia"
                                         style={ui.estilo}
-                                        onClick={() => { setMateriaSeleccionada(mat); setSubVistaMateria('quiz'); setTabMateria('resumen'); }}
+                                        onClick={() => irAMateria(mat)}
                                     >
                                         <span className="home-doc-materia-emoji" aria-hidden="true">{ui.icono}</span>
                                         <span className="home-doc-materia-nombre">{mat}</span>
@@ -714,7 +721,7 @@ export function Dashboard() {
                     <div className="materia-doc">
                         <button
                             className="back-btn"
-                            onClick={() => { setMateriaSeleccionada(null); setArchivoPreview(null); setSubVistaMateria('quiz'); setTabMateria('crear'); }}
+                            onClick={() => { setMateriaSeleccionada(null); setArchivoPreview(null); setSubVistaMateria('quiz'); setTabMateria('resumen'); }}
                         >
                             ← Volver a mis materias
                         </button>
