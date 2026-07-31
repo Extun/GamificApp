@@ -51,18 +51,43 @@ export function Login(){
         }
     };
 
+    // Comprobación en el navegador ANTES de llamar a la API (SPEC-021 P3-12).
+    // Antes, enviar el formulario vacío gastaba un viaje completo al servidor
+    // para volver con "Faltan credenciales", y el niño esperaba a la red para
+    // enterarse de algo que ya se sabía aquí.
+    //
+    // Se conserva `noValidate` a propósito: la validación nativa del navegador
+    // dibuja burbujas del sistema operativo, con su propio idioma y su propia
+    // estética, dentro de una app pensada para niños de 6-9 años. El aviso se
+    // pinta en el mismo `.login-error` (con `role="alert"`) que ya usa el
+    // resto de la pantalla, así que se anuncia y se ve igual que los demás.
+    // Los campos llevan `required` para que un lector de pantalla los anuncie
+    // como obligatorios; `noValidate` impide que además salga la burbuja.
+    const faltan = (mensaje) => {
+        setError(mensaje);
+        return true;
+    };
+
     const handleEstudiante = (e) => {
         e.preventDefault();
+        if (!nombre.trim()) return faltan('Escribe tu nombre completo para entrar.');
+        // El PIN siempre tiene 6 caracteres (el campo ya no deja escribir más),
+        // así que uno más corto es un error seguro: no hace falta preguntarlo.
+        if (pin.trim().length !== 6) return faltan('Tu PIN son 6 letras o números. Escríbelo completo.');
         ejecutar(() => authService.loginEstudiante(nombre.trim(), pin.trim()));
     };
 
     const handleDocente = (e) => {
         e.preventDefault();
+        if (!username.trim()) return faltan('Escribe tu usuario.');
+        if (!password) return faltan('Escribe tu contraseña.');
         ejecutar(() => authService.login(username.trim(), password));
     };
 
     const handleEmergencia = (e) => {
         e.preventDefault();
+        if (!nombre.trim()) return faltan('Escribe tu nombre completo.');
+        if (!codigoEmergencia.trim()) return faltan('Escribe el código de emergencia de tu carné.');
         ejecutar(async () => {
             const data = await authService.loginEmergencia(nombre.trim(), codigoEmergencia.trim());
             // El aviso importa (p. ej. cambiar el PIN tras la emergencia):
@@ -140,6 +165,7 @@ export function Login(){
                                     value={nombre}
                                     onChange={(e)=>setNombre(e.target.value)}
                                     placeholder="Ana María Pérez"
+                                    required
                                 />
                             </label>
                             <label className="login-field">
@@ -154,6 +180,7 @@ export function Login(){
                                         value={pin}
                                         onChange={(e)=>setPin(e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6))}
                                         placeholder="••••••"
+                                        required
                                     />
                                     <button
                                         type="button"
@@ -216,6 +243,7 @@ export function Login(){
                                     value={nombre}
                                     onChange={(e)=>setNombre(e.target.value)}
                                     placeholder="Ana María Pérez"
+                                    required
                                 />
                             </label>
                             <label className="login-field">
@@ -225,6 +253,7 @@ export function Login(){
                                     value={codigoEmergencia}
                                     onChange={(e)=>setCodigoEmergencia(e.target.value.toUpperCase().slice(0, 8))}
                                     placeholder="ABC3X9F2"
+                                    required
                                 />
                             </label>
                             <button type="submit" className="login-submit" disabled={cargando}>
@@ -247,6 +276,7 @@ export function Login(){
                                     value={username}
                                     onChange={(e)=>setUsername(e.target.value)}
                                     placeholder="usuario"
+                                    required
                                 />
                             </label>
                             <label className="login-field">
@@ -258,6 +288,7 @@ export function Login(){
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                         placeholder="••••••••"
+                                        required
                                     />
                                     <button
                                         type="button"
