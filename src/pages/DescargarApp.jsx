@@ -31,7 +31,7 @@ const PASOS = [
         archivo: 'Instalar GamificApp.cmd',
         titulo: 'Instalar',
         cuando: 'Una sola vez, la primera',
-        texto: 'Comprueba el equipo, prepara la base de datos, crea las claves de acceso y deja la aplicación abierta en el navegador. Solo hace una pregunta: si quieres cargar datos de demostración —un docente, cuatro estudiantes y una actividad de cada juego— para probarla enseguida. Al terminar, las credenciales quedan en el archivo CREDENCIALES.txt, junto a los tres accesos.'
+        texto: 'Comprueba el equipo, prepara la base de datos, crea las claves de acceso y deja la aplicación abierta en el navegador. Solo hace una pregunta: si quieres cargar datos de demostración (un docente, cuatro estudiantes y una actividad de cada juego) para probarla enseguida. Al terminar, las credenciales quedan en el archivo CREDENCIALES.txt, junto a los tres accesos.'
     },
     {
         Icon: PlayArrowRoundedIcon,
@@ -122,8 +122,8 @@ export function DescargarApp() {
                     <section className="descargar-seccion">
                         <h2>Tus datos</h2>
                         <p className="descargar-intro">
-                            Todo lo que se haga en la aplicación —cursos, estudiantes, actividades y
-                            progreso— se guarda <strong>solo en tu computadora</strong>, en una carpeta
+                            Todo lo que se haga en la aplicación (cursos, estudiantes, actividades y
+                            progreso) se guarda <strong>solo en tu computadora</strong>, en una carpeta
                             propia fuera del programa. Por eso el trabajo sobrevive a mover la carpeta
                             de GamificApp o a volver a instalarla, y por eso nada se envía a internet.
                         </p>
