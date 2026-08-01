@@ -1,5 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
+    { "source": "/tesis", "destination": "https://1drv.ms/w/c/fb1470d1f44dd87c/IQBnHFBhFxbVR7TFoJO_cZVEAXTT3WZbK-nEvjmgHs7iaew?e=iQV57R", "permanent": false },
+    { "source": "/tesis/", "destination": "https://1drv.ms/w/c/fb1470d1f44dd87c/IQBnHFBhFxbVR7TFoJO_cZVEAXTT3WZbK-nEvjmgHs7iaew?e=iQV57R", "permanent": false }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
