@@ -12,7 +12,15 @@ const pedir = async (ruta, options = {}) => {
         headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
     });
     const data = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+    if (!res.ok) {
+        // El estado y el `codigo` viajan en el error para que quien llama
+        // pueda distinguir un fallo de un "eso ya existe" (409 `duplicada`),
+        // que para el docente no es un error sino información.
+        const err = new Error(data?.error || `HTTP ${res.status}`);
+        err.status = res.status;
+        err.codigo = data?.codigo;
+        throw err;
+    }
     return data;
 };
 

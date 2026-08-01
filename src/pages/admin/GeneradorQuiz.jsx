@@ -350,7 +350,10 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
             });
             toast.exito('Pregunta guardada en tu banco. Podrás reutilizarla con «Añadir del banco».');
         } catch (err) {
-            toast.error(`No se pudo guardar en el banco: ${err.message}`);
+            // "Ya la tenías" no es un fallo: el servidor rechazó la copia y el
+            // banco quedó como el docente quería. Se avisa en ámbar, no en rojo.
+            if (err.codigo === 'duplicada') toast.aviso(err.message);
+            else toast.error(`No se pudo guardar en el banco: ${err.message}`);
         }
     };
 
@@ -432,6 +435,7 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                 <SelectorBanco
                     tipo="quiz"
                     materiaId={idPorNombre(materia)}
+                    yaEnLaActividad={quizEdit?.preguntas}
                     onInsertar={agregarDelBanco}
                     onCerrar={() => setBancoAbierto(false)}
                 />

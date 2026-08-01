@@ -9,8 +9,11 @@
 // procedencia y no re-guardarlo como duplicado.
 import { useEffect, useMemo, useState } from 'react';
 import LibraryAddRoundedIcon from '@mui/icons-material/LibraryAddRounded';
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import bancoService from '../../services/bancoService';
 import { ModalPanel, EmptyState } from '../dashboard/DashboardWidgets';
+import { useConfirmacion } from '../../hooks/useConfirmacion';
+import { toast } from '../dashboard/toastBus';
 import { obtenerJuego } from './registro';
 import './selectorBanco.css';
 
@@ -20,7 +23,12 @@ const DIFICULTAD_LABEL = { facil: 'Fácil', media: 'Media', dificil: 'Difícil' 
 // modal) y la regla de clasificación por dificultad los declara cada juego en
 // su entrada del registro, no un mapa local.
 
-export function SelectorBanco({ tipo = 'quiz', materiaId, onInsertar, onCerrar }) {
+// `yaEnLaActividad`: los ítems que el editor YA tiene puestos. Sirve para no
+// insertar dos veces lo mismo: cada ítem que vino del banco conserva su
+// `_banco_id`, así que se pueden reconocer y bloquear en la lista. Es opcional
+// —si no se pasa, el selector se comporta como antes— y aditivo para los
+// cuatro editores que comparten este modal.
+export function SelectorBanco({ tipo = 'quiz', materiaId, yaEnLaActividad, onInsertar, onCerrar }) {
     const [items, setItems] = useState([]);
     const [cargado, setCargado] = useState(false);
     const [error, setError] = useState('');
@@ -32,6 +40,8 @@ export function SelectorBanco({ tipo = 'quiz', materiaId, onInsertar, onCerrar }
     const [filtroDificultad, setFiltroDificultad] = useState('');
     const [seleccion, setSeleccion] = useState(() => new Set());
     const [insertando, setInsertando] = useState(false);
+    const [borrando, setBorrando] = useState(null); // id en curso
+    const { pedirConfirmacion, dialogoConfirmacion } = useConfirmacion();
 
     const edicion = obtenerJuego(tipo)?.edicion || {};
     const textos = {
@@ -76,8 +86,21 @@ export function SelectorBanco({ tipo = 'quiz', materiaId, onInsertar, onCerrar }
         );
     }, [items, busqueda, filtroMateria, filtroTema, filtroDificultad, conDificultad]);
 
+    // Ids del banco que ya están puestos en la actividad que se está armando.
+    const yaPuestos = useMemo(
+        () => new Set((yaEnLaActividad || []).map((it) => it?._banco_id).filter(Boolean)),
+        [yaEnLaActividad]
+    );
+
+    // Los ya puestos no cuentan como seleccionables: ni se marcan a mano ni
+    // los arrastra "Seleccionar todo".
+    const seleccionables = useMemo(
+        () => visibles.filter((p) => !yaPuestos.has(p.id)),
+        [visibles, yaPuestos]
+    );
+
     // ¿Están seleccionados TODOS los visibles bajo los filtros actuales?
-    const todoSeleccionado = visibles.length > 0 && visibles.every((p) => seleccion.has(p.id));
+    const todoSeleccionado = seleccionables.length > 0 && seleccionables.every((p) => seleccion.has(p.id));
 
     const alternar = (id) => setSeleccion((prev) => {
         const s = new Set(prev);
@@ -89,8 +112,8 @@ export function SelectorBanco({ tipo = 'quiz', materiaId, onInsertar, onCerrar }
     // estaban todos marcados, los desmarca. No toca selecciones fuera del filtro.
     const alternarTodo = () => setSeleccion((prev) => {
         const s = new Set(prev);
-        if (todoSeleccionado) visibles.forEach((p) => s.delete(p.id));
-        else visibles.forEach((p) => s.add(p.id));
+        if (todoSeleccionado) seleccionables.forEach((p) => s.delete(p.id));
+        else seleccionables.forEach((p) => s.add(p.id));
         return s;
     });
 
@@ -113,7 +136,45 @@ export function SelectorBanco({ tipo = 'quiz', materiaId, onInsertar, onCerrar }
         }
     };
 
+    // Quitar del banco. El servidor decide qué significa eso (SPEC-010): si la
+    // pregunta nunca se usó la borra de verdad; si ya se insertó en alguna
+    // actividad la ARCHIVA, porque las actividades guardan su propio snapshot y
+    // borrarla no las rompería, pero perder su rastro sí estorba al docente.
+    // El texto de la confirmación anticipa cuál de las dos cosas va a pasar.
+    const eliminar = (p) => {
+        const conUso = p.veces_utilizada > 0;
+        pedirConfirmacion({
+            titulo: conUso ? 'Archivar del banco' : 'Eliminar del banco',
+            mensaje: conUso
+                ? `"${p.enunciado || 'Este elemento'}" ya se usó ${p.veces_utilizada} ${p.veces_utilizada === 1 ? 'vez' : 'veces'}, así que se archivará en lugar de borrarse: dejará de aparecer aquí y las actividades que la usan NO se tocan.`
+                : `¿Quitar "${p.enunciado || 'este elemento'}" del banco? Nunca se ha usado, así que se elimina definitivamente.`,
+            confirmarTexto: conUso ? 'Archivar' : 'Eliminar',
+            variante: 'danger',
+            accion: async () => {
+                setBorrando(p.id);
+                try {
+                    const r = await bancoService.eliminarPregunta(p.id);
+                    // Fuera de la lista y de la selección: si estaba marcada,
+                    // dejarla seleccionada haría que "Insertar" fuera a buscar
+                    // una pregunta que ya no existe.
+                    setItems((prev) => prev.filter((x) => x.id !== p.id));
+                    setSeleccion((prev) => {
+                        const s = new Set(prev);
+                        s.delete(p.id);
+                        return s;
+                    });
+                    toast.exito(r?.archivada ? 'Pregunta archivada.' : 'Pregunta eliminada del banco.');
+                } catch (err) {
+                    toast.error(`No se pudo quitar del banco: ${err.message}`);
+                } finally {
+                    setBorrando(null);
+                }
+            }
+        });
+    };
+
     return (
+        <>
         <ModalPanel
             titulo={textos.titulo}
             subtitulo="Tu repositorio para reutilizar. Se insertan como copia: puedes editarlas sin afectar el banco."
@@ -184,19 +245,27 @@ export function SelectorBanco({ tipo = 'quiz', materiaId, onInsertar, onCerrar }
 
             {visibles.length > 0 && (
                 <label className="banco-seleccionar-todo">
-                    <input type="checkbox" checked={todoSeleccionado} onChange={alternarTodo} />
-                    Seleccionar todo ({visibles.length})
+                    <input
+                        type="checkbox"
+                        checked={todoSeleccionado}
+                        disabled={!seleccionables.length}
+                        onChange={alternarTodo}
+                    />
+                    Seleccionar todo ({seleccionables.length})
                 </label>
             )}
 
             {visibles.length ? (
                 <ul className="banco-lista">
                     {visibles.map((p) => (
-                        <li key={p.id}>
-                            <label className="banco-item">
+                        // El botón de quitar va FUERA del <label>: dentro, cada
+                        // clic suyo alternaría además la casilla de selección.
+                        <li key={p.id} className="banco-fila">
+                            <label className={`banco-item ${yaPuestos.has(p.id) ? 'is-ya-puesta' : ''}`}>
                                 <input
                                     type="checkbox"
-                                    checked={seleccion.has(p.id)}
+                                    checked={seleccion.has(p.id) && !yaPuestos.has(p.id)}
+                                    disabled={yaPuestos.has(p.id)}
                                     onChange={() => alternar(p.id)}
                                 />
                                 <span className="banco-item-cuerpo">
@@ -208,8 +277,21 @@ export function SelectorBanco({ tipo = 'quiz', materiaId, onInsertar, onCerrar }
                                         {' '}usada {p.veces_utilizada} {p.veces_utilizada === 1 ? 'vez' : 'veces'}
                                         {p.origen === 'ia' ? ' · ✨ IA' : ''}
                                     </span>
+                                    {yaPuestos.has(p.id) && (
+                                        <span className="banco-item-ya">Ya está en esta actividad</span>
+                                    )}
                                 </span>
                             </label>
+                            <button
+                                type="button"
+                                className="banco-item-quitar"
+                                disabled={borrando === p.id || insertando}
+                                title={p.veces_utilizada > 0 ? 'Archivar del banco (ya se usó)' : 'Eliminar del banco'}
+                                aria-label={`Quitar del banco: ${p.enunciado || 'elemento sin enunciado'}`}
+                                onClick={() => eliminar(p)}
+                            >
+                                <DeleteOutlineRoundedIcon sx={{ fontSize: '1.15rem' }} />
+                            </button>
                         </li>
                     ))}
                 </ul>
@@ -223,6 +305,10 @@ export function SelectorBanco({ tipo = 'quiz', materiaId, onInsertar, onCerrar }
                 />
             )}
         </ModalPanel>
+        {/* Hermano del modal, no hijo: así queda por encima en el orden del DOM
+            (ambos usan --z-modal) y no lo recorta el scroll de .preview-body. */}
+        {dialogoConfirmacion}
+        </>
     );
 }
 

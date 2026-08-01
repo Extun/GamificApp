@@ -779,6 +779,7 @@ export function GeneradorActividadIA({ materia, tipo }) {
                 <SelectorBanco
                     tipo={tipo}
                     materiaId={idPorNombre(materia)}
+                    yaEnLaActividad={actividad?.configuracion?.[claveItems]}
                     onInsertar={agregarDelBanco}
                     onCerrar={() => setBancoAbierto(false)}
                 />

@@ -180,6 +180,39 @@ router.post('/', soloDocente, async (req, res, next) => {
         if (!await puedeGestionarMateria(req.user, datos.materiaId)) {
             return res.status(403).json({ error: 'No tienes asignada esta materia' });
         }
+        // Anti-duplicado. El botón "Guardar en el banco" del editor se puede
+        // pulsar tantas veces como se quiera sobre la misma pregunta, y hasta
+        // ahora cada pulsación creaba otra fila: el repositorio se llenaba de
+        // copias idénticas que luego hay que distinguir a ojo en el selector.
+        //
+        // El criterio es el MISMO que ya usa el backfill de `initDb.js`
+        // (materia + tipo + enunciado normalizado), para que "duplicada"
+        // signifique lo mismo en todo el sistema. Se comprueba en el servidor
+        // y no en la UI porque es donde de verdad se puede garantizar.
+        //
+        // Solo aplica con enunciado real: hay tipos cuyos ítems no lo tienen
+        // (parejas del memorama, por ejemplo) y ahí dos vacíos NO son la misma
+        // cosa — deduplicarlos por «ambos están vacíos» sería un falso positivo.
+        const enunciadoNormalizado = String(datos.enunciado || '').trim();
+        if (enunciadoNormalizado) {
+            const [[duplicada]] = await pool.query(
+                `SELECT id FROM banco_preguntas
+                 WHERE materia_id = ? AND tipo = ? AND estado <> 'archivada'
+                   AND LOWER(TRIM(enunciado)) = LOWER(?)
+                 LIMIT 1`,
+                [datos.materiaId, datos.tipo, enunciadoNormalizado]
+            );
+            if (duplicada) {
+                // 409 y no 400: no es que la petición esté mal formada, es que
+                // ese contenido ya existe. `codigo` deja que la UI lo trate
+                // como un aviso ("ya la tenías") y no como un fallo.
+                return res.status(409).json({
+                    error: 'Esa pregunta ya está en tu banco: no se guardó otra copia.',
+                    codigo: 'duplicada',
+                    id: duplicada.id
+                });
+            }
+        }
         const [creado] = await pool.query(
             `INSERT INTO banco_preguntas
                 (materia_id, tema, tipo, dificultad, enunciado, contenido_json,
