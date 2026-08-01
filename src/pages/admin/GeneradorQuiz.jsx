@@ -10,6 +10,7 @@ import { useHistorialRetos, HistorialActividades } from '../../components/juegos
 import { publicarReto } from '../../services/retosService';
 import { authFetch } from '../../services/authService';
 import { idPorNombre } from '../../services/materiasService';
+import { toast } from '../../components/dashboard/toastBus';
 import bancoService from '../../services/bancoService';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -324,11 +325,18 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
     // SPEC-010: guarda una pregunta del quiz en el banco para reutilizarla en
     // futuros quizzes. Se guarda sin el metadato `_banco_id` (si viniera del
     // banco, sería crear un duplicado consciente, no re-referenciarla).
+    //
+    // Avisa por TOAST y no por el aviso de esta página. Medido en el navegador:
+    // el botón «Guardar en el banco» vive dentro de la pregunta desplegada y el
+    // aviso se pintaba **537 px más arriba**, fuera de la vista en cuanto el
+    // docente está editando la tercera pregunta de un quiz largo — y encima se
+    // borraba solo a los 4 s. El guardado funcionaba (POST /api/banco → 201) y
+    // aun así el botón se sentía muerto: no hay peor confirmación que la que
+    // nadie ve. El toast es fijo y va sobre todo lo demás (--z-toast).
     const guardarPreguntaEnBanco = async (pregunta) => {
         const materiaId = idPorNombre(materia);
         if (!materiaId) {
-            setError('No se reconoce la materia actual; no se puede guardar en el banco.');
-            setTimeout(() => setError(''), 4000);
+            toast.error('No se reconoce la materia actual; no se puede guardar en el banco.');
             return;
         }
         try {
@@ -340,11 +348,9 @@ export function GeneradorQuiz({ materia = 'la materia' }) {
                 contenido,
                 tema: quizEdit?.tema || undefined
             });
-            setAviso('Pregunta guardada en tu banco. Podrás reutilizarla con «Añadir del banco».');
-            setTimeout(() => setAviso(''), 4000);
+            toast.exito('Pregunta guardada en tu banco. Podrás reutilizarla con «Añadir del banco».');
         } catch (err) {
-            setError(`No se pudo guardar en el banco: ${err.message}`);
-            setTimeout(() => setError(''), 4000);
+            toast.error(`No se pudo guardar en el banco: ${err.message}`);
         }
     };
 
