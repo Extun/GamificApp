@@ -1,6 +1,6 @@
 # SPEC-023 — Rediseño del sidebar (Admin · Docente · Estudiante)
 
-**Estado:** aprobada (decisiones de diseño confirmadas por Fabrizio el 2026-07-31)
+**Estado:** ✅ **APROBADA E IMPLEMENTADA** (decisiones de diseño confirmadas por Fabrizio el 2026-07-31; implementada y medida en navegador ese mismo día). Bitácora con las mediciones —cabecera 97→54px, pie 192→151px, chrome del sidebar 289→205px en Estudiante y 238→163px en Docente/Admin, ancho 264→220px a 768px— en `CURRENT_STATE`. *(Estado corregido el 2026-08-01: figuraba solo como «aprobada» y se leía como trabajo pendiente.)*
 **Alcance:** solo presentación. No cambia rutas, permisos, endpoints, ni el conjunto
 de secciones de ningún panel.
 **Áreas protegidas (§9 de CONTRIBUTING):** ninguna tocada. El filtro `puede(permiso)`

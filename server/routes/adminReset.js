@@ -10,11 +10,14 @@
 //
 // Deja el sistema como una instalación nueva:
 //   · CONSERVA  → institución (config), catálogo de misiones (re-sembrado por
-//                 initDb) y el/los Administrador(es) Principal(es).
+//                 initDb), configuración de IA, estado de los tipos de juego
+//                 y el/los Administrador(es) Principal(es).
 //   · REINICIA  → estudiantes, docentes, administradores secundarios, cursos,
-//                 materias, actividades, biblioteca/materiales, progreso, XP,
-//                 ranking, retroalimentaciones, auditoría, misiones-estudiante
-//                 y cualquier dato generado por usuarios.
+//                 materias, actividades, biblioteca/materiales, banco de
+//                 preguntas, progreso, XP, ranking, retroalimentaciones,
+//                 auditoría, misiones-estudiante y cualquier dato de usuario.
+//
+// El respaldo se puede descargar después con GET /respaldo/:archivo.
 //
 // Todo ocurre dentro de UNA transacción con backup previo. Se usa DELETE (no
 // TRUNCATE: TRUNCATE es DDL y haría commit implícito, rompiendo el rollback).
@@ -46,6 +49,10 @@ const TABLAS_A_VACIAR = [
     'invitaciones_estudiante',
     'docente_materia',
     'docente_curso',
+    // Preguntas reutilizables creadas por los docentes (SPEC-010). Es
+    // contenido de usuario, no catálogo del sistema: se va con el resto.
+    // Va antes que `materias` y `usuarios` porque cuelga de ambas.
+    'banco_preguntas',
     'retos',
     'estudiantes',
     'cursos',
@@ -53,11 +60,21 @@ const TABLAS_A_VACIAR = [
     'auditoria'
 ];
 
+// Tablas que el reset NO toca, por la misma razón que `institucion`: son
+// catálogo o configuración del sistema, no datos generados por usuarios.
+// Se listan explícitas para que la omisión se lea como decisión y no como
+// olvido — que fue justo lo que le pasó a `banco_preguntas`.
+const TABLAS_QUE_SE_CONSERVAN = [
+    'usuarios',        // solo sobrevive el/los Administrador(es) Principal(es)
+    'institucion',     // nombre, logo, colores, escala XP
+    'misiones',        // catálogo semilla, lo re-siembra initDb
+    'configuracion_ia', // proveedor/modelo elegidos (las claves viven en el entorno)
+    'tipos_juego'      // qué tipos de juego están habilitados (SPEC-017)
+];
+
 // Todas las tablas se incluyen en el backup previo (también las que se
 // conservan: así el respaldo es una foto completa del estado anterior).
-const TABLAS_BACKUP = [
-    ...TABLAS_A_VACIAR, 'usuarios', 'institucion', 'misiones'
-];
+const TABLAS_BACKUP = [...TABLAS_A_VACIAR, ...TABLAS_QUE_SE_CONSERVAN];
 
 // Genera un respaldo JSON completo del estado actual y lo guarda en disco.
 // Devuelve { archivo, filas } o lanza si no se pudo escribir (aborta el reset).
@@ -131,6 +148,42 @@ router.post('/', soloAdminPrincipal, async (req, res, next) => {
         next(err);
     } finally {
         conn.release();
+    }
+});
+
+// GET /api/admin/reset/respaldo/:archivo — descarga el JSON del respaldo.
+//
+// Sin esto el respaldo era una promesa a medias en producción: se escribe en
+// `server/backups/`, que en Render es disco efímero (se borra en el siguiente
+// deploy), y la respuesta del reset solo devolvía el NOMBRE del archivo. Es
+// decir: había red de seguridad para abortar, pero no para arrepentirse.
+//
+// NO exige `RESET_HABILITADO`: el archivo solo existe si un reset ya corrió
+// (que sí la exigió), y apagar la bandera justo después no debe dejar el
+// respaldo inaccesible — que es exactamente cuando más falta hace.
+router.get('/respaldo/:archivo', soloAdminPrincipal, async (req, res, next) => {
+    // Solo nombres que genera esta misma ruta. Es la defensa contra travesía
+    // de directorios: sin barras ni puntos suspensivos no hay forma de salir
+    // de DIR_BACKUPS, y aun así se comprueba la ruta resuelta más abajo.
+    if (!/^reset-[\w-]+\.json$/.test(req.params.archivo)) {
+        return res.status(400).json({ error: 'Nombre de respaldo no válido.' });
+    }
+    const ruta = path.resolve(DIR_BACKUPS, req.params.archivo);
+    if (path.dirname(ruta) !== DIR_BACKUPS) {
+        return res.status(400).json({ error: 'Nombre de respaldo no válido.' });
+    }
+    try {
+        const contenido = await fs.readFile(ruta, 'utf8');
+        res.type('application/json');
+        res.setHeader('Content-Disposition', `attachment; filename="${req.params.archivo}"`);
+        res.send(contenido);
+    } catch (err) {
+        if (err.code === 'ENOENT') {
+            return res.status(404).json({
+                error: 'Ese respaldo ya no está en el servidor. En Render el disco se borra en cada despliegue.'
+            });
+        }
+        next(err);
     }
 });
 

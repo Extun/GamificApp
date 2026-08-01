@@ -101,6 +101,25 @@ export const activarMision = (id, activa) =>
 export const restablecerAplicacion = () =>
     pedir('/api/admin/reset', { method: 'POST', body: JSON.stringify({ confirmacion: 'RESET' }) });
 
+// Baja el JSON del respaldo que el reset dejó en el servidor. No usa `pedir`
+// porque la respuesta es un archivo, no JSON de la API. Importa hacerlo
+// pronto: en Render ese disco se borra en el siguiente despliegue.
+export const descargarRespaldoReset = async (archivo) => {
+    const res = await authFetch(`${API_URL}/api/admin/reset/respaldo/${encodeURIComponent(archivo)}`);
+    if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || `HTTP ${res.status}`);
+    }
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = archivo;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+};
+
 export default {
     listarDocentes,
     crearDocente,
@@ -134,5 +153,6 @@ export default {
     crearMision,
     actualizarMision,
     activarMision,
-    restablecerAplicacion
+    restablecerAplicacion,
+    descargarRespaldoReset
 };

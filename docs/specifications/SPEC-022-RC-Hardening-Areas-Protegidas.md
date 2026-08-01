@@ -1,7 +1,11 @@
 # SPEC-022 — RC Hardening: los cuatro puntos de `CONTRIBUTING` §9
 
-**Estado:** 🟡 **PROPUESTA — pendiente de aprobación de Fabrizio. Nada implementado.**
-**Fecha:** 2026-07-31
+**Estado:** 🟡 **PARCIALMENTE IMPLEMENTADA — el resto sigue pendiente de aprobación de Fabrizio.**
+De los cuatro puntos, **P0-1 ya está implementado** (bloque B1 del sprint RC, en
+`main`: el limitador de `/api/auth` ya solo consume cupo con las respuestas 401).
+**P1-2, P1-6 y P2-13 siguen sin implementar y siguen necesitando tu aprobación
+explícita**, porque tocan áreas protegidas por `CONTRIBUTING` §9.
+**Fecha:** 2026-07-31 · **Estado revisado:** 2026-08-01 (la cabecera decía «nada implementado» y ya era falsa)
 **Origen:** SPEC-021 §8 identifica cuatro hallazgos que tocan áreas protegidas. Esta spec los cubre **los cuatro a la vez**, para aprobarse una sola vez en lugar de abrir cuatro documentos.
 **Naturaleza:** endurecimiento previo al Release Candidate. **No** añade funcionalidad, **no** cambia el flujo pedagógico, **no** toca la identidad visual.
 

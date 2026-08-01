@@ -1,6 +1,6 @@
 # SPEC-012 — Editores de juegos consistentes (barra unificada, Misión editable, vista previa)
 
-**Estado:** APROBADA por Fabrizio (2026-07-16) — Fases 1, 2 y 3 implementadas en código; verificación e2e pendiente del deploy (sin MySQL local)
+**Estado:** APROBADA por Fabrizio (2026-07-16) — Fases 1, 2 y 3 implementadas en código y desplegadas. *Revisado el 2026-08-01:* igual que en SPEC-011, la coletilla «(sin MySQL local)» **ya no aplica** — hay entorno local completo desde el 2026-07-29 (`docs/DEV-ENTORNO-LOCAL.md`). La verificación e2e está pendiente de hacerse, no de poder hacerse.
 **Fecha:** 2026-07-16
 **Nota de implementación (Fase 3):** el botón explícito "Guardar borrador" quedó en Misión y en los juegos genéricos; Quiz y Clasificador guardan el borrador AUTOMÁTICAMENTE en BD con cada edición (SPEC-011), así que el botón sería ruido ahí. La barra unificada cubre las 4 acciones de contenido: + Manual / + Del banco / + Con IA / Vista previa. Además, los juegos genéricos ganaron "+ ítem manual" (pareja/evento/frase vacía editable), que no existía.
 **Alcance:** Frontend (editores del docente + reproductores en modo prueba). Sin migración de BD, sin cambios de API. Áreas protegidas §10 NO se tocan (la "Misión Narrativa" es un reto tipo `mision`, no el motor de misiones/logros).

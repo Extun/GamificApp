@@ -60,12 +60,18 @@ export function ModuloMaterias({ materias, docentes = [], ejecutar }) {
     const [asignarIds, setAsignarIds] = useState([]);
     const [asignando, setAsignando] = useState(null);
     const [asignacionIds, setAsignacionIds] = useState([]);
+    const [errorModal, setErrorModal] = useState('');
+    const [errorAsignacion, setErrorAsignacion] = useState('');
+    // Un doble clic mandaba dos POST: el segundo choca con el UNIQUE del
+    // nombre de materia y acusa de duplicado a quien acaba de crearla bien.
+    const [guardando, setGuardando] = useState(false);
     const bannerRef = useRef(null);
 
     const abrirNueva = () => {
         setForm(FORM_VACIO);
         setAsignarModo('todos');
         setAsignarIds([]);
+        setErrorModal('');
         setEditando('nueva');
     };
 
@@ -76,6 +82,7 @@ export function ModuloMaterias({ materias, docentes = [], ejecutar }) {
                 descripcion: m.descripcion || '', competencias: m.competencias || '',
                 nivel: m.nivel || '', banner_data: m.banner_data || null, protegida: Boolean(m.protegida)
             });
+            setErrorModal('');
             setEditando(m);
         };
         if (m.protegida) {
@@ -91,17 +98,24 @@ export function ModuloMaterias({ materias, docentes = [], ejecutar }) {
         abrirFormulario();
     };
 
-    const guardar = () => {
+    // Cierra solo si el guardado salió bien; si falla, el motivo se muestra
+    // dentro del modal (el aviso de la página queda debajo del backdrop).
+    const guardar = async () => {
+        if (guardando) return;
         const esNueva = editando === 'nueva';
         const payload = { ...form };
         if (esNueva && asignarModo !== 'ninguno') {
             payload.asignar = asignarModo === 'todos' ? 'todos' : asignarIds;
         }
-        ejecutar(async () => {
+        setErrorModal('');
+        setGuardando(true);
+        const fallo = await ejecutar(async () => {
             if (esNueva) await adminService.crearMateria(payload);
             else await adminService.actualizarMateria(editando.id, payload);
-            setEditando(null);
         }, esNueva ? `Materia "${form.nombre}" creada.` : `Materia "${form.nombre}" actualizada.`);
+        setGuardando(false);
+        if (fallo) setErrorModal(fallo);
+        else setEditando(null);
     };
 
     const alternarEstado = (m) => {
@@ -148,24 +162,29 @@ export function ModuloMaterias({ materias, docentes = [], ejecutar }) {
     };
 
     const abrirAsignacion = (m) => {
+        setErrorAsignacion('');
         setAsignando(m);
         setAsignacionIds(
             docentes.filter((d) => d.materias?.some((dm) => dm.id === m.id)).map((d) => d.id)
         );
     };
 
-    const guardarAsignacion = () => {
-        if (!asignando) return;
+    const guardarAsignacion = async () => {
+        if (!asignando || guardando) return;
         const actuales = docentes
             .filter((d) => d.materias?.some((dm) => dm.id === asignando.id))
             .map((d) => d.id);
         const agregar = asignacionIds.filter((id) => !actuales.includes(id));
         const quitar = actuales.filter((id) => !asignacionIds.includes(id));
-        ejecutar(async () => {
+        setErrorAsignacion('');
+        setGuardando(true);
+        const fallo = await ejecutar(async () => {
             if (agregar.length) await adminService.asignarMateria(asignando.id, 'agregar', agregar);
             if (quitar.length) await adminService.asignarMateria(asignando.id, 'quitar', quitar);
-            setAsignando(null);
         }, `Docentes de "${asignando.nombre}" actualizados.`);
+        setGuardando(false);
+        if (fallo) setErrorAsignacion(fallo);
+        else setAsignando(null);
     };
 
     const toggleId = (lista, setLista, id) =>
@@ -280,6 +299,7 @@ export function ModuloMaterias({ materias, docentes = [], ejecutar }) {
                     className="modal-materias"
                     titulo={editando === 'nueva' ? 'Nueva materia' : 'Editar materia'}
                     subtitulo={editando === 'nueva' ? 'Se mostrará a docentes y estudiantes' : editando.nombre}
+                    error={errorModal}
                     avatar={
                         <span
                             className="materia-form-preview"
@@ -295,9 +315,14 @@ export function ModuloMaterias({ materias, docentes = [], ejecutar }) {
                             <button type="button" className="preview-action" onClick={() => setEditando(null)}>
                                 Cancelar
                             </button>
-                            <button type="button" className="preview-action preview-action-primary" onClick={guardar}>
+                            <button
+                                type="button"
+                                className="preview-action preview-action-primary"
+                                disabled={guardando}
+                                onClick={guardar}
+                            >
                                 <TaskAltRoundedIcon />
-                                Guardar
+                                {guardando ? 'Guardando…' : 'Guardar'}
                             </button>
                         </>
                     }
@@ -482,14 +507,20 @@ export function ModuloMaterias({ materias, docentes = [], ejecutar }) {
                     subtitulo="Marca quiénes enseñan esta materia. Los cambios se aplican al guardar."
                     avatar={<BannerMateria materia={asignando} className="matcat-banner" />}
                     onCerrar={() => setAsignando(null)}
+                    error={errorAsignacion}
                     pie={
                         <>
                             <button type="button" className="preview-action" onClick={() => setAsignando(null)}>
                                 Cancelar
                             </button>
-                            <button type="button" className="preview-action preview-action-primary" onClick={guardarAsignacion}>
+                            <button
+                                type="button"
+                                className="preview-action preview-action-primary"
+                                disabled={guardando}
+                                onClick={guardarAsignacion}
+                            >
                                 <TaskAltRoundedIcon />
-                                Guardar cambios
+                                {guardando ? 'Guardando…' : 'Guardar cambios'}
                             </button>
                         </>
                     }

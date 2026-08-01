@@ -27,10 +27,14 @@ export function ModuloMisiones({ data, ejecutar }) {
     // null = cerrado, 'nueva' = crear, objeto = editar.
     const [editando, setEditando] = useState(null);
     const [form, setForm] = useState(FORM_VACIO);
+    const [errorModal, setErrorModal] = useState('');
+    // Un doble clic mandaba dos POST: el segundo choca con el UNIQUE de
+    // `clave` y acusa de duplicada a la misión que se acaba de crear bien.
+    const [guardando, setGuardando] = useState(false);
 
     const activas = useMemo(() => misiones.filter((m) => m.activa).length, [misiones]);
 
-    const abrirNueva = () => { setForm(FORM_VACIO); setEditando('nueva'); };
+    const abrirNueva = () => { setForm(FORM_VACIO); setErrorModal(''); setEditando('nueva'); };
 
     const abrirEdicion = (m) => {
         setForm({
@@ -46,10 +50,15 @@ export function ModuloMisiones({ data, ejecutar }) {
             requiere_mision_id: m.requiere_mision_id || '',
             orden: m.orden, activa: Boolean(m.activa)
         });
+        setErrorModal('');
         setEditando(m);
     };
 
-    const guardar = () => {
+    // Cierra solo si el guardado salió bien. Aquí el fallo típico es la clave
+    // repetida o un JSON de filtro mal escrito: motivos que hay que poder leer
+    // sin perder el formulario.
+    const guardar = async () => {
+        if (guardando) return;
         const esNueva = editando === 'nueva';
         const payload = {
             ...form,
@@ -61,11 +70,15 @@ export function ModuloMisiones({ data, ejecutar }) {
             recompensa_banner: form.recompensa_banner.trim() || null,
             objetivo_filtro: form.objetivo_filtro.trim() || null
         };
-        ejecutar(async () => {
+        setErrorModal('');
+        setGuardando(true);
+        const fallo = await ejecutar(async () => {
             if (esNueva) await adminService.crearMision(payload);
             else await adminService.actualizarMision(editando.id, payload);
-            setEditando(null);
         }, esNueva ? `Misión "${form.titulo}" creada.` : `Misión "${form.titulo}" actualizada.`);
+        setGuardando(false);
+        if (fallo) setErrorModal(fallo);
+        else setEditando(null);
     };
 
     const alternar = (m) => ejecutar(
@@ -148,16 +161,17 @@ export function ModuloMisiones({ data, ejecutar }) {
                     titulo={editando === 'nueva' ? 'Nueva misión' : 'Editar misión'}
                     subtitulo={editando === 'nueva' ? 'Se añade al catálogo del backend' : editando.clave}
                     onCerrar={() => setEditando(null)}
+                    error={errorModal}
                     pie={
                         <>
                             <button type="button" className="preview-action" onClick={() => setEditando(null)}>Cancelar</button>
                             <button
                                 type="button"
                                 className="preview-action preview-action-primary"
-                                disabled={!puedeGuardar}
+                                disabled={guardando || !puedeGuardar}
                                 onClick={guardar}
                             >
-                                <TaskAltRoundedIcon /> Guardar
+                                <TaskAltRoundedIcon /> {guardando ? 'Guardando…' : 'Guardar'}
                             </button>
                         </>
                     }

@@ -220,9 +220,6 @@
 }
 .home-mundo-emoji { font-size: 2.2rem; }
 
-.home-mundo-2 { background: #fce7f3; border-color: #fbcfe8; }
-.home-mundo-4 { background: #fef3c7; border-color: #fde68a; }
-
 /* --- Tarjeta de premios --- */
 .home-logros {
     display: flex;
@@ -259,16 +256,6 @@
 .home-logros-texto span { font-size: 0.88rem; color: var(--color-text-muted); }
 
 .home-logros-flecha { color: var(--color-accent-dark); }
-
-/* --- Resaltado del propio estudiante en el ranking --- */
-.rank-item-yo {
-    background: var(--color-primary-soft);
-    border-radius: var(--radius-sm);
-    padding: 6px 10px;
-    margin: 0 -10px;
-    font-weight: 600;
-}
-.rank-item-yo .rank-name { color: var(--color-primary-dark); }
 
 /* --- Panel de pestañas del estudiante: 4 opciones en fila --- */
 .materia-panel-est {
@@ -354,66 +341,6 @@
 
 .back-btn-inline { margin-bottom: 0; }
 
-/* --- Grid de logros / insignias --- */
-.logros-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 18px;
-    margin-top: 24px;
-}
-
-.logro-card {
-    position: relative;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-sm);
-    padding: 24px 20px;
-    text-align: center;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-}
-
-.logro-card:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-md);
-    border-color: var(--color-primary-light);
-}
-
-.logro-card h4 { margin: 14px 0 4px; font-size: 1rem; color: var(--color-text); }
-.logro-card p { margin: 0; font-size: 0.84rem; color: var(--color-text-muted); line-height: 1.45; }
-
-.logro-icon {
-    width: 56px;
-    height: 56px;
-    margin: 0 auto;
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.logro-icon svg { font-size: 1.9rem; }
-.logro-icon-gold { background: #fef3c7; color: #d97706; }
-.logro-icon-fire { background: #fee2e2; color: #ef4444; }
-.logro-icon-accent { background: var(--color-accent-soft); color: var(--color-accent-dark); }
-.logro-icon-primary { background: var(--color-primary-soft); color: var(--color-primary); }
-
-.logro-badge {
-    display: inline-block;
-    margin-top: 14px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--color-primary-dark);
-    background: var(--color-primary-soft);
-    padding: 4px 12px;
-    border-radius: 999px;
-}
-
-.logro-bloqueado {
-    opacity: 0.65;
-    background: var(--color-surface-alt);
-}
-.logro-bloqueado .logro-icon { background: var(--color-border) !important; color: var(--color-text-muted) !important; }
-
 /* ===== Móvil pequeño (≤480px, breakpoint del Design System) =====
    El Home del estudiante no tenía ninguna media query propia (el del docente
    sí, a 720px), así que en pantallas de ~320px conservaba el tamaño de
@@ -436,8 +363,7 @@
    estudiante se centra igual que .home-nino y .materia-doc del docente. */
 .contenido > .materia-hero,
 .contenido > .materia-panel,
-.contenido > .card,
-.contenido > .logros-grid {
+.contenido > .card {
     max-width: 1100px;
     margin-left: auto;
     margin-right: auto;

@@ -189,6 +189,62 @@ summary,
   touch-action: manipulation;
 }
 
+/* ===== SPEC-020 Etapa 4 — Foco visible, red global (N5) =====
+   La auditoría midió `:focus-visible` en 8 de 23 hojas frente a 34 `:focus`:
+   quien navega con teclado se quedaba sin señal en más de la mitad de la app.
+
+   `:where()` tiene especificidad CERO, así que esto NO pisa ningún foco ya
+   diseñado (el del `.home-mundo` del estudiante, el de los editores, el de
+   los modales): solo aparece donde hoy no había nada. Y al ser
+   `:focus-visible` y no `:focus`, el anillo no sale al tocar con el dedo ni
+   al hacer clic con el ratón, únicamente al llegar con Tab. */
+:where(a, button, summary, input, select, textarea, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ===== SPEC-020 Etapa 4 — Objetivos táctiles (N6) =====
+   Medido en el panel de administración a 1280px: los 22 controles visibles
+   quedaban por debajo de 44px de alto (la barra lateral, 40px). El público
+   son niños de 6-9 años en tablets compartidas, donde un objetivo pequeño se
+   falla y el niño cree que la aplicación no responde.
+
+   `(pointer: coarse)` es la clave para poder hacerlo ahora: la regla NO
+   existe en escritorio, así que no mueve un píxel del layout con ratón y las
+   capturas de la tesis siguen siendo válidas. Solo crece donde se toca con
+   el dedo. `:where()` mantiene especificidad cero: cualquier tamaño
+   declarado a propósito en un archivo concreto sigue mandando. */
+@media (pointer: coarse) {
+  :where(button, summary, select, [role="button"], .nav-item) {
+    min-height: 44px;
+  }
+}
+
+/* ===== SPEC-020 Etapa 6 — Acabado del navegador (N7) =====
+   Dos detalles que ninguna pantalla "pide" pero que separan una aplicación
+   terminada de una en construcción: la selección de texto salía con el azul
+   del sistema, ajeno a la marca, y las barras de scroll con el gris por
+   defecto de Windows dentro de paneles que sí están tematizados. */
+::selection {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-dark);
+}
+
+/* `scrollbar-*` se hereda: declararlo en la raíz cubre toda la app.
+   Firefox usa el estándar; Chrome/Edge/Safari, el pseudo-elemento. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }
+
 /* ===== SPEC-018 Fase 8 — Menos movimiento, global =====
    Cuatro archivos ya respetaban `prefers-reduced-motion` (login, Toast, los
    overlays de resultado y parte de juegos.css), pero el resto de animaciones

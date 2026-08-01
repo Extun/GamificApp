@@ -1,7 +1,7 @@
 # SPEC-021 — Release Candidate QA & UX Audit
 
-**Estado:** 🔵 **AUDITORÍA ENTREGADA — nada implementado.**
-**Fecha:** 2026-07-30
+**Estado:** 🟡 **AUDITORÍA ENTREGADA — corrección PARCIALMENTE implementada.** Ver §10 para el estado real, hallazgo por hallazgo (verificado contra el código el 2026-08-01, no contra esta cabecera).
+**Fecha:** 2026-07-30 · **Estado revisado:** 2026-08-01
 **Origen:** SPEC-020 (POLISH SPRINT v1.0.1) cerrado; frontend congelado.
 **Naturaleza:** sprint independiente. **No** continúa SPEC-020 ni lo reabre.
 
@@ -373,3 +373,47 @@ La automatización del navegador entrega eventos de teclado con `isTrusted: true
 ### 9.5 Pendiente de la Ola 0
 
 Pasada a **320 px** y **768 px**, y los 6 reproductores restantes. Por decisión de Fabrizio se verifican **dentro de su bloque**, cuando se toquen, en vez de bloquear el arranque del sprint.
+
+---
+
+## 10. Estado real de la corrección (revisión del 2026-08-01)
+
+La cabecera decía «nada implementado» y llevaba tiempo siendo falsa: los bloques
+B1 y B2 se implementaron en la rama `rc/spec-021`, **que ya está fusionada en
+`main`** (`git branch --merged main` la lista, y `main` va 5 commits por
+delante). Además, varios P3 se corrigieron sobre la marcha dentro de otros
+bloques. Esta sección se levantó **leyendo el código**, no la bitácora.
+
+### 10.1 Cerrados y verificados en el código
+
+| Hallazgo | Dónde se comprobó |
+|---|---|
+| **P0-1** limitador por IP | Bloque B1 — solo los 401 consumen cupo |
+| **P0-2** Atrás expulsa | Bloque B2 (mitigado) — `RutaDeAcceso` en `App.jsx` + `useCapasAtras` |
+| **P3-1** vacío ≠ filtrado | `DashboardWidgets.jsx` — «Todavía no hay registros que mostrar» |
+| **P3-2** fecha sin año | `DashboardWidgets.jsx` — `esOtroAno` añade el año solo cuando aporta |
+| **P3-3** «Siguiente paso» contradictorio | `dashboard.jsx` — el botón lleva a *Subir material* |
+| **P3-4** dos caminos, dos pestañas | Bloque B2 — ambos aterrizan en *Resumen* |
+| **P3-5** 4 `window.confirm` nativos | Cero restos en `src/`; los 4 usan `ConfirmDialog` |
+| **P3-7** `pointerEvents:'none'` en títulos | Cero ocurrencias en `src/` |
+| **P3-8** misma opción incorrecta sin respuesta | `MisionNarrativa.jsx` — contador `intentosFallidos` |
+| **P3-9** overlay sin focus trap | `ResultadoActividad.jsx` — `onTabulador` con el selector de `ModalPanel` |
+| **P3-11** «Top estudiantes» engañoso | `dashboard.jsx` — ahora «Top de la institución» + `EmptyState` |
+| **P3-12** formularios sin validación previa | Bloque B1 — validación en cliente conservando `noValidate` |
+
+### 10.2 Abiertos, confirmados en el código
+
+| Hallazgo | Evidencia |
+|---|---|
+| **P3-6** | **68** atributos `title` en `src/` (la auditoría contó 65: ha crecido) |
+| **P3-10** | `pagina === 'banco'` **sigue sin ser alcanzable**: su ítem de menú continúa comentado (`dashboard.jsx:555`) y nadie hace `setPagina('banco')`, pero la vista y `BancoPreguntas.jsx` (441 líneas) se siguen compilando y viajando en el bundle |
+| **P3-13** | `role="status"` sobre la pista estática de `LineaTiempo.jsx` |
+
+El resto de hallazgos de las olas 2, 3 y 4 no se han revisado uno a uno en esta
+pasada: **se dan por abiertos** salvo que su bloque diga lo contrario.
+
+### 10.3 Regla que sale de esto
+
+Esta desincronización costó una auditoría entera para descubrir que media
+docena de puntos ya estaban resueltos. **Al cerrar un hallazgo dentro de un
+bloque, se marca aquí en el mismo commit**, aunque el bloque no sea el suyo.

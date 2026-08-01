@@ -1,6 +1,6 @@
 # SPEC-002 — Centro de Administración Institucional
 
-> Estado: **APROBADA** (Fabrizio, 2026-07-09) — Fase 1 implementada en código; pendiente paso 7 (backup + migración Aiven + deploy)
+> Estado: **APROBADA e IMPLEMENTADA** (Fabrizio, 2026-07-09). *Revisado el 2026-08-01:* la nota anterior decía «pendiente paso 7 (backup + migración Aiven + deploy)» y llevaba meses siendo engañosa. **Las migraciones no son un paso manual**: `server/initDb.js` las aplica solas, de forma idempotente, en cada arranque del servidor (ver `MASTER_PLAN` §6 y el riesgo operativo correspondiente en `CURRENT_STATE`). El Centro de Administración lleva desplegado y en uso desde entonces. **No leer esta línea como trabajo pendiente.**
 > Fecha: 2026-07-09
 > Alcance acordado: Fase 1 completa antes de la sustentación; Fase 2 solo si el tiempo lo permite.
 > Decisiones ya tomadas: polling ligero (no WebSockets), migración conservadora de materias (IDs se conservan), relaciones siempre por `materia_id`/`curso_id` (nunca por nombre).

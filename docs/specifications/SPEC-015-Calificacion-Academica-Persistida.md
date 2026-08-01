@@ -1,6 +1,6 @@
 # SPEC-015 — Calificación académica persistida y XP proporcional al desempeño
 
-**Estado:** Aprobada por Fabrizio (solicitud directa, 2026-07-18).
+**Estado:** ✅ Aprobada por Fabrizio (solicitud directa, 2026-07-18) e **implementada y desplegada**. *Añadido el 2026-08-01:* la bitácora la describía como «en código; pendiente de commit/deploy», redacción que ya no corresponde — está en `main` y la migración 010 se aplica sola vía `migrarCalificacionAcademica()` en `server/initDb.js`. Lo que sigue sin hacerse es la **validación e2e** (reintentos reales y Libro de Calificaciones), que ya no depende de tener entorno: existe desde el 2026-07-29.
 **Toca área restringida (§10):** `POST /api/progreso` y esquema de `progreso_estudiante`.
 
 ## Problema

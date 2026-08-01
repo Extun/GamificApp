@@ -111,7 +111,11 @@ const SELECTOR_ENFOCABLES =
 let modalesAbiertos = 0;
 let overflowPrevioBody = '';
 
-export function ModalPanel({ titulo, subtitulo, avatar, onCerrar, pie, children, className = '' }) {
+// `error`: mensaje a mostrar DENTRO del panel. Existe porque el aviso de
+// error de la página vive en `.admin-vista`, debajo del backdrop (--z-modal):
+// si una acción lanzada desde un modal fallaba, el modal se quedaba abierto y
+// el motivo quedaba tapado. Desde fuera parecía que el botón no hacía nada.
+export function ModalPanel({ titulo, subtitulo, avatar, onCerrar, pie, children, error = '', className = '' }) {
     const panelRef = useRef(null);
     const tituloId = useId();
     const subtituloId = useId();
@@ -215,7 +219,10 @@ export function ModalPanel({ titulo, subtitulo, avatar, onCerrar, pie, children,
                     </div>
                     <button type="button" className="preview-close" aria-label="Cerrar" onClick={onCerrar}>✕</button>
                 </div>
-                <div className="preview-body">{children}</div>
+                <div className="preview-body">
+                    {error && <p className="modal-error" role="alert">{error}</p>}
+                    {children}
+                </div>
                 {pie && <div className="preview-foot">{pie}</div>}
             </div>
         </div>

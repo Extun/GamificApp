@@ -164,7 +164,7 @@ Cada fase es un **commit lógico** (o grupo de fases que Fabrizio autorice), nun
 ## 11. Qué se prueba automáticamente vs en navegador
 
 **Automático (scripts/CLI, sin navegador):**
-- `npm run build` y `npx eslint src` (comparado con baseline 28).
+- `npm run build` y `npx eslint src server` (comparado con la línea base de **29**: 26 errores + 3 warnings; el «28» que decía aquí estaba desfasado — corregido el 2026-08-01).
 - Pruebas funcionales de no-regresión contra la BD local vía API (login 3 roles, permisos, `POST /api/progreso` idempotente/incremental, Libro, Gestión de juegos) — el arnés ya usado en la validación del entorno.
 - Verificación de que las acciones destructivas (Fase 4) siguen ejecutando la misma llamada backend (inspección de red / respuesta).
 

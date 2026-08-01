@@ -295,6 +295,11 @@ export function AdminDashboard() {
         Boolean(docenteEditando) || importando
     );
 
+    // Devuelve '' si la acción salió bien y el mensaje si falló. Quien la
+    // llama desde un modal NECESITA ese dato: el aviso de error se pinta en
+    // `.admin-vista`, que queda debajo del backdrop, así que el modal debe
+    // cerrarse solo en caso de éxito y mostrar el fallo dentro de sí mismo.
+    // Los llamadores que no abren modal siguen ignorando el retorno.
     const ejecutar = async (accion, mensajeOk) => {
         try {
             setError('');
@@ -302,8 +307,10 @@ export function AdminDashboard() {
             const resultado = await accion();
             if (mensajeOk) setAvisoOk(typeof mensajeOk === 'function' ? mensajeOk(resultado) : mensajeOk);
             await cargar();
+            return '';
         } catch (err) {
             setError(err.message);
+            return err.message;
         }
     };
 

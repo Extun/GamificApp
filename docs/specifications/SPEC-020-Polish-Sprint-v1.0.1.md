@@ -1,6 +1,6 @@
 # SPEC-020 — POLISH SPRINT v1.0.1
 
-**Estado:** 🟡 **EN CURSO.** Dos vías. **Vía 1 (sistema de diseño):** etapas 0 y 1 hechas; **2-6 SUSPENDIDAS** por decisión de Fabrizio el 2026-07-30. **Vía 2 (experiencia de juego):** etapas A y B hechas; C, D y E pendientes de aprobación una por una.
+**Estado:** 🟡 **EN CURSO.** Dos vías. **Vía 1 (sistema de diseño):** etapas 0, 1, 3, 4 y la parte N7 de la 6, hechas (las tres últimas el 2026-08-01, al reanudarse el sprint); **etapa 5 pendiente** y **etapa 2 omitida a propósito** (ver Registro de cambios). **Vía 2 (experiencia de juego): CERRADA** — A, B, B-bis, C, D, E y los Quick Wins, todas hechas el 2026-07-30.
 **Fecha:** 2026-07-30
 **Origen:** v1.0 publicada y repositorio limpio. Etapa posterior a la entrega, dedicada exclusivamente a **calidad visual, experiencia de uso, animaciones y calidad técnica del frontend**.
 **Alcance:** **Solo presentación.** Ninguna funcionalidad nueva, ninguna lógica de negocio, ninguna arquitectura, ningún modelo de datos, ninguna API, ninguna navegación, ningún cambio de marca ni de colores principales. Las capturas usadas en la tesis deben seguir siendo válidas.
@@ -55,10 +55,10 @@ Cada etapa es un **commit independiente** y **ninguna empieza sin aprobación ex
 | **0** | `eslint.config.js` ignora `release/` y `runtime/` (ítem 62 del MASTER_PLAN) | Ninguno | ✅ Hecha |
 | **1** | Escala de movimiento (`--duration-*`, `--ease-standard`, `--press-scale`) + base de interacción táctil + estado de pulsación en los controles compartidos | Perceptible al pulsar; nulo en reposo | ✅ Hecha |
 | **2** | Escala tipográfica (`--text-*`) + migración de un archivo piloto | Ninguno (a verificar píxel a píxel) | ⬜ Pendiente |
-| **3** | CSS muerto: ítems 42, 43, 50 + los dos hallazgos nuevos de §5 | Ninguno | ⬜ Pendiente |
-| **4** | `:focus-visible` completo (N5) + objetivos táctiles ≥44px (N6) | Solo al navegar con teclado | ⬜ Pendiente |
+| **3** | CSS muerto: ítems 42, 43, 50 + los dos hallazgos nuevos de §5 | Ninguno | ✅ Hecha (2026-08-01) |
+| **4** | `:focus-visible` completo (N5) + objetivos táctiles ≥44px (N6) | Solo al navegar con teclado | ✅ Hecha (2026-08-01) |
 | **5** | `@media (hover: hover)` por grupos de archivos (N2) | Solo en dispositivos táctiles | ⬜ Pendiente |
-| **6** | Acabado: `::selection`, scrollbars (N7) + ítems 39, 40, 48, 49 | Bajo | ⬜ Pendiente |
+| **6** | Acabado: `::selection`, scrollbars (N7) + ítems 39, 40, 48, 49 | Bajo | ✅ Hecha en su parte N7 (2026-08-01); ítems 39/40/48/49 pendientes |
 
 **Orden y justificación:** 0 primero porque hace fiable la verificación de todo lo demás. 1 antes que 5 porque el estado de pulsación debe existir *antes* de acotar el hover a los dispositivos que lo tienen. 3 antes que 4-6 para no pulir código que va a desaparecer.
 
@@ -158,6 +158,32 @@ Implementar y verificar; **entregar el reporte y esperar aprobación antes de pa
 ---
 
 ## Registro de cambios
+
+- **2026-08-01** — **Vía 1 reanudada a petición de Fabrizio** («dale un último
+  diseño / mejóralo»). Implementadas **3, 4 y la parte N7 de la 6**; la **2
+  (tipografía) se omite a propósito**: es la única cuyo riesgo es justamente
+  el que §3 prohíbe (mover las capturas de la tesis) a cambio de cero mejora
+  perceptible. La **5** queda pendiente: son 109 reglas `:hover` en muchos
+  archivos y merece su propia pasada verificada.
+  - **Etapa 3.** Borrado el CSS muerto de los ítems 43 y 64, comprobando
+    **antes** con búsqueda mecánica que ninguna clase tiene consumidores en
+    `src/` ni se construye dinámicamente (`home-mundo-${i}` no existe: los
+    colores llegan inline desde `uiMateria().estilo`). Fuera: `.home-mundo-2/-4`,
+    `.rank-item-yo` (+ hijo), el bloque de logros de SPEC-011
+    (`.logros-grid`, `.logro-card/-icon/-badge/-bloqueado`, con los 2 únicos
+    `!important` del archivo) y los 7 selectores `.contenido-materia*`.
+    **El ítem 65 (`QuickActionCard`) NO se toca**: esta spec pide decidirlo
+    antes de borrar y esa decisión sigue siendo de Fabrizio.
+  - **Etapa 4.** `:focus-visible` global con `:where(...)` —especificidad
+    cero, así que no pisa ningún foco ya diseñado— y objetivos táctiles de
+    44px **acotados a `@media (pointer: coarse)`**. Esa condición es lo que
+    permite hacerlo sin violar §3: medido en el navegador, en escritorio las
+    alturas siguen siendo 30/36/40px, idénticas; solo crece donde se toca.
+  - **Etapa 6 (N7).** `::selection` con el verde de marca y scrollbars
+    tematizadas (`scrollbar-*` en la raíz para Firefox + `::-webkit-*`).
+  - Verificado: build limpio, **lint 29** (misma línea base), consola sin
+    errores, y comprobado en navegador real que Home del estudiante y "Mis
+    premios" —las dos vistas dueñas del CSS borrado— siguen intactas.
 
 - **2026-07-30** — **Giro del sprint a la Vía 2.** Fabrizio da por suficiente la infraestructura visual y suspende las etapas 2-6. Se añade la **auditoría de la experiencia de juego** (§4-ter, con juego real instrumentado) y la **Vía 2** (§4-bis). **Etapas A y B implementadas y verificadas** el mismo día; evidencia en `CURRENT_STATE.md`.
 - **2026-07-30** — Redacción inicial con la auditoría de partida medida. **Etapas 0 y 1 implementadas y verificadas** en el mismo día; detalle y evidencia en `CURRENT_STATE.md`. Etapas 2-6 sin empezar.

@@ -50,10 +50,21 @@ borrar todo.
 | `institucion` (nombre, logo, colores, escala XP) | `estudiantes` |
 | `misiones` (catálogo; lo re-siembra `initDb.js`) | `usuarios` docentes y admins **no** principales |
 | `usuarios` con `rol='admin' AND es_principal=1` | `cursos`, `materias` |
-| | `retos`, `materiales`, `retroalimentaciones` |
+| `configuracion_ia` (proveedor/modelo; las claves viven en el entorno) | `retos`, `materiales`, `retroalimentaciones` |
+| `tipos_juego` (qué tipos están habilitados, SPEC-017) | `banco_preguntas` (SPEC-010) |
 | | `progreso_estudiante`, `mision_estudiante` (XP, ranking, racha) |
-| | `invitaciones_estudiante`, `docente_materia` |
+| | `invitaciones_estudiante`, `docente_materia`, `docente_curso` |
 | | `auditoria` |
+
+> **Corrección 2026-08-01.** `banco_preguntas` **no se vaciaba**: la tabla nació
+> con SPEC-010, después de que se escribiera este reset, y nunca se añadió a
+> `TABLAS_A_VACIAR`. El efecto no era visible —el listado hace `JOIN materias`
+> y las materias sí se borran, así que las preguntas quedaban huérfanas e
+> invisibles— pero sobrevivían en la base a un "borrar todo", que es
+> exactamente lo que un traspaso a la institución no puede permitirse. Ya está
+> corregido. Para que la omisión no se repita, las tablas que se conservan
+> ahora se declaran explícitas en `TABLAS_QUE_SE_CONSERVAN`: si aparece una
+> tabla nueva, tiene que estar en una de las dos listas.
 
 Criterio: una **instalación nueva** (lo que crea `initDb.js`) no trae materias,
 cursos ni usuarios salvo el Principal; sí trae institución por defecto y el
@@ -76,13 +87,34 @@ catálogo de misiones semilla. El reset reproduce ese estado.
 4. **Botón oculto para no-Principales**: la "Zona peligrosa" del módulo
    Institución solo se renderiza si `authService.esPrincipal()`.
 5. **Backup previo obligatorio**: antes de borrar, se vuelca un JSON completo de
-   las 14 tablas a `server/backups/reset-<timestamp>.json`. Si el backup falla,
+   las 18 tablas a `server/backups/reset-<timestamp>.json`. Si el backup falla,
    se aborta sin tocar datos. (Carpeta en `.gitignore`: nunca al repositorio.)
+   **Descargable** desde `GET /api/admin/reset/respaldo/:archivo` — ver §4-bis.
 6. **Transacción**: todo el borrado va en una transacción con `DELETE`
    (no `TRUNCATE`, que auto-commitea) y `FOREIGN_KEY_CHECKS=0/1`; cualquier
    error hace `rollback`.
 7. **Auditoría**: el propio reset queda registrado (`restablecio-aplicacion`)
    con el archivo de backup y el conteo por tabla.
+
+## 4-bis. Descarga del respaldo (añadido 2026-08-01)
+
+El respaldo era una promesa a medias en producción: se escribe en
+`server/backups/`, que en Render es **disco efímero** (se borra en cada
+despliegue), y la respuesta del reset solo devolvía el **nombre** del archivo.
+Había red de seguridad para *abortar*, pero no para *arrepentirse*.
+
+- `GET /api/admin/reset/respaldo/:archivo` — `soloAdminPrincipal`, valida el
+  nombre contra `/^reset-[\w-]+\.json$/` y comprueba además la ruta resuelta
+  (doble defensa contra travesía de directorios). Devuelve el JSON como
+  descarga; 404 con explicación si el despliegue ya se llevó el archivo.
+- **No exige `RESET_HABILITADO`** a propósito: el archivo solo existe si un
+  reset ya corrió (que sí la exigió), y apagar la bandera justo después no
+  debe dejar el respaldo inaccesible — es cuando más falta hace.
+- En la UI, el modal de éxito ofrece **"Descargar respaldo"** y avisa de que
+  hay que hacerlo ya.
+
+**Recomendación operativa:** descargar el JSON **inmediatamente** después del
+reset y guardarlo fuera del servidor. Es el único punto de restauración.
 
 ## 5. Habilitación (código ya listo — falta solo el paso de entorno)
 

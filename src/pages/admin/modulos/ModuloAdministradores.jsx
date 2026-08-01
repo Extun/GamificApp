@@ -32,12 +32,18 @@ export function ModuloAdministradores({ administradores, ejecutar }) {
     // `editando`: null = cerrado, 'nuevo' = crear, objeto = editar existente.
     const [editando, setEditando] = useState(null);
     const [form, setForm] = useState(FORM_VACIO);
+    const [errorModal, setErrorModal] = useState('');
+    // Un doble clic mandaba dos POST: el segundo choca con el UNIQUE de
+    // `username` y devuelve "ese usuario ya existe" sobre una cuenta que se
+    // acababa de crear correctamente.
+    const [guardando, setGuardando] = useState(false);
 
     const yo = authService.getUsuario()?.id;
     const soyPrincipal = authService.esPrincipal();
 
     const abrirNuevo = () => {
         setForm(FORM_VACIO);
+        setErrorModal('');
         setEditando('nuevo');
     };
 
@@ -49,6 +55,7 @@ export function ModuloAdministradores({ administradores, ejecutar }) {
             activo: Boolean(a.activo),
             permisos: Array.isArray(a.permisos) ? a.permisos : PERMISOS_OPERATIVOS
         });
+        setErrorModal('');
         setEditando(a);
     };
 
@@ -60,13 +67,19 @@ export function ModuloAdministradores({ administradores, ejecutar }) {
                 : [...prev.permisos, clave]
         }));
 
-    const guardar = () => {
+    // Cierra solo si el guardado salió bien: "ese usuario ya existe" y
+    // "contraseña demasiado corta" son los fallos más probables aquí, y antes
+    // se pintaban en el aviso de la página, debajo de este mismo modal.
+    const guardar = async () => {
+        if (guardando) return;
         const esNuevo = editando === 'nuevo';
         // Solo el Principal envía permisos/rol; el servidor lo revalida igual.
         const camposPrincipal = soyPrincipal
             ? { es_principal: form.es_principal, ...(form.es_principal ? {} : { permisos: form.permisos }) }
             : {};
-        ejecutar(async () => {
+        setErrorModal('');
+        setGuardando(true);
+        const fallo = await ejecutar(async () => {
             if (esNuevo) {
                 await adminService.crearAdministrador({
                     username: form.username,
@@ -80,8 +93,10 @@ export function ModuloAdministradores({ administradores, ejecutar }) {
                     activo: form.activo
                 });
             }
-            setEditando(null);
         }, esNuevo ? `Administrador "${form.username}" creado.` : `Administrador "${form.username}" actualizado.`);
+        setGuardando(false);
+        if (fallo) setErrorModal(fallo);
+        else setEditando(null);
     };
 
     const alternarEstado = (a) => {
@@ -201,6 +216,7 @@ export function ModuloAdministradores({ administradores, ejecutar }) {
                     titulo={editando === 'nuevo' ? 'Nuevo administrador' : 'Editar administrador'}
                     subtitulo={editando === 'nuevo' ? 'Podrá gestionar la operación diaria de la institución' : editando.username}
                     onCerrar={() => setEditando(null)}
+                    error={errorModal}
                     pie={
                         <>
                             <button type="button" className="preview-action" onClick={() => setEditando(null)}>
@@ -210,14 +226,14 @@ export function ModuloAdministradores({ administradores, ejecutar }) {
                                 type="button"
                                 className="preview-action preview-action-primary"
                                 disabled={
-                                    editando === 'nuevo'
+                                    guardando || (editando === 'nuevo'
                                         ? !form.username.trim() || form.password.length < 8
-                                        : Boolean(form.password) && form.password.length < 8
+                                        : Boolean(form.password) && form.password.length < 8)
                                 }
                                 onClick={guardar}
                             >
                                 <TaskAltRoundedIcon />
-                                Guardar
+                                {guardando ? 'Guardando…' : 'Guardar'}
                             </button>
                         </>
                     }

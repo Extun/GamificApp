@@ -7,6 +7,7 @@ import ImageRoundedIcon from '@mui/icons-material/ImageRounded';
 import PaletteRoundedIcon from '@mui/icons-material/PaletteRounded';
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded';
 import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
+import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import adminService from '../../../services/adminService';
 import authService from '../../../services/authService';
 import { obtenerInstitucion, aplicarInstitucion, getInstitucionCache } from '../../../services/institucionService';
@@ -61,15 +62,36 @@ export function ModuloInstitucion({ ejecutar }) {
     const [resetTexto, setResetTexto] = useState('');
     const [resetCargando, setResetCargando] = useState(false);
     const [resetResultado, setResetResultado] = useState(null);
-    const cerrarReset = () => { setResetPaso(0); setResetTexto(''); setResetResultado(null); };
-    const confirmarReset = () => {
+    const [respaldoError, setRespaldoError] = useState('');
+    const [resetError, setResetError] = useState('');
+    const cerrarReset = () => {
+        setResetPaso(0); setResetTexto(''); setResetResultado(null);
+        setRespaldoError(''); setResetError('');
+    };
+    // El respaldo vive en el disco del servidor, que en Render se borra en el
+    // siguiente despliegue: por eso se ofrece bajarlo aquí y ahora.
+    const bajarRespaldo = async () => {
+        setRespaldoError('');
+        try {
+            await adminService.descargarRespaldoReset(resetResultado.backup.archivo);
+        } catch (err) {
+            setRespaldoError(err.message);
+        }
+    };
+    // El fallo más probable aquí es el 403 de `RESET_HABILITADO` sin activar.
+    // Iba al aviso de la página, que queda debajo de este modal: se escribía
+    // RESET, se pulsaba, y no pasaba visiblemente nada.
+    const confirmarReset = async () => {
         if (resetTexto.trim() !== 'RESET') return;
         setResetCargando(true);
-        ejecutar(async () => {
+        setResetError('');
+        const fallo = await ejecutar(async () => {
             const data = await adminService.restablecerAplicacion();
             setResetResultado(data);
             return data;
-        }, 'Aplicación restablecida a una instalación nueva.').finally(() => setResetCargando(false));
+        }, 'Aplicación restablecida a una instalación nueva.');
+        if (fallo) setResetError(fallo);
+        setResetCargando(false);
     };
 
     useEffect(() => {
@@ -243,9 +265,9 @@ export function ModuloInstitucion({ ejecutar }) {
                     <SectionCard titulo="Zona peligrosa" Icon={WarningRoundedIcon}>
                         <p className="institucion-nota">
                             Restablecer la aplicación borra estudiantes, docentes, cursos, materias, actividades,
-                            material, progreso, XP, ranking, misiones y auditoría. Conserva únicamente tu cuenta
-                            de Administrador Principal y la configuración institucional. Se genera un respaldo
-                            antes de borrar, pero la acción no se puede deshacer desde la app.
+                            material, banco de preguntas, progreso, XP, ranking, misiones y auditoría. Conserva
+                            únicamente tu cuenta de Administrador Principal y la configuración institucional.
+                            Se genera un respaldo antes de borrar, pero la acción no se puede deshacer desde la app.
                         </p>
                         <button
                             type="button"
@@ -275,7 +297,8 @@ export function ModuloInstitucion({ ejecutar }) {
                 >
                     <p>
                         Se eliminarán: estudiantes, docentes y administradores secundarios, cursos, materias,
-                        actividades, biblioteca, material, progreso, XP, ranking, misiones y auditoría.
+                        actividades, biblioteca, material, banco de preguntas, progreso, XP, ranking, misiones
+                        y auditoría.
                     </p>
                     <p>Se conservan: tu cuenta de Administrador Principal y la configuración institucional.</p>
                     <p><strong>Se genera un respaldo antes de borrar, pero esta acción no tiene "deshacer" en la app.</strong></p>
@@ -287,10 +310,16 @@ export function ModuloInstitucion({ ejecutar }) {
                     titulo="Confirmación final"
                     subtitulo='Escribe la palabra "RESET" para confirmar.'
                     onCerrar={cerrarReset}
+                    error={resetError}
                     pie={resetResultado ? (
-                        <button type="button" className="preview-action preview-action-primary" onClick={cerrarReset}>
-                            Cerrar
-                        </button>
+                        <>
+                            <button type="button" className="docente-btn-editar" onClick={bajarRespaldo}>
+                                <DownloadRoundedIcon sx={{ fontSize: '1.1rem' }} /> Descargar respaldo
+                            </button>
+                            <button type="button" className="preview-action preview-action-primary" onClick={cerrarReset}>
+                                Cerrar
+                            </button>
+                        </>
                     ) : (
                         <>
                             <button type="button" className="docente-btn-editar" onClick={cerrarReset} disabled={resetCargando}>
@@ -310,6 +339,11 @@ export function ModuloInstitucion({ ejecutar }) {
                     {resetResultado ? (
                         <>
                             <p>✅ Aplicación restablecida. Respaldo guardado como <code>{resetResultado.backup?.archivo}</code>.</p>
+                            <p>
+                                <strong>Descárgalo ahora.</strong> El respaldo vive en el disco del servidor y se
+                                borra en el siguiente despliegue: si lo dejas ahí, no habrá de dónde restaurar.
+                            </p>
+                            {respaldoError && <p className="institucion-error">{respaldoError}</p>}
                             <p>Cierra sesión y vuelve a entrar para ver el panel limpio.</p>
                         </>
                     ) : (

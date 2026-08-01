@@ -1,6 +1,6 @@
 # SPEC-011 — Eliminar localStorage como fuente de verdad (auditoría y migración)
 
-**Estado:** APROBADA por Fabrizio (2026-07-16) — Fases 1 y 2 implementadas en código; verificación e2e pendiente del deploy (sin MySQL local)
+**Estado:** APROBADA por Fabrizio (2026-07-16) — Fases 1 y 2 implementadas en código y desplegadas. *Revisado el 2026-08-01:* la coletilla «(sin MySQL local)» **ya no es cierta** — desde el 2026-07-29 existe un entorno local completo (MySQL portable 3308 + backend 3001 + `seedDev.js`), documentado en `docs/DEV-ENTORNO-LOCAL.md`. La verificación e2e ya no está bloqueada por falta de entorno: simplemente **no se ha hecho todavía**.
 **Fecha:** 2026-07-16
 **Alcance:** Frontend + endpoints existentes de `retos` (una ampliación menor al PATCH). Sin migración de BD.
 

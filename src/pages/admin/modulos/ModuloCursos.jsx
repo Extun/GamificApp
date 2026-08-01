@@ -16,25 +16,41 @@ export function ModuloCursos({ cursos, ejecutar }) {
     // `editando`: null = cerrado, 'nuevo' = crear, objeto = editar existente.
     const [editando, setEditando] = useState(null);
     const [form, setForm] = useState(FORM_VACIO);
+    const [errorModal, setErrorModal] = useState('');
+    // Sin esto, un doble clic manda dos POST: el primero crea el curso y el
+    // segundo choca con el UNIQUE (nombre, paralelo) y devuelve un 409 que
+    // acusa de duplicado a quien acaba de crearlo bien.
+    const [guardando, setGuardando] = useState(false);
 
     const abrirNuevo = () => {
         setForm(FORM_VACIO);
+        setErrorModal('');
         setEditando('nuevo');
     };
 
     const abrirEdicion = (c) => {
         setForm({ nombre: c.nombre, paralelo: c.paralelo, nivel: c.nivel || '', activo: Boolean(c.activo) });
+        setErrorModal('');
         setEditando(c);
     };
 
-    const guardar = () => {
+    // El modal se cierra SOLO si el guardado salió bien. Antes el cierre iba
+    // dentro de la acción, después del await: al fallar (nombre repetido,
+    // permisos) el modal se quedaba abierto y el motivo aparecía en el aviso
+    // de la página, tapado por el propio modal.
+    const guardar = async () => {
+        if (guardando) return;
         const esNuevo = editando === 'nuevo';
         const etiqueta = `${form.nombre} ${form.paralelo}`.trim();
-        ejecutar(async () => {
+        setErrorModal('');
+        setGuardando(true);
+        const fallo = await ejecutar(async () => {
             if (esNuevo) await adminService.crearCurso(form);
             else await adminService.actualizarCurso(editando.id, form);
-            setEditando(null);
         }, esNuevo ? `Curso "${etiqueta}" creado.` : `Curso "${etiqueta}" actualizado.`);
+        setGuardando(false);
+        if (fallo) setErrorModal(fallo);
+        else setEditando(null);
     };
 
     const alternarEstado = (c) => {
@@ -129,6 +145,7 @@ export function ModuloCursos({ cursos, ejecutar }) {
                     titulo={editando === 'nuevo' ? 'Nuevo curso' : 'Editar curso'}
                     subtitulo={editando === 'nuevo' ? 'Luego asígnalo a los docentes desde su ficha' : editando.etiqueta}
                     onCerrar={() => setEditando(null)}
+                    error={errorModal}
                     pie={
                         <>
                             <button type="button" className="preview-action" onClick={() => setEditando(null)}>
@@ -137,11 +154,11 @@ export function ModuloCursos({ cursos, ejecutar }) {
                             <button
                                 type="button"
                                 className="preview-action preview-action-primary"
-                                disabled={!form.nombre.trim() || !form.paralelo.trim()}
+                                disabled={guardando || !form.nombre.trim() || !form.paralelo.trim()}
                                 onClick={guardar}
                             >
                                 <TaskAltRoundedIcon />
-                                Guardar
+                                {guardando ? 'Guardando…' : 'Guardar'}
                             </button>
                         </>
                     }
