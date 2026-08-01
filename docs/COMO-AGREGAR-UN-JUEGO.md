@@ -106,6 +106,15 @@ edicion: {
 
 Declarando `edicion` **usas el editor genérico** (`GeneradorActividadIA`) sin escribir un editor propio. Solo si tu juego necesita un editor a medida añades una entrada en `registro/editores.js`.
 
+### Anexar ítems (`firmaItem` y `alAnexar`)
+
+Cuando el docente pulsa *Añadir con IA* o *Reutilizar del banco*, el editor no anexa a mano: llama a `src/components/juegos/anexarItems.js`, que quita repetidos, respeta `maxItems` y aplica el hook del tipo. Los dos ganchos que puede declarar tu juego:
+
+- **`firmaItem(item)`** — la clave que identifica al ítem para descartar repetidos. Devuelve **una** cadena o **un arreglo** de cadenas cuando varios campos deben ser únicos a la vez: el memorama devuelve sus dos caras, porque dos parejas que compartan una cara le pondrían al niño dos cartas iguales que no casan entre sí. Un ítem se descarta si **cualquiera** de sus claves ya está tomada.
+- **`alAnexar(actuales, nuevos)`** — opcional, solo si al anexar hay que retocar los ítems nuevos en función de los que ya había. Lo usa la línea del tiempo para continuar «Paso 6, 7…» en vez de reiniciar en «Paso 1». **Exactamente dos parámetros, en ese orden**; devuelve el arreglo de nuevos ya retocado (no la lista completa).
+
+`node scripts/verificar-anexado-ia.mjs` ejercita el anexado de todos los tipos con contenido real y comprueba ese contrato.
+
 ## 5. Registrar el tipo
 
 ```js

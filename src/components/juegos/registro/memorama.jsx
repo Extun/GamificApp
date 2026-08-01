@@ -65,9 +65,14 @@ export const memorama = {
             const b = (item.b || '').trim();
             return (a || b) ? `${a} ↔ ${b}` : '';
         },
+        // Las DOS caras deben ser únicas en todo el memorama, no solo la pareja
+        // completa: el reproductor empareja por índice, así que dos parejas que
+        // compartan una cara ("3 + 2 ↔ 5" y "4 + 1 ↔ 5") le dan al niño dos
+        // cartas iguales que no casan entre sí. Devolver las dos claves hace
+        // que anexarItems.js descarte esa pareja al añadirla.
         firmaItem: (item) => {
             const t = (s) => (s || '').trim().toLowerCase();
-            return `${t(item?.a)}|${t(item?.b)}`;
+            return [t(item?.a), t(item?.b)];
         }
     },
 

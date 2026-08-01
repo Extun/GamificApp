@@ -25,6 +25,7 @@ import { PUNTOS_POR_ACIERTO } from '../../services/gamificationService';
 import docenteService from '../../services/docenteService';
 import bancoService from '../../services/bancoService';
 import { obtenerJuego } from './registro';
+import { seleccionarParaAnexar, anexarItems } from './anexarItems';
 import { SelectorBanco } from './SelectorBanco';
 import { CampoTema } from './CampoTema';
 import { DIFICULTADES_UI } from './metadatosActividad';
@@ -61,10 +62,10 @@ export function GeneradorActividadIA({ materia, tipo }) {
     const cantidades = edicion.cantidades || CANTIDADES_POR_DEFECTO;
     const nombrePlural = edicion.nombreItem?.plural || 'elementos';
     const nombreSingular = edicion.nombreItem?.singular || 'elemento';
-    const firmaItem = edicion.firmaItem || ((item) => JSON.stringify(item));
     const itemVacio = edicion.itemVacio || (() => ({}));
-    // Hook opcional al anexar (línea del tiempo renumera ordinales).
-    const alAnexar = edicion.alAnexar || ((_actuales, nuevos) => nuevos);
+    // Quitar repetidos, respetar el máximo y aplicar el hook `alAnexar` del
+    // tipo son responsabilidad de anexarItems.js (un solo sitio para los dos
+    // caminos que anexan: la IA y el banco).
     const FormularioItem = edicion.FormularioItem;
     const textoParaIA = edicion.textoParaIA || ((item) => (item?.texto || '').trim());
     // Cuenta de ítems puntuables (misma regla de XP que el servidor).
@@ -277,25 +278,32 @@ export function GeneradorActividadIA({ materia, tipo }) {
                 // actividad en vez de generar otra desde cero (y no se repite).
                 existentes: actuales.map(textoParaIA).filter(Boolean)
             });
-            const firmas = new Set(actuales.map((it) => firmaItem(it)));
-            const nuevos = (data.configuracion?.[claveItems] || [])
-                .filter((it) => !firmas.has(firmaItem(it)))
-                .slice(0, Math.min(n, maxItems - actuales.length));
-            if (!nuevos.length) {
+            // Se quedan solo los que no estén ya (por la firma del tipo) y los
+            // que quepan; el banco no debe guardar los descartados, así que la
+            // selección va ANTES de guardarLoteEnBanco.
+            const { seleccion } = seleccionarParaAnexar({
+                edicion,
+                actuales,
+                nuevos: data.configuracion?.[claveItems] || [],
+                cantidad: n
+            });
+            if (!seleccion.length) {
                 setAviso('La IA no encontró ítems distintos a los que ya tienes. Prueba afinando el tema.');
                 setTimeout(() => setAviso(''), 5000);
                 return;
             }
             // Las etiquetas ordinales ("Paso 1"…) continúan la secuencia actual
             // en vez de reiniciarse y duplicar las que ya tiene la actividad.
-            const conBanco = alAnexar(
-                tipo, actuales, await guardarLoteEnBanco(nuevos, temaBase)
-            );
-            editarConfig({ [claveItems]: [...actuales, ...conBanco] });
-            setAviso(`${conBanco.length} ${conBanco.length === 1
+            const { anexados, lista } = anexarItems({
+                edicion, actuales, nuevos: await guardarLoteEnBanco(seleccion, temaBase)
+            });
+            editarConfig({ [claveItems]: lista });
+            const faltaron = n - anexados.length;
+            setAviso(`${anexados.length} ${anexados.length === 1
                 ? nombreSingular
-                : nombrePlural} más, sin tocar lo que ya tenías.`);
-            setTimeout(() => setAviso(''), 5000);
+                : nombrePlural} más, sin tocar lo que ya tenías.` +
+                (faltaron > 0 ? ` Pediste ${n}: el resto repetía lo que ya estaba.` : ''));
+            setTimeout(() => setAviso(''), 6000);
         } catch (err) {
             setError(`No se pudo añadir con la IA: ${err.message}`);
             setTimeout(() => setError(''), 5000);
@@ -440,16 +448,25 @@ export function GeneradorActividadIA({ materia, tipo }) {
         setBancoAbierto(false);
         if (!actividad || !nuevos.length) return;
         const actuales = actividad.configuracion?.[claveItems] || [];
-        const espacio = Math.max(maxItems - actuales.length, 0);
-        const insertados = alAnexar(actuales, nuevos.slice(0, espacio));
-        if (insertados.length) {
-            editarConfig({ [claveItems]: [...actuales, ...insertados] });
+        const { seleccion, repetidos, sinEspacio } = seleccionarParaAnexar({ edicion, actuales, nuevos });
+        const { anexados, lista } = anexarItems({ edicion, actuales, nuevos: seleccion });
+        if (anexados.length) {
+            editarConfig({ [claveItems]: lista });
         }
-        const fuera = nuevos.length - insertados.length;
-        setAviso(fuera > 0
-            ? `Se añadieron ${insertados.length} del banco; ${fuera} no ${fuera === 1 ? 'cupo' : 'cupieron'} (máximo ${maxItems} por actividad).`
-            : `${insertados.length} ${insertados.length === 1 ? 'ítem añadido' : 'ítems añadidos'} del banco.`);
-        setTimeout(() => setAviso(''), 5000);
+        // Se explica cada motivo por separado: no es lo mismo "no cabe" que
+        // "ya lo tenías" (el segundo pasa si el mismo texto está guardado en
+        // el banco dos veces, con ids distintos).
+        const motivos = [];
+        if (sinEspacio > 0) {
+            motivos.push(`${sinEspacio} no ${sinEspacio === 1 ? 'cupo' : 'cupieron'} (máximo ${maxItems} por actividad)`);
+        }
+        if (repetidos > 0) {
+            motivos.push(`${repetidos} ya ${repetidos === 1 ? 'estaba' : 'estaban'} en la actividad`);
+        }
+        setAviso(motivos.length
+            ? `Se ${anexados.length === 1 ? 'añadió' : 'añadieron'} ${anexados.length} del banco; ${motivos.join(' y ')}.`
+            : `${anexados.length} ${anexados.length === 1 ? 'ítem añadido' : 'ítems añadidos'} del banco.`);
+        setTimeout(() => setAviso(''), 6000);
     };
 
     // ---- Edición por tipo -------------------------------------------------
