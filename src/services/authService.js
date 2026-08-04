@@ -1,11 +1,12 @@
 // Servicio de autenticación del cliente (JWT).
 //
 // Gestiona el ciclo de vida del token: login contra la API, almacenamiento,
-// inclusión automática en cada petición (authFetch) y cierre de sesión.
-// Ningún componente debe tocar el token directamente: siempre a través
-// de este servicio.
+// inclusión automática en cada petición (authFetch), renovación mientras se
+// usa la aplicación y cierre de sesión. Ningún componente debe tocar el token
+// directamente: siempre a través de este servicio.
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { API_URL } from './apiBase';
+import { avisarSesionCaida } from './sesionBus';
 
 const KEY_TOKEN = 'auth_token';
 const KEY_USUARIO = 'auth_usuario';
@@ -38,22 +39,79 @@ const CLAVES_RETIRADAS = [
 const limpiarCacheDeUsuario = () =>
     CLAVES_DE_USUARIO.forEach((clave) => localStorage.removeItem(clave));
 
-// Guarda la sesión que devuelve cualquier ruta de /api/auth y vincula la
-// sesión de estudiante con su fila en la BD central para el guardado de
-// progreso (gamificationService.getEstudianteId()).
-const guardarSesion = (data) => {
-    // Primero se descarta la caché de quien usó antes este navegador: si el
-    // anterior no cerró sesión (cerrar la pestaña no pasa por logout), su XP
-    // seguiría ahí y lo vería el siguiente durante el primer render.
-    limpiarCacheDeUsuario();
-    CLAVES_RETIRADAS.forEach((clave) => localStorage.removeItem(clave));
+// ---- Caducidad del token (SPEC-024) ----
+//
+// El token que firma el servidor lleva `exp`. Antes NADIE lo miraba: el token
+// se guardaba para siempre y `isAuthenticated()` solo comprobaba que existiera,
+// así que abrir la aplicación al día siguiente ENTRABA al panel con un token
+// muerto y se quedaba en un panel vacío que no podía cargar nada.
+//
+// Aquí solo se LEE `exp`. La firma no se valida en el cliente y no se pretende
+// que se haga: la autoridad sigue siendo el servidor, que rechaza con 401.
+// Esto es únicamente para no montar una sesión que ya sabemos muerta.
+const cargaDelToken = (token) => {
+    try {
+        const payload = token?.split('.')[1];
+        if (!payload) return null;
+        // base64url → base64. Solo se lee un número (`exp`), así que no hace
+        // falta decodificar UTF-8: los bytes altos de un nombre con tilde no
+        // rompen la sintaxis del JSON.
+        const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+        return JSON.parse(json);
+    } catch {
+        return null;
+    }
+};
 
+// Milisegundos que le quedan al token, o null si no se puede saber.
+export const msParaCaducar = () => {
+    const exp = cargaDelToken(getToken())?.exp;
+    return Number.isFinite(exp) ? exp * 1000 - Date.now() : null;
+};
+
+// ¿El token guardado ya caducó? Si no se puede leer `exp`, se responde `false`
+// a propósito (fail-open): un token con forma inesperada no puede dejar fuera a
+// toda la escuela — para eso ya está el 401 del servidor.
+export const sesionCaducada = () => {
+    const restante = msParaCaducar();
+    return restante !== null && restante <= 0;
+};
+
+// Descarta una sesión ya caducada. Se llama UNA vez en `main.jsx`, antes de
+// montar React: así arrancar con la sesión muerta cae limpio en el Login y el
+// borrado no ocurre dentro de un render.
+export const purgarSesionCaducada = () => {
+    if (!getToken() || !sesionCaducada()) return false;
+    logout();
+    return true;
+};
+
+// Escribe token + usuario y vincula la sesión de estudiante con su fila en la
+// BD central para el guardado de progreso (gamificationService.getEstudianteId()).
+//
+// Separado de `guardarSesion` a propósito (SPEC-024): renovar la sesión pasa
+// por aquí y NO puede llevarse por delante la caché del usuario —
+// `edu_xpTotal` y los borradores de `edu_historialRetos` son de la MISMA
+// persona que sigue trabajando.
+const escribirSesion = (data) => {
     localStorage.setItem(KEY_TOKEN, data.token);
     localStorage.setItem(KEY_USUARIO, JSON.stringify(data.usuario));
     if (data.usuario.rol === 'estudiante' && data.usuario.estudiante_id) {
         localStorage.setItem('edu_estudianteId', String(data.usuario.estudiante_id));
     }
     return data;
+};
+
+// Guarda la sesión que devuelve cualquier ruta de /api/auth. ENTRA alguien
+// nuevo: se descarta primero la caché de quien usó antes este navegador (si el
+// anterior no cerró sesión —cerrar la pestaña no pasa por logout— su XP seguiría
+// ahí y lo vería el siguiente durante el primer render).
+const guardarSesion = (data) => {
+    limpiarCacheDeUsuario();
+    CLAVES_RETIRADAS.forEach((clave) => localStorage.removeItem(clave));
+    // Una sesión nueva rearma el aviso de caída: el anterior ya se consumió.
+    sesionCaidaAvisada = false;
+    return escribirSesion(data);
 };
 
 const postPublico = async (ruta, body) => {
@@ -180,10 +238,35 @@ export const tienePermiso = (clave) => {
     return permisos.includes(clave);
 };
 
-export const isAuthenticated = () => Boolean(getToken());
+// Hay sesión utilizable: token guardado Y todavía vigente. La comprobación de
+// `exp` es lo que impide entrar al panel con un token muerto (SPEC-024).
+export const isAuthenticated = () => Boolean(getToken()) && !sesionCaducada();
 
-// fetch con el token incluido. Si el servidor responde 401 (token expirado
-// o inválido), cierra la sesión local: la próxima navegación cae al login.
+// Un panel lanza varias peticiones a la vez; si todas caen con 401 a la vez,
+// sin esta bandera saldrían N avisos y N navegaciones al login. Se rearma al
+// guardar una sesión nueva.
+let sesionCaidaAvisada = false;
+
+// La sesión dejó de valer: se cierra en local y se avisa UNA sola vez para que
+// el <GuardiaDeSesion/> lo explique y devuelva al acceso.
+//
+// Exportada porque el guardia también la detecta por su cuenta (una pestaña que
+// estuvo horas en segundo plano caduca sin que ninguna petición lo descubra) y
+// tiene que entrar por la MISMA puerta, o saldrían dos avisos.
+export const declararSesionCaida = (motivo = 'expirada') => {
+    logout();
+    if (sesionCaidaAvisada) return;
+    sesionCaidaAvisada = true;
+    avisarSesionCaida(motivo);
+};
+
+// fetch con el token incluido. Si el servidor responde 401 (token expirado,
+// inválido o cuenta revocada), cierra la sesión local y avisa: el guardia
+// muestra el motivo y devuelve al login.
+//
+// Solo el 401 cierra sesión. El 503 de `autenticar` («no puedo verificarte
+// ahora», SPEC-019) NO debe hacerlo: una caída de MySQL no es una sesión
+// muerta.
 //
 // `conservarSesionEn401` (opt-in, por llamada) desactiva ESE cierre en los
 // pocos endpoints donde un 401 describe la credencial enviada en el cuerpo y
@@ -199,8 +282,39 @@ export const authFetch = async (url, options = {}) => {
             ...(token ? { Authorization: `Bearer ${token}` } : {})
         }
     });
-    if (res.status === 401 && !conservarSesionEn401) logout();
+    if (res.status === 401 && !conservarSesionEn401) declararSesionCaida();
     return res;
+};
+
+// Renovación deslizante (SPEC-024). Re-firma el token mientras la sesión sigue
+// viva; el servidor revalida la cuenta contra la BD antes de renovar, así que
+// esto NO revive a nadie desactivado ni en la Papelera.
+//
+// Devuelve `true` si la sesión quedó renovada. Si falla, la sesión se declara
+// caída (con la única excepción de un fallo de red, donde no se sabe nada y no
+// se echa a nadie: el token viejo sigue siendo el que hay).
+export const renovarSesion = async () => {
+    if (!getToken() || sesionCaducada()) return false;
+    let res;
+    try {
+        res = await fetch(`${API_URL}/api/auth/renovar`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${getToken()}` }
+        });
+    } catch {
+        return false; // Sin red: se reintenta en la siguiente oportunidad.
+    }
+    if (res.status === 401) {
+        declararSesionCaida();
+        return false;
+    }
+    if (!res.ok) return false; // 503 y demás: no se toca la sesión.
+    const data = await res.json().catch(() => null);
+    if (!data?.token || !data?.usuario) return false;
+    // `escribirSesion` y no `guardarSesion`: es la MISMA persona, su caché
+    // (XP, borradores) no se toca.
+    escribirSesion(data);
+    return true;
 };
 
 const authService = {
@@ -213,6 +327,11 @@ const authService = {
     loginEmergencia,
     cambiarPin,
     logout,
+    declararSesionCaida,
+    renovarSesion,
+    msParaCaducar,
+    sesionCaducada,
+    purgarSesionCaducada,
     getToken,
     getUsuario,
     getRol,

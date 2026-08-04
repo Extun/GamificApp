@@ -32,6 +32,7 @@ param(
 . (Join-Path $PSScriptRoot 'comun.ps1')
 . (Join-Path $PSScriptRoot 'runtime.ps1')
 . (Join-Path $PSScriptRoot 'mysql.ps1')
+. (Join-Path $PSScriptRoot 'opciones.ps1')
 
 Iniciar-Registro 'instalador'
 Escribir-Titulo 'GamificApp — Instalacion local'
@@ -49,18 +50,7 @@ function Preguntar-Texto {
     return $respuesta.Trim()
 }
 
-function Preguntar-SiNo {
-    param([string]$Pregunta)
-    # El predeterminado es SIEMPRE "No": nada opcional ocurre por inercia.
-    while ($true) {
-        $respuesta = Read-Host "   $Pregunta [s/N]"
-        if ([string]::IsNullOrWhiteSpace($respuesta)) { return $false }
-        $r = $respuesta.Trim().ToLower()
-        if ($r -eq 's' -or $r -eq 'si' -or $r -eq 'sí' -or $r -eq 'y') { return $true }
-        if ($r -eq 'n' -or $r -eq 'no') { return $false }
-        Write-Host '   Responde s o n.' -ForegroundColor Yellow
-    }
-}
+# Preguntar-SiNo vive en comun.ps1: la comparten este script y configurar.ps1.
 
 function Preguntar-Clave {
     param([string]$Pregunta)
@@ -503,6 +493,64 @@ if ($puedeOfrecerDemo) {
 }
 
 # ------------------------------------------------------------
+# 8-bis. Las dos opciones del equipo. Predeterminado de las dos: NO.
+# ------------------------------------------------------------
+# Solo se preguntan en la PRIMERA instalacion. Quien reinstala ya decidio, y
+# quien quiera cambiar de idea tiene "Configurar GamificApp.cmd", que existe
+# exactamente para eso. Van ANTES del build porque activar la red local puede
+# obligar a reconstruir la pagina (ver Revisar-EnvFrontend).
+$primeraVez = -not (Test-OpcionesPreguntadas)
+$quiereRed  = Test-RedLocalActiva
+$quiereArranque = $false
+
+if ($primeraVez) {
+    Escribir-Paso 'Acceso desde otros dispositivos (opcional)'
+    Write-Host '   Puedo dejar que este equipo haga de servidor: cualquier tablet, telefono' -ForegroundColor White
+    Write-Host '   o portatil conectado a la MISMA red podria abrir GamificApp desde su' -ForegroundColor White
+    Write-Host '   navegador, sin instalar nada.' -ForegroundColor White
+    Write-Host '   Este equipo tendria que quedarse encendido mientras se use, y la conexion' -ForegroundColor White
+    Write-Host '   va sin cifrar: sirve para la red de una escuela, no para una red publica.' -ForegroundColor White
+    Write-Host '   Si respondes que no, GamificApp solo se abrira en este equipo.' -ForegroundColor White
+    Write-Host ''
+    $quiereRed = Preguntar-SiNo -Pregunta 'Permitir el acceso desde otros dispositivos de la red?'
+
+    Escribir-Paso 'Arranque automatico (opcional)'
+    Write-Host '   Puedo hacer que GamificApp se inicie sola cada vez que inicies sesion en' -ForegroundColor White
+    Write-Host '   Windows en este equipo, sin tener que abrir nada a mano.' -ForegroundColor White
+    Write-Host '   No se instala ningun servicio de Windows y podras quitarlo cuando quieras.' -ForegroundColor White
+    Write-Host ''
+    $quiereArranque = Preguntar-SiNo -Pregunta 'Iniciar GamificApp automaticamente?'
+
+    Write-Host ''
+    Escribir-Detalle 'Las dos se pueden cambiar despues con "Configurar GamificApp.cmd".'
+} else {
+    Escribir-Paso 'Opciones de este equipo'
+    Escribir-Detalle 'Ya elegiste antes: se conserva tu eleccion. Para cambiarla, "Configurar GamificApp.cmd".'
+    # Una tarea que apunte a OTRA carpeta se vuelve a registrar hacia esta:
+    # es justo lo que pasa cuando alguien mueve o reemplaza GamificApp.
+    if ((Test-ArranqueAutomaticoActivo) -and -not (Test-TareaApuntaAqui)) {
+        $quiereArranque = $true
+        Escribir-Detalle 'El arranque automatico apuntaba a otra carpeta: se corrige hacia esta.'
+    }
+}
+
+Escribir-Paso 'Aplicando las opciones del equipo'
+$resultadoRed = Aplicar-RedLocal -Activar $quiereRed
+Mostrar-ResultadoRedLocal -Resultado $resultadoRed
+Guardar-Preferencias -Preguntado $true
+
+# Con la red local encendida, un VITE_API_URL fijo en el .env de la raiz
+# horneraria la direccion de la API dentro de dist\ y anularia todo lo
+# anterior. Se revisa AHORA, antes del build de mas abajo, para que la
+# correccion entre en la misma construccion y no haga falta una segunda.
+if ($quiereRed) {
+    switch (Revisar-EnvFrontend) {
+        'neutralizado' { Escribir-Detalle 'Se comento VITE_API_URL en el .env de la carpeta principal: la direccion de la API se deducira sola.' }
+        'ajeno'        { Escribir-Aviso  'El .env de la carpeta principal apunta la API a un servidor concreto: no se toca, pero los demas dispositivos usaran ese servidor.' }
+    }
+}
+
+# ------------------------------------------------------------
 # 9. Construir la pagina web
 # ------------------------------------------------------------
 Escribir-Paso 'Construyendo la pagina web (npm run build)'
@@ -697,7 +745,7 @@ if ($lineasDemo.Count -eq 0 -and (Test-Path $script:ArchivoDatosDemo)) {
 # 12. Arrancar la pagina web y esperar a que responda
 # ------------------------------------------------------------
 Escribir-Paso 'Iniciando la pagina web'
-$procesoFrontend = Iniciar-Frontend
+$procesoFrontend = Iniciar-Frontend -EscucharEnRed:$quiereRed
 Escribir-Detalle "Proceso de la pagina: PID $($procesoFrontend.Id)"
 
 $saludWeb = Esperar-Respuesta -Url $script:UrlFrontend -SegundosMax 60 -Proceso $procesoFrontend
@@ -715,6 +763,7 @@ Escribir-Ok "La pagina web responde en $($script:UrlFrontend)."
 # ------------------------------------------------------------
 # 13. Archivo de credenciales para el usuario
 # ------------------------------------------------------------
+$urlAcceso = Obtener-UrlDeAcceso -Ip $resultadoRed.Ip
 $rutaCredenciales = Join-Path $script:Raiz 'CREDENCIALES.txt'
 $textoCredenciales = @"
 GamificApp — Credenciales de tu instalación local
@@ -734,6 +783,20 @@ Base de datos MySQL
   Usuario  : $usuarioFinal
   Clave    : $claveFinal
 "@
+if ($quiereRed -and $resultadoRed.Ip) {
+    $textoCredenciales += @"
+
+Desde otros dispositivos de la misma red
+  Dirección : $urlAcceso
+
+  Esa dirección es la que tenía este equipo al instalar. Si el router le
+  asigna otra más adelante, GamificApp se adapta sola: la dirección correcta
+  aparece SIEMPRE al final de "Iniciar GamificApp.cmd" y en
+  "Configurar GamificApp.cmd". No hace falta reinstalar ni reconstruir nada.
+
+  Este equipo debe estar encendido para que los demás puedan entrar.
+"@
+}
 if ($usaPortable) {
     $textoCredenciales += @"
 
@@ -763,6 +826,26 @@ Este archivo está ignorado por Git. No lo subas ni lo compartas.
 Escribir-Ok 'Credenciales guardadas en CREDENCIALES.txt (en la carpeta del proyecto).'
 
 # ------------------------------------------------------------
+# 13-bis. Arranque automatico
+# ------------------------------------------------------------
+# Se registra AL FINAL y solo si todo lo anterior salio bien: no tiene sentido
+# programar el arranque diario de una instalacion que no llego a funcionar.
+if ($quiereArranque) {
+    Escribir-Paso 'Programando el arranque automatico'
+    $resultadoTarea = Registrar-TareaArranque
+    switch -Wildcard ($resultadoTarea) {
+        'registrada' {
+            Escribir-Ok 'GamificApp se iniciara sola al iniciar sesion en Windows.'
+            Escribir-Detalle 'Para quitarlo: "Configurar GamificApp.cmd".'
+        }
+        'error*' {
+            Escribir-Aviso "No se pudo programar el arranque automatico. $resultadoTarea"
+            Escribir-Detalle 'La instalacion es correcta: abrela con "Iniciar GamificApp.cmd".'
+        }
+    }
+}
+
+# ------------------------------------------------------------
 # 14. Abrir el navegador y resumen
 # ------------------------------------------------------------
 Abrir-Navegador -Url $script:UrlFrontend
@@ -772,6 +855,11 @@ Write-Host "  ============================================================" -For
 Write-Host "   GAMIFICAPP ESTA LISTA" -ForegroundColor Green
 Write-Host "  ============================================================" -ForegroundColor Green
 Write-Host "   Abrela en:  $($script:UrlFrontend)" -ForegroundColor White
+if ($quiereRed -and $resultadoRed.Ip) {
+    Write-Host ''
+    Write-Host "   Desde tablets u otros equipos de la misma red:" -ForegroundColor White
+    Write-Host "       $urlAcceso" -ForegroundColor Cyan
+}
 Write-Host ''
 Write-Host "   Entra como administrador con:" -ForegroundColor White
 Write-Host "     Usuario:    admin" -ForegroundColor White
@@ -785,6 +873,7 @@ Write-Host ''
 Write-Host "   A partir de ahora:" -ForegroundColor White
 Write-Host "     · Para usarla otro dia:  Iniciar GamificApp.cmd" -ForegroundColor White
 Write-Host "     · Para cerrarla:         Detener GamificApp.cmd" -ForegroundColor White
+Write-Host "     · Para cambiar opciones: Configurar GamificApp.cmd" -ForegroundColor White
 Write-Host ''
 Escribir-Log 'Instalacion completada correctamente.' 'OK' $false
 exit 0

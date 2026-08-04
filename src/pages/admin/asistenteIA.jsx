@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { RespuestaIA } from './respuestaIA';
 import { authFetch } from '../../services/authService';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { API_URL } from '../../services/apiBase';
 
 export function AsistenteIA() {
     const [message, setMessage] = useState("");

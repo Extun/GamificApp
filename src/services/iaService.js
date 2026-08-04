@@ -2,7 +2,7 @@
 // La API key de Gemini vive SOLO en el backend; aquí solo viajan ids y textos.
 import { authFetch } from './authService';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { API_URL } from './apiBase';
 
 const pedir = async (ruta, body) => {
     const res = await authFetch(`${API_URL}${ruta}`, {

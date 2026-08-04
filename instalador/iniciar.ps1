@@ -5,9 +5,17 @@
 # No instala nada ni reconstruye la pagina: asume que ya se ejecuto una vez
 # "Instalar GamificApp.cmd". Si detecta que la aplicacion ya esta en marcha,
 # NO la duplica: solo abre el navegador.
+#
+# Parametros (no se usan en el doble clic):
+#   -SinNavegador   no abre el navegador al terminar. Lo usa la tarea del
+#                   arranque automatico: al encender el equipo nadie ha pedido
+#                   que se abra una ventana.
 # ============================================================
+param([switch]$SinNavegador)
+
 . (Join-Path $PSScriptRoot 'comun.ps1')
 . (Join-Path $PSScriptRoot 'mysql.ps1')
+. (Join-Path $PSScriptRoot 'opciones.ps1')
 
 Iniciar-Registro 'iniciar'
 Escribir-Titulo 'GamificApp — Iniciar'
@@ -90,10 +98,52 @@ if (-not (Test-PuertoTcpAbierto -Servidor $servidorBd -Puerto ([int]$puertoBd)))
 Escribir-Ok "MySQL responde en ${servidorBd}:${puertoBd}."
 
 # ------------------------------------------------------------
+# 2-bis. Acceso desde otros dispositivos (si esta activado)
+# ------------------------------------------------------------
+# Va ANTES del servidor a proposito: el backend lee CORS_ORIGIN de server/.env
+# una sola vez, al arrancar. Si la IP de este equipo cambio desde ayer —cosa
+# normal cuando el router reparte por DHCP— hay que dejarla escrita antes de
+# encenderlo, o rechazaria a todas las tablets del aula.
+$modoRed = Test-RedLocalActiva
+$ipLocal = ''
+$corsCambio = $false
+if ($modoRed) {
+    Escribir-Paso 'Comprobando el acceso desde otros dispositivos'
+    $ipLocal = Obtener-IPLocal
+    if (-not $ipLocal) {
+        Escribir-Aviso 'No se pudo averiguar la direccion de este equipo en la red.'
+        Escribir-Detalle 'GamificApp arrancara igual, pero solo se podra abrir en este equipo.'
+    } else {
+        $resultadoCors = Sincronizar-CorsOrigin -Ip $ipLocal
+        $corsCambio = ($resultadoCors -eq 'actualizado')
+        if ($corsCambio) {
+            Escribir-Ok "La direccion de este equipo es ahora ${ipLocal}: server/.env actualizado."
+        } else {
+            Escribir-Ok "Direccion de este equipo en la red: $ipLocal"
+        }
+        if ($resultadoCors -eq 'ajeno') {
+            Escribir-Aviso 'CORS_ORIGIN esta escrito a mano en server/.env: se respeta y no se toca.'
+        }
+        if (-not (Test-ReglaFirewall)) {
+            Escribir-Aviso 'El firewall de Windows no tiene la regla de GamificApp: los demas dispositivos no podran entrar.'
+            Escribir-Detalle 'Ejecuta "Configurar GamificApp.cmd" para ver como abrirlo.'
+        }
+    }
+}
+
+# ------------------------------------------------------------
 # 3. Servidor (backend)
 # ------------------------------------------------------------
 Escribir-Paso 'Comprobando el servidor de GamificApp'
 $estadoBackend = Obtener-EstadoServicio -Nombre 'backend' -Puerto $script:PuertoBackend -UrlSalud "$($script:UrlBackend)/api/health"
+
+# Un servidor ya en marcha sigue teniendo en memoria el CORS_ORIGIN viejo: si
+# la direccion cambio, hay que reiniciarlo o seguira rechazando al aula.
+if ($corsCambio -and $estadoBackend.Vivo) {
+    Escribir-Detalle 'La direccion de red cambio: se reinicia el servidor para que la tome.'
+    [void](Detener-Servicio 'backend')
+    $estadoBackend = Obtener-EstadoServicio -Nombre 'backend' -Puerto $script:PuertoBackend -UrlSalud "$($script:UrlBackend)/api/health"
+}
 
 if ($estadoBackend.Vivo -and $estadoBackend.Responde) {
     Escribir-Ok "Ya estaba en marcha (PID $($estadoBackend.ProcesoId)). No se inicia otra vez."
@@ -175,6 +225,19 @@ Escribir-Ok "Esquema completo: $($esquema.tablas) tablas."
 Escribir-Paso 'Comprobando la pagina web'
 $estadoFrontend = Obtener-EstadoServicio -Nombre 'frontend' -Puerto $script:PuertoFrontend -UrlSalud $script:UrlFrontend
 
+# Vite decide en que interfaces escucha al arrancar y no lo cambia despues.
+# Si la pagina lleva viva desde antes de que se activara (o desactivara) el
+# acceso desde otros dispositivos, esta sirviendo el modo equivocado: se
+# reinicia. Se compara contra lo que quedo apuntado al lanzarla, no contra una
+# suposicion.
+$registroFrontend = Leer-Proceso 'frontend'
+if ($estadoFrontend.Vivo -and $registroFrontend -and ([bool]$registroFrontend.red) -ne $modoRed) {
+    $haciaDonde = $(if ($modoRed) { 'para toda la red' } else { 'solo para este equipo' })
+    Escribir-Detalle "La pagina web estaba sirviendo en otro modo: se reinicia $haciaDonde."
+    [void](Detener-Servicio 'frontend')
+    $estadoFrontend = Obtener-EstadoServicio -Nombre 'frontend' -Puerto $script:PuertoFrontend -UrlSalud $script:UrlFrontend
+}
+
 if ($estadoFrontend.Vivo -and $estadoFrontend.Responde) {
     Escribir-Ok "Ya estaba en marcha (PID $($estadoFrontend.ProcesoId)). No se inicia otra vez."
 } else {
@@ -200,7 +263,7 @@ if ($estadoFrontend.Vivo -and $estadoFrontend.Responde) {
             )
         }
     } else {
-        $procesoFrontend = Iniciar-Frontend
+        $procesoFrontend = Iniciar-Frontend -EscucharEnRed:$modoRed
         Escribir-Detalle "Pagina web iniciada (PID $($procesoFrontend.Id)). Esperando a que responda..."
         $saludWeb = Esperar-Respuesta -Url $script:UrlFrontend -SegundosMax 60 -Proceso $procesoFrontend
         if (-not $saludWeb.Ok) {
@@ -219,15 +282,27 @@ if ($estadoFrontend.Vivo -and $estadoFrontend.Responde) {
 # ------------------------------------------------------------
 # 5. Abrir el navegador
 # ------------------------------------------------------------
-Abrir-Navegador -Url $script:UrlFrontend
+# La direccion del aula es la de HOY: se acaba de medir unas lineas mas
+# arriba. Aunque el router haya dado otra IP esta manana, lo que se abre y lo
+# que se imprime es lo correcto, sin reconstruir nada ni tocar la
+# configuracion del router.
+$urlAcceso = Obtener-UrlDeAcceso -Ip $ipLocal
+if (-not $SinNavegador) { Abrir-Navegador -Url $script:UrlFrontend }
 
 Write-Host ''
 Write-Host "  ============================================================" -ForegroundColor Green
 Write-Host "   GAMIFICAPP ESTA EN MARCHA" -ForegroundColor Green
 Write-Host "  ============================================================" -ForegroundColor Green
-Write-Host "   Abrela en:  $($script:UrlFrontend)" -ForegroundColor White
+Write-Host "   En este equipo:  $($script:UrlFrontend)" -ForegroundColor White
+if ($modoRed -and $ipLocal) {
+    Write-Host ''
+    Write-Host "   Desde tablets, telefonos u otros equipos de la misma red:" -ForegroundColor White
+    Write-Host "       $urlAcceso" -ForegroundColor Cyan
+    Write-Host "   (esa direccion puede cambiar; siempre es la que aparece aqui)" -ForegroundColor DarkGray
+}
+Write-Host ''
 Write-Host "   Tus credenciales estan en CREDENCIALES.txt" -ForegroundColor White
 Write-Host "   Para cerrarla: Detener GamificApp.cmd" -ForegroundColor White
 Write-Host ''
-Escribir-Log 'Arranque completado.' 'OK' $false
+Escribir-Log "Arranque completado. Direccion de acceso: $urlAcceso" 'OK' $false
 exit 0

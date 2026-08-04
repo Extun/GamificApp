@@ -4,6 +4,7 @@ import './App.css'
 import {Login} from './pages/admin/login.jsx'
 import {RegistroEstudiante} from './pages/estudiante/RegistroEstudiante.jsx'
 import {ToastHost} from './components/dashboard/Toast.jsx'
+import {GuardiaDeSesion} from './components/GuardiaDeSesion.jsx'
 import authService from './services/authService'
 
 // Los tres paneles se cargan BAJO DEMANDA, no en el arranque.
@@ -35,8 +36,10 @@ function CargandoPanel() {
   )
 }
 
-// Solo entra quien tiene un JWT emitido por el servidor; si el token expira,
-// authFetch lo descarta en el primer 401 y esta guardia devuelve al login.
+// Solo entra quien tiene un JWT emitido por el servidor Y todavía vigente
+// (SPEC-024: `isAuthenticated` mira `exp`, no solo que el token exista). Un
+// token caducado ya no deja montar el panel, así que no hay panel fantasma
+// esperando a que el primer 401 lo descubra.
 function ProtectedRoute({ children }) {
   if (!authService.isAuthenticated()) {
     return <Navigate to="/" replace />
@@ -95,6 +98,10 @@ function App() {
       {/* Notificaciones transitorias (SPEC-018 Fase 4): un solo host para
           toda la app; sobrevive a la navegación interna de la SPA. */}
       <ToastHost />
+      {/* Vigilancia de la sesión (SPEC-024): explica y devuelve al acceso
+          cuando caduca, y la renueva mientras la app se está usando. No
+          pinta nada; va dentro del Router porque navega. */}
+      <GuardiaDeSesion />
     </>
   )
 }

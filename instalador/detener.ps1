@@ -15,6 +15,7 @@
 # ============================================================
 . (Join-Path $PSScriptRoot 'comun.ps1')
 . (Join-Path $PSScriptRoot 'mysql.ps1')
+. (Join-Path $PSScriptRoot 'opciones.ps1')
 
 Iniciar-Registro 'detener'
 Escribir-Titulo 'GamificApp — Detener'
@@ -92,6 +93,16 @@ if ($detenidos -gt 0) {
 }
 Write-Host "   Tus datos siguen guardados en la base de datos." -ForegroundColor White
 Write-Host "   Para volver a usarla: Iniciar GamificApp.cmd" -ForegroundColor White
+
+# Detener no desactiva el arranque automatico —son dos cosas distintas— pero
+# callarselo confundiria a quien cierra la aplicacion creyendo que ya no
+# volvera a abrirse sola.
+if (Test-ArranqueAutomaticoActivo) {
+    Write-Host ''
+    Write-Host "   Nota: el arranque automatico sigue activado, asi que GamificApp" -ForegroundColor White
+    Write-Host "   volvera a abrirse sola la proxima vez que inicies sesion." -ForegroundColor White
+    Write-Host "   Para quitarlo: Configurar GamificApp.cmd" -ForegroundColor White
+}
 
 if ($ajenos.Count -gt 0) {
     Write-Host ''

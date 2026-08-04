@@ -7,7 +7,7 @@
 
 import { authFetch } from './authService';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { API_URL } from './apiBase';
 
 // POST /api/retos — publica (o republica) un reto con su configuración.
 // Lanza Error con el mensaje del servidor si la publicación falla, para que

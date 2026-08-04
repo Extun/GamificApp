@@ -14,7 +14,7 @@ import { misEstudiantes } from '../../services/docenteService';
 import { EmptyState, ModalPanel, TablaPro, formatearFecha } from './DashboardWidgets';
 import { retroalimentacionDe } from '../juegos/calificacion';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { API_URL } from '../../services/apiBase';
 
 const pedirJson = async (ruta, options = {}) => {
     const res = await authFetch(`${API_URL}${ruta}`, {

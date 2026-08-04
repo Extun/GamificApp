@@ -2,7 +2,8 @@
 // El GET es público (el Login lo necesita antes de la sesión). La respuesta
 // se cachea en localStorage para pintar la identidad al instante en visitas
 // siguientes; la API siempre pisa la caché.
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { API_URL } from './apiBase';
+
 const CACHE_KEY = 'institucion_cache';
 
 // Nombre institucional por defecto: se usa como respaldo cuando la caché aún

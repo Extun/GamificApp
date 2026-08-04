@@ -441,6 +441,35 @@ function Escribir-TextoSinBom {
     [System.IO.File]::WriteAllText($Ruta, $Contenido, $codificacion)
 }
 
+# Cambia el VALOR de una clave que ya existe, dejando intacto todo lo demas
+# del archivo: comentarios, orden y el resto de variables. Si la clave no
+# estuviera, la añade al final.
+#
+# Se reescribe linea a linea a proposito, en vez de regenerar el .env: ahi
+# viven JWT_SECRET y ADMIN_PASSWORD, y regenerar el archivo cerraria la sesion
+# de todo el mundo y cambiaria la contraseña del administrador.
+function Establecer-ClaveEnv {
+    param([string]$Ruta, [string]$Clave, [string]$Valor)
+    if (-not (Test-Path $Ruta)) { return $false }
+
+    $lineas = @(Get-Content -Path $Ruta -Encoding UTF8)
+    $encontrada = $false
+    $salida = foreach ($linea in $lineas) {
+        if (-not $encontrada -and $linea -match "^\s*$([regex]::Escape($Clave))\s*=") {
+            $encontrada = $true
+            "$Clave=$Valor"
+        } else {
+            $linea
+        }
+    }
+    if (-not $encontrada) {
+        Agregar-ClaveEnv -Ruta $Ruta -Clave $Clave -Valor $Valor -Comentario "$Clave — faltaba"
+        return $true
+    }
+    Escribir-TextoSinBom -Ruta $Ruta -Contenido (($salida -join "`r`n") + "`r`n")
+    return $true
+}
+
 # Añade una clave al final de un .env existente SIN tocar ninguna linea
 # previa. Se usa solo cuando falta una variable obligatoria.
 function Agregar-ClaveEnv {
@@ -483,7 +512,11 @@ function Nueva-ClaveLegible {
 
 # ---- Registro de procesos (.run) ---------------------------------------
 function Guardar-Proceso {
-    param([string]$Nombre, [int]$ProcesoId, [int]$Puerto, [string]$Patron)
+    # -Red deja constancia de si el proceso se lanzo escuchando en toda la red
+    # o solo en localhost. Sin ese dato, un arranque posterior no tiene forma
+    # de saber si el Vite que ya esta vivo sirve para el modo que el usuario
+    # tiene elegido ahora, y habria que adivinarlo.
+    param([string]$Nombre, [int]$ProcesoId, [int]$Puerto, [string]$Patron, [bool]$Red = $false)
     if (-not (Test-Path $script:CarpetaRun)) {
         New-Item -ItemType Directory -Path $script:CarpetaRun -Force | Out-Null
     }
@@ -492,6 +525,7 @@ function Guardar-Proceso {
         pid      = $ProcesoId
         puerto   = $Puerto
         patron   = $Patron
+        red      = $Red
         iniciado = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
     }
     $datos | ConvertTo-Json | Out-File -FilePath (Join-Path $script:CarpetaRun "$Nombre.json") -Encoding utf8
@@ -571,6 +605,7 @@ function Iniciar-Backend {
 }
 
 function Iniciar-Frontend {
+    param([switch]$EscucharEnRed)
     $salida  = Join-Path $script:CarpetaLogs 'frontend.log'
     $errores = Join-Path $script:CarpetaLogs 'frontend-errores.log'
     $vite = Join-Path $script:Raiz 'node_modules\vite\bin\vite.js'
@@ -582,6 +617,14 @@ function Iniciar-Frontend {
     # --strictPort es obligatorio: si Vite saltara solo al 5174, el backend
     # rechazaria las peticiones por CORS (CORS_ORIGIN apunta al 5173).
     $argumentos = @("`"$vite`"", 'preview', '--port', "$script:PuertoFrontend", '--strictPort')
+    # Sin --host, `vite preview` solo escucha en localhost y ningun otro
+    # dispositivo de la red puede conectarse, ni con el firewall abierto.
+    # Solo se anade cuando el usuario activo el acceso desde otros
+    # dispositivos: por defecto GamificApp sigue siendo invisible en la red.
+    #
+    # 0.0.0.0 incluye localhost, asi que el propio equipo servidor sigue
+    # entrando por http://localhost:5173 igual que siempre.
+    if ($EscucharEnRed) { $argumentos += @('--host', '0.0.0.0') }
     # Vite se invoca por su .js con el Node elegido (nunca por el lanzador
     # vite.cmd), y ademas se le deja ese Node al frente del PATH heredado.
     $pathPrevio = Anteponer-NodeAlPath
@@ -595,7 +638,7 @@ function Iniciar-Frontend {
     } finally {
         Restaurar-Path $pathPrevio
     }
-    Guardar-Proceso -Nombre 'frontend' -ProcesoId $proceso.Id -Puerto $script:PuertoFrontend -Patron 'vite.js'
+    Guardar-Proceso -Nombre 'frontend' -ProcesoId $proceso.Id -Puerto $script:PuertoFrontend -Patron 'vite.js' -Red ([bool]$EscucharEnRed)
     return $proceso
 }
 
@@ -670,4 +713,21 @@ $script:TablasDeMigraciones = 'auditoria,misiones,mision_estudiante,docente_curs
 function Abrir-Navegador {
     param([string]$Url)
     try { Start-Process $Url | Out-Null } catch { }
+}
+
+# ---- Preguntas al usuario ----------------------------------------------
+# Vive aqui, y no en instalar.ps1, porque la comparten dos puntos de entrada:
+# el instalador y "Configurar GamificApp.cmd". Duplicarla seria la forma mas
+# facil de que un dia acepten respuestas distintas.
+function Preguntar-SiNo {
+    param([string]$Pregunta)
+    # El predeterminado es SIEMPRE "No": nada opcional ocurre por inercia.
+    while ($true) {
+        $respuesta = Read-Host "   $Pregunta [s/N]"
+        if ([string]::IsNullOrWhiteSpace($respuesta)) { return $false }
+        $r = $respuesta.Trim().ToLower()
+        if ($r -eq 's' -or $r -eq 'si' -or $r -eq 'sí' -or $r -eq 'y') { return $true }
+        if ($r -eq 'n' -or $r -eq 'no') { return $false }
+        Write-Host '   Responde s o n.' -ForegroundColor Yellow
+    }
 }

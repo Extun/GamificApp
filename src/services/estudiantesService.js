@@ -1,7 +1,7 @@
 // Carga masiva de estudiantes por Excel (SPEC-014) — vía API.
 import { authFetch } from './authService';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { API_URL } from './apiBase';
 
 const pedir = async (ruta, options = {}) => {
     const res = await authFetch(`${API_URL}${ruta}`, {

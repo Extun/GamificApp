@@ -11,6 +11,7 @@
 // terminar (mensaje nativo del navegador, sin personalizar).
 // No hay autoguardado: confirmar la salida descarta el progreso local.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { marcarActividadEnCurso } from '../services/sesionBus';
 import '../components/juegos/resultadoActividad.css';
 
 function DialogoSalida({ onSeguir, onSalir }) {
@@ -89,12 +90,22 @@ export function useGuardiaActividad() {
     const marcar = useCallback((valor) => {
         enCursoRef.current = valor;
         setEnCurso(valor);
+        // El <GuardiaDeSesion/> vive fuera de los paneles y necesita saber si
+        // hay un niño en mitad de un intento para NO sacarlo de golpe al login
+        // cuando caduca la sesión (SPEC-024). Este hook ya es la fuente de
+        // verdad de «intento con progreso real sin terminar».
+        marcarActividadEnCurso(valor);
     }, []);
 
     const proteger = useCallback((accion) => (...args) => {
         if (enCursoRef.current) setPendiente(() => () => accion(...args));
         else accion(...args);
     }, []);
+
+    // Al desmontar el panel, el bus no puede quedarse creyendo que sigue
+    // habiendo una actividad abierta: bloquearía para siempre la vuelta al
+    // login del guardia de sesión.
+    useEffect(() => () => marcarActividadEnCurso(false), []);
 
     // Cierre/recarga de pestaña: solo con un intento realmente iniciado.
     useEffect(() => {

@@ -45,13 +45,14 @@ Si un documento contradice al código, **el código es la fuente de verdad** —
 
 ### Opción A (recomendada en Windows): instalación guiada
 
-Tres archivos en la raíz del repositorio, pensados para doble clic:
+Cuatro archivos en la raíz del repositorio, pensados para doble clic:
 
 | Archivo | Qué hace |
 |---|---|
 | `Instalar GamificApp.cmd` | Comprueba Node/npm/MySQL y los puertos, instala dependencias (`npm ci`), crea la base y carga el esquema, genera `server/.env` con credenciales aleatorias, construye el frontend, arranca todo y abre el navegador |
 | `Iniciar GamificApp.cmd` | Arranque diario. Si ya está en marcha, no duplica procesos |
 | `Detener GamificApp.cmd` | Cierra **solo** los procesos de GamificApp (por PID registrado, nunca `taskkill /IM node.exe`) |
+| `Configurar GamificApp.cmd` | Enciende y apaga las dos opciones del equipo: acceso desde otros dispositivos de la red y arranque automático. No instala nada ni toca la base de datos |
 
 Detalles importantes:
 
@@ -74,8 +75,32 @@ Detalles importantes:
 - **Es seguro repetirlo**: en la segunda ejecución conserva `server/.env` tal cual (no regenera `JWT_SECRET` ni `ADMIN_PASSWORD`) y no toca los datos.
 - Las credenciales generadas quedan en `CREDENCIALES.txt` (ignorado por Git). El `JWT_SECRET` no se muestra nunca.
 - Los **datos de demostración son opcionales**: pregunta explícitamente y el valor por defecto es *No*. Solo se permiten sobre la base local `gamificapp_dev`, usando `server/scripts/seedDev.js` con sus barreras intactas.
-- Registro de lo ocurrido en `logs/` (`instalador.log`, `iniciar.log`, `detener.log`, `backend.log`, `frontend.log`). Ningún log contiene credenciales.
-- El frontend se sirve con `vite preview --strictPort` en el 5173: **no puede saltar al 5174**, porque el backend solo acepta `CORS_ORIGIN=http://localhost:5173`.
+- Registro de lo ocurrido en `logs/` (`instalador.log`, `iniciar.log`, `detener.log`, `configurar.log`, `backend.log`, `frontend.log`). Ningún log contiene credenciales.
+- El frontend se sirve con `vite preview --strictPort` en el 5173: **no puede saltar al 5174**, porque el backend solo acepta el 5173 en `CORS_ORIGIN`.
+
+### Las dos opciones del equipo (`instalador/opciones.ps1`)
+
+El instalador las pregunta **una sola vez**, en la primera instalación, y el valor por defecto de las dos es **No** — misma norma que los datos de demostración: nada opcional ocurre por inercia. Después se cambian en `Configurar GamificApp.cmd`, sin reinstalar. La preferencia de red vive en `%LOCALAPPDATA%\GamificApp\preferencias.json` (junto a `instancia.json`, así que sobrevive a reinstalar y a mover la carpeta); del arranque automático **la fuente de verdad es la propia tarea de Windows**, no un archivo, para que borrarla desde el Programador de tareas no deje a GamificApp mintiendo.
+
+**1 · Acceso desde otros dispositivos de la red.** Este equipo hace de servidor y el resto entra por navegador, sin instalar nada. Implica tres cosas a la vez, y las tres hacen falta:
+
+| Pieza | Qué hace | Dónde |
+|---|---|---|
+| `vite preview --host 0.0.0.0` | Sin `--host`, Vite **solo escucha en localhost** y ningún otro dispositivo conecta, ni con el firewall abierto | `Iniciar-Frontend` en `instalador/comun.ps1` |
+| `CORS_ORIGIN` con la IP de hoy | Se revisa **en cada arranque**: si el DHCP repartió otra dirección se reescribe y **se reinicia el backend**, que lee esa variable una sola vez | `Sincronizar-CorsOrigin` |
+| Regla de firewall | Puertos 3001 y 5173, perfiles **Private y Domain, nunca Public**. Es lo único que pide permisos de administrador; si no los hay se imprime el comando exacto | `Asegurar-ReglaFirewall` |
+
+**La IP del servidor no se fija ni se hornea.** `src/services/apiBase.js` deduce la dirección de la API del origen desde el que se abrió la página, así que el **mismo `dist` funciona con cualquier IP** y el router puede repartir la que quiera. Por eso una reserva DHCP es cómoda pero **no es requisito**. La dirección del día se imprime al final de `Iniciar GamificApp.cmd`, la muestra `Configurar GamificApp.cmd` y queda anotada en `CREDENCIALES.txt`.
+
+*Un `CORS_ORIGIN` escrito a mano no se pisa*: `Test-CorsGestionable` solo reconoce como suyos `http://localhost:5173` y una `IPv4:5173`; cualquier otra cosa se respeta y se avisa.
+
+*Cuidado con el `.env` de la raíz*: es el único sitio que puede volver a romper esto, porque `VITE_API_URL` queda **horneada en `dist/`** al construir. Al activar la red local, `Revisar-EnvFrontend` comenta esa línea **solo si apunta a localhost**; si apunta a un servidor real (un despliegue en Render, por ejemplo) no la toca y avisa. En el paquete que se distribuye ese archivo **ni siquiera viaja**, así que esto solo afecta a quien instala desde una copia del repositorio.
+
+*Límite que se dice en pantalla, no se esconde:* el tráfico va en **HTTP sin cifrar**. Vale para la red de un aula; no para una red pública.
+
+**2 · Arranque automático.** Tarea programada **al iniciar sesión de este usuario**, con 30 s de retraso para que la red esté lista. Dos razones que no son de estilo para no usar una tarea «al iniciar el sistema»: registrarla no pediría permisos de administrador pero **correría como SYSTEM**, y entonces `%LOCALAPPDATA%` sería otra carpeta — MySQL arrancaría contra un datadir vacío y parecería que se perdió el trabajo de la escuela. La tarea invoca `iniciar.ps1 -SinNavegador`, **nunca el `.cmd`**: ese termina en `pause` y una tarea esperando una tecla se cuelga para siempre.
+
+Ojo: «al iniciar sesión» **no** es «al encender». Para que baste con pulsar el botón hay que activar además el inicio de sesión automático de Windows, que deja el equipo desbloqueado — es decisión del usuario y GamificApp no lo toca.
 
 ### Copias de seguridad, reinstalar y mover GamificApp
 
@@ -107,7 +132,7 @@ Con `-Zip` se obtiene además un `.zip` de **~244 MB** (desde 750,8 MB sin compr
 | `node_modules` + `server\node_modules` | ~252 MB | Para que **la instalación no necesite internet** |
 | `runtime\node` | ~95 MB | Node v22.23.1 portable |
 | `dist`, `src`, `public`, `server`, `database`, `instalador` | ~5 MB | La aplicación y sus scripts |
-| Los 3 `.cmd`, `LEEME.txt`, `INVENTARIO.txt`, `PAQUETE.json` | — | Punto de entrada y documentación para quien lo recibe |
+| Los 4 `.cmd`, `LEEME.txt`, `INVENTARIO.txt`, `PAQUETE.json` | — | Punto de entrada y documentación para quien lo recibe |
 
 **Qué se genera al instalar, en el equipo de destino**: `server/.env` (credenciales aleatorias e irrepetibles), `CREDENCIALES.txt`, `logs/`, `.run/` y `dist/` reconstruido.
 
@@ -177,7 +202,9 @@ npm install
 npm run dev     # vite, sirve en http://localhost:5173
 ```
 
-El frontend usa `VITE_API_URL` (ver `.env.example` en la raíz) para saber dónde está el backend. El `.env` de la raíz es **opcional en local**: sin él, todos los servicios de `src/services/` caen al valor por defecto `http://localhost:3001`.
+El frontend usa `VITE_API_URL` (ver `.env.example` en la raíz) para saber dónde está el backend. El `.env` de la raíz es **opcional en local**: sin él, `src/services/apiBase.js` **deduce la dirección del origen desde el que se abrió la página** (mismo host, puerto 3001), así que en `localhost` sale `http://localhost:3001` exactamente igual que antes.
+
+Ese módulo es el **único sitio** donde se resuelve la dirección de la API — antes esa línea estaba copiada en 18 archivos. Regla de precedencia: `VITE_API_URL` definida **manda siempre** (es lo que usa producción, Vercel → Render); solo cuando no lo está entra la deducción. Y ojo: lo que diga ese archivo queda **horneado dentro de `dist/`** al construir, no se lee en tiempo de ejecución. Por eso un `VITE_API_URL=http://localhost:3001` fijo impide que la instalación offline sirva a otros dispositivos de la red, y el instalador lo comenta al activar esa opción (ver *Las dos opciones del equipo*, más arriba).
 
 ### Comandos útiles
 

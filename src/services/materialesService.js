@@ -3,7 +3,7 @@
 // SIEMPRE refrescan consultando el GET: nada de listas solo-locales.
 import { authFetch } from './authService';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { API_URL } from './apiBase';
 
 // La API usa snake_case; el frontend (FileChip, modales) usa camelCase.
 const aArchivoUI = (fila) => ({

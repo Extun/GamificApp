@@ -21,7 +21,7 @@
 # QUÉ VIAJA, QUÉ SE GENERA Y QUÉ NO SALE DE AQUÍ
 # ------------------------------------------------------------
 #   VIAJA EN EL PAQUETE
-#     · los 3 .cmd de doble clic e instalador\
+#     · los 4 .cmd de doble clic e instalador\
 #     · runtime\node  (Node v22.23.1 portable) y runtime\mysql (MySQL 8.0.44
 #       portable, podado — ver $PodaMySql)
 #     · código fuente del frontend (src, public, index.html, vite.config.js)
@@ -99,6 +99,7 @@ $ArchivosDelPaquete = @(
     'Instalar GamificApp.cmd',
     'Iniciar GamificApp.cmd',
     'Detener GamificApp.cmd',
+    'Configurar GamificApp.cmd',
     'index.html',
     'vite.config.js',
     'package.json',
@@ -148,8 +149,8 @@ $PodaMySql = @{
 # AUDITORÍA — artefactos que NO pueden aparecer en el paquete
 # ------------------------------------------------------------
 $NombresProhibidos = @(
-    '.env', 'CREDENCIALES.txt', 'root.txt', 'instancia.json', 'my.ini',
-    'mysqld.pid', 'backend.json', 'frontend.json', 'env-anterior-docker.bak'
+    '.env', 'CREDENCIALES.txt', 'root.txt', 'instancia.json', 'preferencias.json',
+    'my.ini', 'mysqld.pid', 'backend.json', 'frontend.json', 'env-anterior-docker.bak'
 )
 $PatronesProhibidos = @('*.pid', '*.log')
 
@@ -449,21 +450,62 @@ PASOS
      Tarda unos minutos la primera vez. Es normal que Windows pregunte si
      permites la ejecución.
 
-     Solo te hará una pregunta:
+     Te hará tres preguntas. En las tres, pulsar Enter significa "no":
+     nada opcional ocurre sin que tú lo pidas.
 
          ¿Deseas cargar datos de demostración?  [s/N]
 
      Responde  s  y GamificApp creará un docente, cuatro estudiantes y una
      actividad de cada juego para que puedas probarla enseguida. Son datos
      FICTICIOS: no pertenecen a ninguna escuela real. Responde  n  (o pulsa
-     Enter) para empezar con la aplicación vacía. Solo se pregunta la primera
-     vez, y en ningún caso se escribe encima de datos que ya existan.
+     Enter) para empezar con la aplicación vacía. En ningún caso se escribe
+     encima de datos que ya existan.
+
+         ¿Permitir el acceso desde otros dispositivos de la red?  [s/N]
+
+     Responde  s  si quieres que este equipo haga de servidor y que las
+     tablets, teléfonos y portátiles conectados a la MISMA red puedan usar
+     GamificApp desde su navegador, sin instalar nada. Este equipo tendrá que
+     quedarse encendido mientras se use. Ver más abajo.
+
+         ¿Iniciar GamificApp automáticamente?  [s/N]
+
+     Responde  s  y GamificApp se abrirá sola cada vez que inicies sesión en
+     Windows en este equipo.
+
+     Las tres preguntas solo salen en la primera instalación. Las dos últimas
+     se pueden cambiar cuando quieras con  Configurar GamificApp.cmd
 
   3. Al terminar, GamificApp se abre sola en el navegador.
      Si no se abriera, entra tú a:   http://localhost:5173
 
   4. Los días siguientes, para usarla:   Iniciar GamificApp.cmd
      Para cerrarla:                      Detener GamificApp.cmd
+     Para cambiar opciones:              Configurar GamificApp.cmd
+
+
+USARLA DESDE OTROS DISPOSITIVOS (TABLETS, TELÉFONOS, PORTÁTILES)
+---------------------------------------------------------------
+Si activaste esa opción, este equipo hace de servidor y los demás entran por
+su navegador. No hay que instalar nada en ellos.
+
+  · La dirección aparece SIEMPRE al final de "Iniciar GamificApp.cmd", con
+    este aspecto:   http://192.168.1.50:5173
+    También la muestra "Configurar GamificApp.cmd" en cualquier momento.
+
+  · Esa dirección puede cambiar de un día para otro: el router la reparte y
+    no siempre da la misma. GamificApp se adapta sola, no hay que reinstalar
+    ni reconstruir nada. Por eso conviene mirarla en pantalla en vez de
+    apuntarla en un papel.
+
+  · Este equipo debe estar encendido y sin suspenderse mientras se use.
+
+  · Windows preguntará una vez si permites el acceso a la red. Si no lo
+    permitiste, "Configurar GamificApp.cmd" te dirá exactamente qué hacer.
+
+  · Solo funciona dentro de la red local (el wifi o el cable de la escuela).
+    No expone GamificApp a internet, y la conexión va sin cifrar: no actives
+    esto en una red pública.
 
 
 CÓMO ENTRAR
@@ -502,6 +544,7 @@ CONTENIDO DE ESTA CARPETA
   Instalar GamificApp.cmd     empieza por aquí
   Iniciar GamificApp.cmd      uso diario
   Detener GamificApp.cmd      cerrar la aplicación
+  Configurar GamificApp.cmd   red local y arranque automático
   instalador\                 los pasos de la instalación
   runtime\node\               Node.js $versionNode (no se instala en Windows)
   runtime\mysql\              MySQL $versionMySql (no se instala en Windows)

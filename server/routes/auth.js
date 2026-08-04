@@ -513,6 +513,33 @@ router.post('/activar', async (req, res, next) => {
     }
 });
 
+// ---- POST /api/auth/renovar (SPEC-024) ----
+//
+// Renovación deslizante: mientras la aplicación se está usando de verdad, el
+// cliente pide un token nuevo poco antes de que caduque el suyo. Sin esto, un
+// docente que entra a las 7:00 se queda sin sesión a las 15:00 en mitad de una
+// clase, y un niño puede perder el intento que estaba jugando.
+//
+// No abre ningún agujero, por dos razones que conviene dejar escritas:
+//   · `autenticar` exige un token que TODAVÍA verifique — uno caducado no pasa
+//     de `jwt.verify`. Esto renueva sesiones vivas, no resucita muertas.
+//   · `autenticar` ya revalida la cuenta contra la BD (SPEC-019): quien esté
+//     desactivado o en la Papelera recibe 401 antes de llegar aquí, así que
+//     renovar NO devuelve el acceso a nadie revocado.
+//
+// Se responde con el usuario completo y no solo con el token: el rol y los
+// permisos se releen de la BD, así que un cambio de permisos (SPEC-003) deja
+// de esperar a un login nuevo para reflejarse en la interfaz.
+router.post('/renovar', autenticar, async (req, res, next) => {
+    try {
+        const [[usuario]] = await pool.query('SELECT * FROM usuarios WHERE id = ?', [req.user.id]);
+        if (!usuario) return res.status(401).json({ error: 'Tu cuenta ya no tiene acceso. Vuelve a iniciar sesión.' });
+        return respuestaSesion(res, usuario);
+    } catch (err) {
+        next(err);
+    }
+});
+
 // ---- PUT /api/auth/cambiar-pin (estudiante autenticado) ----
 router.put('/cambiar-pin', autenticar, async (req, res, next) => {
     try {

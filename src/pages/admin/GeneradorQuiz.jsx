@@ -13,7 +13,7 @@ import { idPorNombre } from '../../services/materiasService';
 import { toast } from '../../components/dashboard/toastBus';
 import bancoService from '../../services/bancoService';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { API_URL } from '../../services/apiBase';
 
 // Copia profunda simple (los estados de los editores son JSON puro).
 const clon = (v) => JSON.parse(JSON.stringify(v));
