@@ -9,10 +9,22 @@ import { toast } from '../../components/dashboard/toastBus';
 import { getInstitucionCache, obtenerInstitucion, NOMBRE_INSTITUCION_DEFECTO } from '../../services/institucionService';
 
 // ¿Esta copia ES ya la instalación local? El paquete offline se sirve desde
-// localhost, así que ahí sobra el enlace de descarga: quien lo ve ya la tiene
-// instalada, y seguirlo exigiría justo lo que no tiene, internet.
+// localhost en el equipo que hace de servidor, y desde su IP privada en el
+// resto del aula cuando se activa el acceso por red (instalador/opciones.ps1).
+// En los DOS casos sobra el enlace de descarga: quien lo ve ya la tiene
+// delante, y seguirlo exigiría justo lo que no tiene, internet.
+//
+// Los rangos son los de la RFC 1918, los mismos que reconoce Test-IPPrivada en
+// el instalador. Un despliegue de verdad (Vercel) tiene nombre de dominio y no
+// entra por aquí, así que ahí el enlace se sigue ofreciendo.
+const esHostDeInstalacionLocal = (host) =>
+    ['localhost', '127.0.0.1', '[::1]', '::1'].includes(host)
+    || /^10\./.test(host)
+    || /^192\.168\./.test(host)
+    || /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+
 const ES_INSTALACION_LOCAL = typeof window !== 'undefined'
-    && ['localhost', '127.0.0.1', '[::1]', '::1'].includes(window.location.hostname);
+    && esHostDeInstalacionLocal(window.location.hostname);
 
 // El rol NUNCA se elige aquí: lo determina el servidor según la cuenta y
 // viaja firmado dentro del JWT. Las pestañas solo cambian el formulario:

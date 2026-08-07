@@ -130,6 +130,32 @@ export function RegistroEstudiante() {
 
     // --- Conservar las credenciales (SPEC-021 P1-2, parte de bajo riesgo) ---
     const [copiado, setCopiado] = useState(false);
+
+    // navigator.clipboard NO existe fuera de un contexto seguro, y la
+    // instalación offline se sirve por http://<IP-del-aula>: en cualquier
+    // tablet que no sea el propio equipo servidor la API moderna es undefined y
+    // este botón no funcionaría jamás. execCommand está obsoleto, pero es
+    // exactamente el que sigue vivo ahí, así que se intenta antes de rendirse.
+    // Se llama desde un manejador de clic, que es lo que exige el navegador.
+    const copiarTexto = async (texto) => {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(texto);
+            return;
+        }
+        const area = document.createElement('textarea');
+        area.value = texto;
+        area.setAttribute('readonly', '');   // sin teclado emergente en tablet
+        area.style.position = 'fixed';
+        area.style.top = '-1000px';          // fuera de la vista, pero en el DOM
+        document.body.appendChild(area);
+        try {
+            area.select();
+            if (!document.execCommand('copy')) throw new Error('El navegador no permitio copiar.');
+        } finally {
+            document.body.removeChild(area);
+        }
+    };
+
     const copiarCredenciales = async () => {
         if (!credenciales) return;
         const lineas = [
@@ -139,7 +165,7 @@ export function RegistroEstudiante() {
             credenciales.codigo_emergencia ? `Código de emergencia: ${credenciales.codigo_emergencia}` : null
         ].filter(Boolean).join('\n');
         try {
-            await navigator.clipboard.writeText(lineas);
+            await copiarTexto(lineas);
             setCopiado(true);
             setTimeout(() => setCopiado(false), 3000);
         } catch {

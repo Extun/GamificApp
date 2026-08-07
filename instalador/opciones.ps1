@@ -134,9 +134,12 @@ function Obtener-IPLocal {
 # no se pudo averiguar la IP, se cae a localhost: nunca se anuncia una
 # direccion que no vaya a funcionar.
 function Obtener-UrlDeAcceso {
-    param([string]$Ip = $null)
+    param([string]$Ip = '')
     if (-not (Test-RedLocalActiva)) { return $script:UrlFrontend }
-    if ($null -eq $Ip) { $Ip = Obtener-IPLocal }
+    # Ojo: un parametro [string] con valor por defecto $null llega como cadena
+    # VACIA, nunca como $null. Comprobarlo con -eq $null hacia que llamar a esta
+    # funcion sin -Ip devolviera siempre localhost en vez de averiguar la IP.
+    if (-not $Ip) { $Ip = Obtener-IPLocal }
     if (-not $Ip) { return $script:UrlFrontend }
     return "http://${Ip}:$($script:PuertoFrontend)"
 }
