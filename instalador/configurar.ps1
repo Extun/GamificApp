@@ -88,6 +88,7 @@ function Alternar-RedLocal {
         }
         $resultado = Aplicar-RedLocal -Activar $false
         Mostrar-ResultadoRedLocal -Resultado $resultado
+        Mostrar-ResultadoCredenciales -Resultado (Actualizar-CredencialesConRed)
 
         # La regla de firewall se quita aparte: es lo unico que necesita
         # permisos de administrador, y dejarla puesta seria dejar dos puertos
@@ -124,8 +125,9 @@ function Alternar-RedLocal {
         return $false
     }
 
-    $resultado = Aplicar-RedLocal -Activar $true
+    $resultado = Aplicar-RedLocal -Activar $true -PedirPermisos
     Mostrar-ResultadoRedLocal -Resultado $resultado
+    Mostrar-ResultadoCredenciales -Resultado (Actualizar-CredencialesConRed -Ip $resultado.Ip)
 
     # El .env de la raiz hornea la direccion de la API dentro de dist\, asi
     # que manda sobre todo lo anterior. Si estorba, hay que reconstruir.

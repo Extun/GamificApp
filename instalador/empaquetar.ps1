@@ -152,7 +152,10 @@ $NombresProhibidos = @(
     '.env', 'CREDENCIALES.txt', 'root.txt', 'instancia.json', 'preferencias.json',
     'my.ini', 'mysqld.pid', 'backend.json', 'frontend.json', 'env-anterior-docker.bak'
 )
-$PatronesProhibidos = @('*.pid', '*.log')
+# CREDENCIALES.txt.nuevo es el temporal del reemplazo atomico de ese archivo:
+# lleva los mismos secretos y un corte de luz en el peor instante lo deja en
+# disco. Que la auditoria lo pare aunque nadie lo haya limpiado.
+$PatronesProhibidos = @('*.pid', '*.log', 'CREDENCIALES.txt.*')
 
 # ------------------------------------------------------------
 # Utilidades
@@ -191,6 +194,15 @@ function Copiar-Arbol {
         [string[]]$ExcluirCarpetas = @(),
         [string[]]$ExcluirArchivos = @()
     )
+    # /MT:8 y no mas. Se intento subirlo a 16 y a 32 para acelerar y NO se pudo
+    # demostrar ninguna mejora: copiando node_modules (54.549 archivos) las
+    # medidas salieron 28,6 s con 8 hilos, 25,8 s con 16, 16,9 s con 32... y
+    # 16,9 s otra vez con 8. Lo que se estaba midiendo era la cache del sistema
+    # de archivos calentandose, no los hilos.
+    #
+    # Y aunque ayudase, apenas importaria: el copiado entero son ~42 s de los
+    # ~507 s del empaquetado. El 92% del tiempo es comprimir el ZIP. Si alguien
+    # vuelve por aqui buscando velocidad, el sitio no es este.
     $argumentos = @($Origen, $Destino, '/E', '/NFL', '/NDL', '/NJH', '/NJS', '/NP', '/R:1', '/W:1', '/MT:8')
     if ($ExcluirCarpetas.Count -gt 0) { $argumentos += '/XD'; $argumentos += $ExcluirCarpetas }
     if ($ExcluirArchivos.Count -gt 0) { $argumentos += '/XF'; $argumentos += $ExcluirArchivos }

@@ -19,7 +19,11 @@ server/backups/
 # Instalador local para Windows: estado de ejecución y credenciales generadas
 # en cada equipo. Los logs ya están cubiertos por la regla `logs` de arriba.
 .run/
-CREDENCIALES.txt
+# El comodin cubre tambien CREDENCIALES.txt.nuevo, el temporal con el que se
+# reemplaza el archivo de un solo movimiento al cambiar la direccion de red.
+# Si el equipo se apagara justo entre escribirlo y moverlo, ese temporal se
+# queda en disco con la contraseña del administrador dentro.
+CREDENCIALES.txt*
 
 # Runtimes portables (Node, y más adelante MySQL). Son binarios de cientos de
 # MB que se descargan verificados o se incluyen en la distribución: NUNCA

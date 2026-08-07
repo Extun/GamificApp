@@ -131,6 +131,21 @@ if ($modoRed) {
     }
 }
 
+# CREDENCIALES.txt es el papel al que vuelve el docente, asi que tiene que
+# llevar la direccion de HOY y no la del dia que se instalo. Va fuera del
+# if de arriba a proposito: con la red apagada esto RETIRA el bloque, para que
+# nadie dicte una direccion que ya no atiende a nadie.
+$credenciales = Actualizar-CredencialesConRed -Ip $ipLocal
+switch -Wildcard ($credenciales) {
+    'actualizado' { Escribir-Detalle 'CREDENCIALES.txt actualizado con la direccion de hoy.' }
+    'retirado'    { Escribir-Detalle 'CREDENCIALES.txt ya no anuncia una direccion de red.' }
+    'bloqueado'   {
+        Escribir-Aviso 'CREDENCIALES.txt esta abierto en otro programa: no se pudo poner al dia.'
+        Escribir-Detalle 'Cierralo y vuelve a iniciar. La direccion correcta es la que sale aqui abajo.'
+    }
+    'error*'      { Escribir-Aviso "No se pudo actualizar CREDENCIALES.txt. $credenciales" }
+}
+
 # ------------------------------------------------------------
 # 3. Servidor (backend)
 # ------------------------------------------------------------
@@ -287,18 +302,37 @@ if ($estadoFrontend.Vivo -and $estadoFrontend.Responde) {
 # que se imprime es lo correcto, sin reconstruir nada ni tocar la
 # configuracion del router.
 $urlAcceso = Obtener-UrlDeAcceso -Ip $ipLocal
-if (-not $SinNavegador) { Abrir-Navegador -Url $script:UrlFrontend }
+if (-not $SinNavegador) {
+    # Se abre la del aula para tenerla delante en la barra de direcciones.
+    # Elegir-UrlParaNavegador la prueba primero: si no responde (VPN, adaptador
+    # virtual, router que aun no ha dado IP) se abre localhost y se dice.
+    $urlNavegador = Elegir-UrlParaNavegador -UrlDeRed $urlAcceso
+    if ($urlAcceso -ne $script:UrlFrontend -and $urlNavegador -eq $script:UrlFrontend) {
+        Escribir-Aviso "La direccion de red no respondio: se abre $($script:UrlFrontend)."
+    }
+    Abrir-Navegador -Url $urlNavegador
+}
 
 Write-Host ''
 Write-Host "  ============================================================" -ForegroundColor Green
 Write-Host "   GAMIFICAPP ESTA EN MARCHA" -ForegroundColor Green
 Write-Host "  ============================================================" -ForegroundColor Green
-Write-Host "   En este equipo:  $($script:UrlFrontend)" -ForegroundColor White
 if ($modoRed -and $ipLocal) {
-    Write-Host ''
-    Write-Host "   Desde tablets, telefonos u otros equipos de la misma red:" -ForegroundColor White
+    # Primero la del aula: es la unica que sirve fuera de este equipo.
+    Write-Host "   Para tablets, telefonos y otros equipos:" -ForegroundColor White
     Write-Host "       $urlAcceso" -ForegroundColor Cyan
-    Write-Host "   (esa direccion puede cambiar; siempre es la que aparece aqui)" -ForegroundColor DarkGray
+    Write-Host "   (puede cambiar de un dia a otro; siempre es la que sale aqui)" -ForegroundColor DarkGray
+    Write-Host ''
+    Write-Host "   Solo en ESTE equipo:  $($script:UrlFrontend)" -ForegroundColor White
+    Write-Host "   (no la compartas: en otro aparato, localhost es ese aparato)" -ForegroundColor DarkGray
+    if (-not (Test-ReglaFirewall)) {
+        Write-Host ''
+        Write-Host "   FALTA abrir el firewall: hasta entonces los demas dispositivos" -ForegroundColor Yellow
+        Write-Host "   NO entraran, ni con la direccion correcta." -ForegroundColor Yellow
+        Write-Host '   Ejecuta "Configurar GamificApp.cmd" y te da el comando exacto.' -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "   En este equipo:  $($script:UrlFrontend)" -ForegroundColor White
 }
 Write-Host ''
 Write-Host "   Tus credenciales estan en CREDENCIALES.txt" -ForegroundColor White

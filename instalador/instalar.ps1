@@ -535,7 +535,7 @@ if ($primeraVez) {
 }
 
 Escribir-Paso 'Aplicando las opciones del equipo'
-$resultadoRed = Aplicar-RedLocal -Activar $quiereRed
+$resultadoRed = Aplicar-RedLocal -Activar $quiereRed -PedirPermisos
 Mostrar-ResultadoRedLocal -Resultado $resultadoRed
 Guardar-Preferencias -Preguntado $true
 
@@ -783,22 +783,9 @@ Base de datos MySQL
   Usuario  : $usuarioFinal
   Clave    : $claveFinal
 "@
-if ($quiereRed -and $resultadoRed.Ip) {
-    $textoCredenciales += @"
-
-Desde otros dispositivos de la misma red
-  Dirección : $urlAcceso
-
-  Esa dirección es la que tenía este equipo al instalar. Si el router le
-  asigna otra más adelante, GamificApp se adapta sola: la dirección correcta
-  aparece SIEMPRE al final de "Iniciar GamificApp.cmd" y en
-  "Configurar GamificApp.cmd". No hace falta reinstalar ni reconstruir nada.
-
-  Este equipo debe estar encendido para que los demás puedan entrar.
-"@
-}
 if ($usaPortable) {
     $textoCredenciales += @"
+
 
 Dónde se guardan tus datos
   $($script:MySqlDatadir)
@@ -825,6 +812,12 @@ Este archivo está ignorado por Git. No lo subas ni lo compartas.
 [System.IO.File]::WriteAllText($rutaCredenciales, $textoCredenciales, (New-Object System.Text.UTF8Encoding($true)))
 Escribir-Ok 'Credenciales guardadas en CREDENCIALES.txt (en la carpeta del proyecto).'
 
+# Todo lo que depende de la direccion de red lo pone una sola funcion, la misma
+# que usan "Configurar GamificApp.cmd" y cada arranque. Aqui no se duplica ni
+# una linea: si el router cambia la IP mañana, ese archivo se corrige solo y
+# siempre de la misma manera.
+Mostrar-ResultadoCredenciales -Resultado (Actualizar-CredencialesConRed -Ip $resultadoRed.Ip)
+
 # ------------------------------------------------------------
 # 13-bis. Arranque automatico
 # ------------------------------------------------------------
@@ -848,17 +841,36 @@ if ($quiereArranque) {
 # ------------------------------------------------------------
 # 14. Abrir el navegador y resumen
 # ------------------------------------------------------------
-Abrir-Navegador -Url $script:UrlFrontend
+# Se abre la direccion del aula, no localhost: asi queda a la vista en la barra
+# del navegador para poder dictarla. Elegir-UrlParaNavegador la comprueba antes
+# y se cae a localhost si no responde.
+$urlNavegador = Elegir-UrlParaNavegador -UrlDeRed $urlAcceso
+if ($urlAcceso -ne $script:UrlFrontend -and $urlNavegador -eq $script:UrlFrontend) {
+    Escribir-Aviso "La direccion de red no respondio todavia: se abre $($script:UrlFrontend)."
+    Escribir-Detalle 'Revisa la conexion; la direccion del aula se recalcula en cada arranque.'
+}
+Abrir-Navegador -Url $urlNavegador
 
 Write-Host ''
 Write-Host "  ============================================================" -ForegroundColor Green
 Write-Host "   GAMIFICAPP ESTA LISTA" -ForegroundColor Green
 Write-Host "  ============================================================" -ForegroundColor Green
-Write-Host "   Abrela en:  $($script:UrlFrontend)" -ForegroundColor White
 if ($quiereRed -and $resultadoRed.Ip) {
-    Write-Host ''
-    Write-Host "   Desde tablets u otros equipos de la misma red:" -ForegroundColor White
+    # La del aula PRIMERO. localhost debajo y etiquetado: es incompartible, y
+    # ofrecerla como si no lo fuera manda al docente a probar en otro equipo
+    # una direccion que no puede funcionar ahi.
+    Write-Host "   Para tablets, telefonos y otros equipos:" -ForegroundColor White
     Write-Host "       $urlAcceso" -ForegroundColor Cyan
+    Write-Host ''
+    Write-Host "   Solo en ESTE equipo:  $($script:UrlFrontend)" -ForegroundColor White
+    Write-Host "   (no la compartas: en otro aparato, localhost es ese aparato)" -ForegroundColor DarkGray
+    if (-not (Test-ReglaFirewall)) {
+        Write-Host ''
+        Write-Host "   FALTA abrir el firewall: hasta que lo hagas, los demas" -ForegroundColor Yellow
+        Write-Host "   dispositivos NO podran entrar. Ver arriba el comando exacto." -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "   Abrela en:  $($script:UrlFrontend)" -ForegroundColor White
 }
 Write-Host ''
 Write-Host "   Entra como administrador con:" -ForegroundColor White

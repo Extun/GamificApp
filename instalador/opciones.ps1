@@ -1,4 +1,4 @@
-# ============================================================
+﻿# ============================================================
 # GamificApp — Las dos opciones que el usuario puede activar y desactivar
 # cuando quiera:
 #
@@ -186,6 +186,243 @@ function Sincronizar-CorsOrigin {
     return 'actualizado'
 }
 
+# ---- CREDENCIALES.txt: la direccion que se dicta en el aula -------------
+# CREDENCIALES.txt lo genera instalar.ps1 con datos que solo el conoce —la
+# contraseña del administrador y las de MySQL—, asi que desde aqui NO se puede
+# regenerar. Pero la direccion de red tampoco es un dato de la instalacion:
+# cambia el dia que el router reparte otra IP. Por eso ese bloque, y SOLO ese,
+# se reescribe aparte, y lo hacen los tres sitios que conocen la IP de hoy: el
+# instalador, "Configurar GamificApp.cmd" y cada arranque.
+$script:TituloRedCredenciales = 'Desde otros dispositivos de la misma red'
+
+# ¿El fallo es "alguien tiene el archivo abierto" o un error de verdad? Hay que
+# recorrer la cadena de excepciones: al llamar a un metodo de .NET, PowerShell
+# envuelve la original dentro de una MethodInvocationException y comprobar solo
+# la de fuera no encuentra nunca la IOException.
+function Test-ErrorDeArchivoOcupado {
+    param($Registro)
+    $e = $Registro.Exception
+    while ($e) {
+        if ($e -is [System.IO.IOException] -or $e -is [System.UnauthorizedAccessException]) { return $true }
+        $e = $e.InnerException
+    }
+    return $false
+}
+
+function Obtener-BloqueRedCredenciales {
+    param([string]$Url)
+    return @"
+$script:TituloRedCredenciales
+  Dirección : $Url
+
+  Dicta esa dirección en las tablets. Si el router le asigna otra más adelante,
+  GamificApp se adapta sola: la correcta aparece SIEMPRE al final de
+  "Iniciar GamificApp.cmd" y en "Configurar GamificApp.cmd".
+
+  Este equipo debe estar encendido para que los demás puedan entrar.
+
+  Si se cae el wifi, en ESTE equipo GamificApp sigue funcionando en
+  $($script:UrlFrontend). Esa dirección no depende de la red y nunca cambia:
+  es la de emergencia si la de arriba deja de responder.
+"@
+}
+
+# ---- La cabecera "Cómo abrir la aplicación" -----------------------------
+# Se mantiene desde aqui por un motivo que costo una tarde de pruebas: decia
+# "Página web: http://localhost:5173" y esa direccion es INCOMPARTIBLE.
+# localhost no significa "el equipo servidor", significa "el equipo en el que
+# estas mirando". Copiarla a un portatil o a un movil no falla por culpa de
+# GamificApp: falla porque ese aparato se busca a si mismo.
+#
+# Con la red encendida, la direccion del aula va PRIMERA y localhost queda
+# etiquetado como lo que es.
+$script:TituloComoAbrirCredenciales = 'Cómo abrir la aplicación'
+
+#
+# Las dos variantes terminan en una linea en blanco a proposito: la que separa
+# esta seccion de la siguiente forma parte del cuerpo, y si no se repone el
+# archivo sale con las secciones pegadas.
+function Obtener-CuerpoComoAbrir {
+    param([string]$Url)
+    if (-not $Url) {
+        return @(
+            "  Página web : $($script:UrlFrontend)",
+            "  Servidor   : $($script:UrlBackend)",
+            ''
+        )
+    }
+    return @(
+        "  Desde tablets y otros equipos : $Url",
+        "  Solo en ESTE equipo           : $($script:UrlFrontend)",
+        "  Servidor (uso interno)        : $($script:UrlBackend)",
+        '',
+        '  No compartas la dirección de "localhost": en cualquier otro aparato',
+        '  significa ese mismo aparato, así que no encontrará nada. La primera',
+        '  es la única que sirve para el aula.',
+        ''
+    )
+}
+
+# Cambia el cuerpo de una seccion dejando el resto del archivo igual. El cuerpo
+# son las lineas que siguen al titulo hasta la primera que vuelve a empezar en
+# la columna 0 (la seccion siguiente o la raya final).
+function Reemplazar-CuerpoDeSeccion {
+    param([string[]]$Lineas, [string]$Titulo, [string[]]$Cuerpo)
+    $salida = New-Object System.Collections.Generic.List[string]
+    $dentro = $false
+    foreach ($linea in $Lineas) {
+        if ($dentro) {
+            if ($linea -match '^\S') { $dentro = $false } else { continue }
+        }
+        $salida.Add($linea)
+        if ($linea.TrimEnd() -eq $Titulo) {
+            $dentro = $true
+            $salida.AddRange([string[]]$Cuerpo)
+        }
+    }
+    return $salida.ToArray()
+}
+
+# Reescribe SOLO el bloque de red dentro de CREDENCIALES.txt y deja intacto
+# todo lo demas. No es una precaucion teorica: ese archivo es el unico sitio
+# donde vive en claro la contraseña del administrador, asi que se trabaja en
+# una copia, se comprueba que el resultado sigue teniendo sus secciones y solo
+# entonces se reemplaza de un movimiento. Si algo falla, el original no se ha
+# tocado.
+#
+# Con la red apagada (o sin IP) el bloque se RETIRA: mas vale ninguna direccion
+# que una que ya no funciona.
+#
+# Devuelve: 'sin-archivo' | 'sin-cambios' | 'actualizado' | 'retirado' |
+#           'bloqueado' | 'error: <detalle>'
+function Actualizar-CredencialesConRed {
+    param([string]$Ip = '')
+
+    $ruta = Join-Path $script:Raiz 'CREDENCIALES.txt'
+    if (-not (Test-Path $ruta)) { return 'sin-archivo' }
+
+    $activa = Test-RedLocalActiva
+    if ($activa -and -not $Ip) { $Ip = Obtener-IPLocal }
+    $url = ''
+    if ($activa -and $Ip) { $url = "http://${Ip}:$($script:PuertoFrontend)" }
+
+    # Leer tambien puede fallar: hay editores y antivirus que abren el archivo
+    # sin compartir. Se distingue de un error de verdad para poder decirle al
+    # docente que lo cierre, en vez de escupirle una excepcion de .NET.
+    try { $original = [System.IO.File]::ReadAllText($ruta) }
+    catch {
+        if (Test-ErrorDeArchivoOcupado $_) { return 'bloqueado' }
+        return "error: $($_.Exception.Message)"
+    }
+
+    # 1. La cabecera, para que la primera direccion que se lee sea la que de
+    #    verdad sirve para las tablets.
+    $lineas = Reemplazar-CuerpoDeSeccion -Lineas ($original -split "`r?`n") `
+        -Titulo $script:TituloComoAbrirCredenciales -Cuerpo (Obtener-CuerpoComoAbrir -Url $url)
+
+    # 2. Fuera el bloque anterior. El cuerpo va siempre indentado, asi que
+    #    termina en la primera linea que empieza en la columna 0 (la seccion
+    #    siguiente o la raya final).
+    $sinBloque = New-Object System.Collections.Generic.List[string]
+    $dentro = $false
+    foreach ($linea in $lineas) {
+        if ($dentro) {
+            if ($linea -match '^\S') { $dentro = $false } else { continue }
+        }
+        if ($linea.TrimEnd() -eq $script:TituloRedCredenciales) { $dentro = $true; continue }
+        $sinBloque.Add($linea)
+    }
+
+    # 3. Y dentro otra vez, si toca. Se coloca antes de "Dónde se guardan tus
+    #    datos" para que el archivo salga igual lo escriba quien lo escriba.
+    $final = New-Object System.Collections.Generic.List[string]
+    if ($url) {
+        $bloque = (Obtener-BloqueRedCredenciales -Url $url) -split "`r?`n"
+        $puesto = $false
+        foreach ($linea in $sinBloque) {
+            if (-not $puesto -and ($linea -match '^Dónde se guardan' -or
+                                   $linea -match '^Cuentas de DEMOSTRACIÓN' -or
+                                   $linea -match '^-{10,}$')) {
+                # Una linea en blanco delante si no la habia ya: el archivo que
+                # escribe el instalador pega las secciones sin separarlas.
+                if ($final.Count -gt 0 -and $final[$final.Count - 1].Trim() -ne '') { $final.Add('') }
+                $final.AddRange([string[]]$bloque)
+                $final.Add('')
+                $puesto = $true
+            }
+            $final.Add($linea)
+        }
+        if (-not $puesto) {
+            $final.Add('')
+            $final.AddRange([string[]]$bloque)
+        }
+    } else {
+        $final.AddRange([string[]]$sinBloque)
+    }
+
+    # 4. Sin lineas en blanco de mas por reescribir el archivo muchas veces.
+    $texto = ($final -join "`r`n") -replace '(\r\n){3,}', "`r`n`r`n"
+
+    if ($texto -eq $original) { return 'sin-cambios' }
+
+    # 5. Red de seguridad: si el resultado ya no tiene las secciones que debe
+    #    tener, algo salio mal y NO se escribe. Prefiero no actualizar la
+    #    direccion antes que dejar al docente sin su contraseña. Se comprueba
+    #    por secciones y no solo por tamaño: apagar la red encoge el archivo a
+    #    proposito y eso es correcto.
+    if ($texto -notmatch 'Cuenta de administrador' -or
+        $texto -notmatch 'Base de datos MySQL' -or
+        $texto.Length -lt ($original.Length / 3)) {
+        return 'error: el resultado no se parece a un CREDENCIALES.txt; no se ha tocado el archivo'
+    }
+
+    # 6. Reemplazo en un solo movimiento: si el docente lo tiene abierto en el
+    #    Bloc de notas, falla el Move y el original sigue entero.
+    $temporal = "$ruta.nuevo"
+    try {
+        [System.IO.File]::WriteAllText($temporal, $texto, (New-Object System.Text.UTF8Encoding($true)))
+        Move-Item -LiteralPath $temporal -Destination $ruta -Force -ErrorAction Stop
+    } catch {
+        if (Test-Path $temporal) { Remove-Item -LiteralPath $temporal -Force -ErrorAction SilentlyContinue }
+        if (Test-ErrorDeArchivoOcupado $_) { return 'bloqueado' }
+        return "error: $($_.Exception.Message)"
+    }
+    if ($url) { return 'actualizado' }
+    return 'retirado'
+}
+
+# Mensaje compartido para lo anterior, por el mismo motivo que
+# Mostrar-ResultadoRedLocal: que el instalador y el configurador no acaben
+# contando la misma cosa de dos maneras.
+function Mostrar-ResultadoCredenciales {
+    param([string]$Resultado)
+    switch -Wildcard ($Resultado) {
+        'actualizado' { Escribir-Detalle 'CREDENCIALES.txt ya lleva la direccion para las tablets.' }
+        'retirado'    { Escribir-Detalle 'CREDENCIALES.txt ya no anuncia una direccion de red.' }
+        'sin-archivo' { Escribir-Detalle 'Todavia no existe CREDENCIALES.txt: lo escribira el instalador.' }
+        'sin-cambios' { }
+        'bloqueado'   {
+            Escribir-Aviso 'CREDENCIALES.txt esta abierto en otro programa: no se pudo poner al dia.'
+            Escribir-Detalle 'Cierralo y vuelve a ejecutar esto.'
+        }
+        'error*'      { Escribir-Aviso "No se pudo actualizar CREDENCIALES.txt. $Resultado" }
+    }
+}
+
+# ---- Que direccion se abre en el navegador de ESTE equipo ---------------
+# Se abre la del aula a proposito: asi el docente la tiene delante y puede
+# dictarla sin buscarla. Pero esa direccion depende de la red, y hay dos casos
+# reales en los que abrirla daria una pestaña muerta: que la ruta por defecto
+# la gane una VPN o un adaptador virtual, y que el router todavia no haya
+# terminado de dar IP. Por eso se COMPRUEBA antes de abrirla, y si no responde
+# se cae a localhost, que no depende del wifi.
+function Elegir-UrlParaNavegador {
+    param([string]$UrlDeRed)
+    if (-not $UrlDeRed -or $UrlDeRed -eq $script:UrlFrontend) { return $script:UrlFrontend }
+    if ((Esperar-Respuesta -Url $UrlDeRed -SegundosMax 8).Ok) { return $UrlDeRed }
+    return $script:UrlFrontend
+}
+
 # ---- El .env de la raiz (el del frontend) ------------------------------
 # Es distinto del de server\: este solo lo lee Vite AL CONSTRUIR, y lo que
 # diga queda HORNEADO dentro de dist\.
@@ -264,6 +501,61 @@ function Asegurar-ReglaFirewall {
     } catch {
         return "error: $($_.Exception.Message)"
     }
+}
+
+# Pide los permisos a Windows SOLO para crear la regla.
+#
+# Se eleva un ayudante minimo, JAMAS el instalador entero. Y no es una manía:
+# si se elevara todo y quien instala no fuese administrador, Windows pediria
+# las credenciales de OTRA cuenta, y a partir de ahi %LOCALAPPDATA% seria la
+# carpeta de esa otra cuenta. MySQL arrancaria contra un directorio de datos
+# vacio y pareceria que se perdio el trabajo de la escuela. Este ayudante no
+# toca el perfil, ni el disco, ni el PATH: ejecuta una orden y termina.
+#
+# Solo se llama al ACTIVAR el acceso por red, nunca desde el arranque diario:
+# un docente que enciende el equipo con los ninos entrando no puede toparse un
+# dialogo de permisos.
+#
+# Devuelve: 'ya-existia' | 'creada' | 'cancelado' | 'sin-permisos' |
+#           'error: <detalle>'
+function Solicitar-ReglaFirewallElevada {
+    # Lo primero, y por eso esto no molesta cada dia: comprobar si ya esta
+    # puesta NO necesita permisos, asi que en el 99% de los arranques ni se
+    # plantea pedir nada.
+    if (Test-ReglaFirewall) { return 'ya-existia' }
+
+    # Con los permisos ya en la mano no hay nada que pedir.
+    if (Test-Administrador) { return (Asegurar-ReglaFirewall) }
+
+    Write-Host ''
+    Write-Host '   Windows va a pedirte permiso para abrir el firewall.' -ForegroundColor Cyan
+    Write-Host '   Es el unico paso que necesita administrador y solo ocurre esta vez:' -ForegroundColor White
+    Write-Host '   la regla se queda puesta y los arranques de cada dia no piden nada.' -ForegroundColor White
+    Write-Host '   Si dices que no, GamificApp funcionara igual en este equipo, pero los' -ForegroundColor White
+    Write-Host '   demas dispositivos no podran entrar.' -ForegroundColor White
+    Write-Host ''
+
+    $orden = "New-NetFirewallRule -DisplayName '$($script:NombreReglaFirewall)' " +
+             "-Description 'Permite que otros dispositivos de la red local abran GamificApp.' " +
+             "-Direction Inbound -Action Allow -Protocol TCP " +
+             "-LocalPort $($script:PuertoBackend),$($script:PuertoFrontend) " +
+             "-Profile Private,Domain -ErrorAction Stop | Out-Null"
+    $proceso = $null
+    try {
+        $proceso = Start-Process -FilePath 'powershell.exe' `
+            -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-Command', $orden) `
+            -Verb RunAs -Wait -PassThru -ErrorAction Stop
+    } catch {
+        # Cerrar el dialogo de Windows llega aqui como Win32Exception 1223. No
+        # es un fallo: es una respuesta, y se respeta.
+        return 'cancelado'
+    }
+
+    # No se da por buena la salida del ayudante: se comprueba que la regla
+    # exista de verdad. Un codigo 0 con la regla sin crear seria peor que un
+    # error, porque nadie volveria a mirar.
+    if (Test-ReglaFirewall) { return 'creada' }
+    return "error: el permiso se concedio pero la regla no aparece (codigo $($proceso.ExitCode))"
 }
 
 # Devuelve: 'no-estaba' | 'quitada' | 'sin-permisos' | 'error: <detalle>'
@@ -366,8 +658,12 @@ function Quitar-TareaArranque {
 #
 # Devuelve un objeto con lo que hizo, para que quien llama lo cuente en
 # pantalla como prefiera.
+# -PedirPermisos solo lo pasan el instalador y "Configurar GamificApp.cmd", que
+# son interactivos y donde el usuario acaba de decir que si al acceso por red.
+# Sin ese interruptor la funcion no abre ningun dialogo, que es lo que necesita
+# cualquier otro sitio que la llame sin nadie delante.
 function Aplicar-RedLocal {
-    param([bool]$Activar)
+    param([bool]$Activar, [switch]$PedirPermisos)
 
     Guardar-Preferencias -RedLocal $Activar
 
@@ -376,7 +672,9 @@ function Aplicar-RedLocal {
     $cors = Sincronizar-CorsOrigin -Ip $ip
 
     $firewall = 'omitido'
-    if ($Activar) { $firewall = Asegurar-ReglaFirewall }
+    if ($Activar) {
+        $firewall = $(if ($PedirPermisos) { Solicitar-ReglaFirewallElevada } else { Asegurar-ReglaFirewall })
+    }
 
     return [pscustomobject]@{
         Activa   = $Activar
@@ -422,6 +720,15 @@ function Mostrar-ResultadoRedLocal {
             Write-Host "     $(Obtener-ComandoFirewall)" -ForegroundColor Cyan
             Write-Host ''
             Escribir-Detalle 'Sin eso, los demas dispositivos no lograran conectarse.'
+        }
+        'cancelado'    {
+            Escribir-Aviso 'No se dieron los permisos: el firewall sigue cerrado.'
+            Escribir-Detalle 'GamificApp funciona igual en este equipo, pero los demas dispositivos'
+            Escribir-Detalle 'no entraran. Puedes darlos cuando quieras volviendo a ejecutar'
+            Escribir-Detalle '"Configurar GamificApp.cmd", o a mano con:'
+            Write-Host ''
+            Write-Host "     $(Obtener-ComandoFirewall)" -ForegroundColor Cyan
+            Write-Host ''
         }
         'error*'       { Escribir-Aviso "No se pudo crear la regla de firewall. $($Resultado.Firewall)" }
     }
