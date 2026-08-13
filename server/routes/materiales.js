@@ -5,7 +5,10 @@ import { Router } from 'express';
 import pool from '../db.js';
 import { soloDocente, puedeGestionarMateria } from '../middleware/auth.js';
 import { registrarAuditoria } from '../lib/auditoria.js';
-import { cursoDelEstudiante, sqlAlcanceCurso, puedeDirigirACurso } from '../lib/alcanceCurso.js';
+import {
+    cursoDelEstudiante, sqlAlcanceCurso, puedeDirigirACurso,
+    sqlAutoriaDocente, puedeGestionarContenido
+} from '../lib/alcanceCurso.js';
 
 // mergeParams: el router se monta en /api/materias/:id/material.
 const router = Router({ mergeParams: true });
@@ -13,7 +16,8 @@ const router = Router({ mergeParams: true });
 const materiaIdValida = (id) => Number.isInteger(id) && id > 0;
 
 // GET /api/materias/:id/material — material unificado de la materia.
-// El material privado del docente solo se incluye si quien pregunta es docente.
+// El material privado solo lo ve su autor (y el admin, que ve toda la
+// institución); el estudiante, nunca.
 router.get('/', async (req, res, next) => {
     try {
         const materiaId = Number(req.params.id);
@@ -26,7 +30,21 @@ router.get('/', async (req, res, next) => {
         // ni siquiera con el ID directo (la UI oculta, el servidor protege).
         const condiciones = ['materia_id = ?'];
         const params = [materiaId];
-        if (!esDocente) condiciones.push('is_private = FALSE');
+        if (!esDocente && req.user?.rol !== 'admin') condiciones.push('is_private = FALSE');
+        if (esDocente) {
+            // SPEC-027 — El docente ve su material y el institucional (legacy
+            // sin autor o del admin), no el de sus colegas. Hasta ahora el
+            // panel prometía «Privado · solo tú puedes verlo» y sin embargo
+            // cualquier docente de la materia lo listaba.
+            condiciones.push(sqlAutoriaDocente('materiales'));
+            params.push(req.user.id);
+            // Y de ese conjunto, lo privado solo si es SUYO. El material
+            // privado LEGACY (sin autor registrado) se sigue viendo: no se
+            // puede adivinar de quién era y ocultarlo le quitaría a alguien un
+            // archivo que hoy usa (fail-open, §2.2).
+            condiciones.push('(is_private = FALSE OR docente_id IS NULL OR docente_id = ?)');
+            params.push(req.user.id);
+        }
         if (req.user?.rol === 'estudiante') {
             const [[materia]] = await pool.query(
                 'SELECT activa FROM materias WHERE id = ? AND eliminado_en IS NULL',
@@ -132,9 +150,14 @@ router.delete('/:materialId', soloDocente, async (req, res, next) => {
             return res.status(403).json({ error: 'No tienes asignada esta materia' });
         }
         const [[previo]] = await pool.query(
-            'SELECT nombre FROM materiales WHERE id = ? AND materia_id = ?',
+            'SELECT nombre, docente_id FROM materiales WHERE id = ? AND materia_id = ?',
             [materialId, materiaId]
         );
+        // SPEC-027: borrar el material de un colega es exactamente lo mismo que
+        // borrar su actividad; misma frontera de autoría.
+        if (previo && !await puedeGestionarContenido(req.user, previo.docente_id)) {
+            return res.status(403).json({ error: 'Ese material lo subió otro docente' });
+        }
         const [resultado] = await pool.query(
             'DELETE FROM materiales WHERE id = ? AND materia_id = ?',
             [materialId, materiaId]

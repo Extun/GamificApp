@@ -45,6 +45,15 @@ export const JUEGOS_UI = Object.fromEntries(
     TIPOS.filter((d) => d.enPestanaJuegos).map((d) => [d.tipo, d])
 );
 
+// ¿Este tipo cuenta como "juego" al resumir una materia? Es la misma división
+// que ve el estudiante —quiz y misión tienen pestaña propia, el resto son
+// juegos—, pero preguntada por SLUG y no por el registro: así un tipo que
+// todavía no esté registrado en el frontend sigue contándose, y los tres
+// contadores del panel del docente suman siempre el total. Contar solo
+// 'clasificador' dejaba fuera memorama, línea del tiempo, completar y
+// verdadero/falso, y la tarjeta decía "0 juegos" con juegos publicados.
+export const esTipoDeJuego = (tipo) => tipo !== 'quiz' && tipo !== 'mision';
+
 // ¿La configuración trae contenido jugable? Cada tipo responde por sí mismo,
 // en vez del `switch` anterior. Un tipo desconocido devuelve false.
 export const tieneContenido = (reto) =>

@@ -574,12 +574,54 @@ $leeme = $leeme -replace "`r?`n", "`r`n"
 Escribir-Ok 'LEEME.txt escrito.'
 
 # ------------------------------------------------------------
+# 8-bis. Carpetas de herramientas de edición (asistentes de IA)
+# ------------------------------------------------------------
+# El repositorio ya las ignora, así que las NUESTRAS no llegan aquí. Estas
+# vienen de fuera: algunos paquetes de npm publican por error la carpeta de
+# configuración del asistente con el que trabajan sus mantenedores (a día de
+# hoy, `nanoid` y `resolve` traen un `.claude`). Son archivos inertes —ajustes
+# y notas—, pero viajan dentro de la distribución que recibe el revisor y ahí
+# no pintan nada: no son de GamificApp ni hacen falta para instalarla.
+#
+# Es la ÚNICA escritura que este empaquetador hace sobre un árbol de terceros,
+# y es un borrado: no altera el código que se ejecuta.
+Escribir-Paso 'Retirando carpetas de herramientas de edicion (incluidas las de terceros)'
+$CarpetasDeHerramientas = @('.claude', '.cursor', '.github/copilot')
+$retiradas = 0
+foreach ($nombre in $CarpetasDeHerramientas) {
+    $encontradas = @(Get-ChildItem -Path $Salida -Recurse -Force -Directory -Filter $nombre -ErrorAction SilentlyContinue)
+    foreach ($carpeta in $encontradas) {
+        $relativa = $carpeta.FullName.Substring($Salida.Length + 1)
+        try {
+            Remove-Item -LiteralPath $carpeta.FullName -Recurse -Force -ErrorAction Stop
+            Escribir-Detalle "Retirada: $relativa"
+            $retiradas++
+        } catch {
+            Escribir-Detalle "No se pudo retirar ${relativa}: $($_.Exception.Message)"
+        }
+    }
+}
+if ($retiradas -eq 0) { Escribir-Ok 'No habia ninguna: el paquete ya estaba limpio.' }
+else { Escribir-Ok "$retiradas carpeta(s) retirada(s) del paquete." }
+
+# ------------------------------------------------------------
 # 9. Auditoría del paquete generado
 # ------------------------------------------------------------
 Escribir-Paso 'Auditando el paquete: secretos y artefactos prohibidos'
 $hallazgos = @()
 
 $archivosPaquete = @(Get-ChildItem -Path $Salida -Recurse -File -Force)
+
+# Ninguna carpeta de herramientas puede haber sobrevivido al paso anterior:
+# se comprueba en la auditoría para que un fallo al borrar no pase inadvertido.
+foreach ($archivo in $archivosPaquete) {
+    $rel = $archivo.FullName.Substring($Salida.Length + 1)
+    foreach ($nombre in $CarpetasDeHerramientas) {
+        if ($rel -like "*\$nombre\*" -or $rel -like "$nombre\*") {
+            $hallazgos += "HERRAMIENTA DE EDICION: $rel"
+        }
+    }
+}
 
 # --- 9a. Nombres de archivo prohibidos ---
 foreach ($archivo in $archivosPaquete) {

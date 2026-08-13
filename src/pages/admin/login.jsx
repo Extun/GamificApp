@@ -337,7 +337,7 @@ export function Login(){
                     que tiene delante, y encima requeriría internet. */}
                 {!ES_INSTALACION_LOCAL && (
                     <Link className="login-link login-descargar" to="/descargar">
-                        ⬇ Usar GamificApp sin internet en tu computadora
+                        gamificapp.com/descargar
                     </Link>
                 )}
 

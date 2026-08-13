@@ -8,5 +8,6 @@
 export {
     JUEGOS, JUEGOS_UI, TIPOS_ACTIVIDAD, TIPOS_VALIDOS,
     etiquetaTipo, emojiTipo, obtenerJuego, juegoJugable, tieneContenido,
+    esTipoDeJuego,
     default
 } from './registro';

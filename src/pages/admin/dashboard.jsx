@@ -52,7 +52,14 @@ import AgregarEstudiante from '../../components/AgregarEstudiante';
 import EditarEstudiante from '../../components/EditarEstudiante';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 
-const TIPO_RETO_LABEL = { quiz: 'Quiz', clasificador: 'Juego', mision: 'Misión' };
+// La etiqueta de un tipo la da el registro de juegos (SPEC-017), nunca una
+// tabla suelta: esta pantalla tenía la suya con los tres tipos originales, así
+// que desde que existen siete el docente leía el slug crudo en su propio panel
+// ("memorama · Matemáticas · 300 XP", "linea-tiempo", "verdadero-falso")
+// mientras el estudiante veía "Memorama" bien escrito.
+
+// Contador con la palabra concordada: las tarjetas decían "1 quizzes · 1 juegos".
+const contar = (n, singular, plural) => `${n} ${n === 1 ? singular : plural}`;
 
 const materiaIdPorNombre = (nombre) => idPorNombre(nombre);
 
@@ -66,7 +73,7 @@ const leerComoDataUrl = (file) => new Promise((resolve, reject) => {
 import { actividadSorpresa } from '../../services/iaService';
 import { LibroCalificaciones } from '../../components/dashboard/LibroCalificaciones';
 import { Grid, Card } from '@mui/material';
-import { TIPOS_CREABLES, obtenerJuego } from '../../components/juegos/registro';
+import { TIPOS_CREABLES, obtenerJuego, etiquetaTipo, esTipoDeJuego } from '../../components/juegos/registro';
 import { obtenerEditor } from '../../components/juegos/registro/editores';
 import { SidebarLayout } from '../../components/dashboard/SidebarLayout';
 
@@ -355,10 +362,20 @@ export function Dashboard() {
             .slice(0, 12)
     ), [retosPorMateria]);
 
+    // Las tres pestañas son las mismas tres cestas que ve el estudiante (quiz,
+    // juegos, misión). Antes la tercera filtraba por el slug 'clasificador',
+    // así que una actividad de cualquiera de los otros cuatro tipos no
+    // aparecía bajo NINGÚN filtro: solo se la podía ver en "Todo".
     const [filtroReciente, setFiltroReciente] = useState('todos');
-    const retosFiltrados = filtroReciente === 'todos'
-        ? retosRecientes
-        : retosRecientes.filter((r) => r.tipo === filtroReciente);
+    const CESTA_RECIENTE = {
+        todos: () => true,
+        quiz: (tipo) => tipo === 'quiz',
+        mision: (tipo) => tipo === 'mision',
+        juegos: esTipoDeJuego
+    };
+    const retosFiltrados = retosRecientes.filter(
+        (r) => (CESTA_RECIENTE[filtroReciente] || CESTA_RECIENTE.todos)(r.tipo)
+    );
 
     // Punto ÚNICO de entrada a una materia (SPEC-021 P3-4). Antes había dos
     // caminos con destinos distintos: desde el Inicio se aterrizaba en "Crear
@@ -693,7 +710,7 @@ export function Dashboard() {
                                     {materias.map((mat) => {
                                         const ui = uiMateria(mat);
                                         const retos = retosPorMateria[mat] || [];
-                                        const cuenta = (tipo) => retos.filter((r) => r.tipo === tipo).length;
+                                        const cuenta = (cumple) => retos.filter((r) => cumple(r.tipo)).length;
                                         return (
                                             <button
                                                 key={mat}
@@ -712,7 +729,9 @@ export function Dashboard() {
                                                     <span className="home-doc-materia-detalle">Actividades no disponibles</span>
                                                 ) : retos.length ? (
                                                     <span className="home-doc-materia-detalle">
-                                                        {cuenta('quiz')} quizzes · {cuenta('clasificador')} juegos · {cuenta('mision')} misiones
+                                                        {contar(cuenta((t) => t === 'quiz'), 'quiz', 'quizzes')} ·{' '}
+                                                        {contar(cuenta(esTipoDeJuego), 'juego', 'juegos')} ·{' '}
+                                                        {contar(cuenta((t) => t === 'mision'), 'misión', 'misiones')}
                                                     </span>
                                                 ) : (
                                                     <span className="home-doc-materia-detalle home-doc-materia-aviso">
@@ -765,7 +784,7 @@ export function Dashboard() {
                                         ['todos', 'Todo'],
                                         ['quiz', 'Quiz'],
                                         ['mision', 'Misión'],
-                                        ['clasificador', 'Clasificador']
+                                        ['juegos', 'Juegos']
                                     ].map(([id, label]) => (
                                         <button
                                             key={id}
@@ -785,7 +804,7 @@ export function Dashboard() {
                                                 <div className="actividad-meta">
                                                     <strong>{r.titulo}</strong>
                                                     <span>
-                                                        {TIPO_RETO_LABEL[r.tipo] || r.tipo} · {r.materia} · {r.xp_recompensa} XP
+                                                        {etiquetaTipo(r.tipo)} · {r.materia} · {r.xp_recompensa} XP
                                                     </span>
                                                 </div>
                                                 <span className="actividad-fecha">{formatearFecha(r.creado_en)}</span>
@@ -806,7 +825,7 @@ export function Dashboard() {
                                         <li><span>Total actividades</span><strong>{resumen.stats.actividades}</strong></li>
                                         <li><span>Quizzes</span><strong>{resumen.stats.quizzes}</strong></li>
                                         <li><span>Misiones</span><strong>{resumen.stats.misiones}</strong></li>
-                                        <li><span>Clasificadores</span><strong>{resumen.stats.clasificadores}</strong></li>
+                                        <li><span>Juegos</span><strong>{resumen.stats.juegos}</strong></li>
                                         <li><span>Materiales</span><strong>{resumen.stats.materiales}</strong></li>
                                     </ul>
                                 </section>
@@ -980,7 +999,7 @@ export function Dashboard() {
                                                     <span className="actividad-icono"><TaskAltRoundedIcon /></span>
                                                     <div className="actividad-meta">
                                                         <strong>{r.titulo}</strong>
-                                                        <span>{TIPO_RETO_LABEL[r.tipo] || r.tipo} · ⭐ {r.xp_recompensa} XP</span>
+                                                        <span>{etiquetaTipo(r.tipo)} · ⭐ {r.xp_recompensa} XP</span>
                                                     </div>
                                                     <span className="actividad-fecha">{formatearFecha(r.creado_en)}</span>
                                                 </li>

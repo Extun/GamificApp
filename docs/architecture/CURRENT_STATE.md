@@ -2,6 +2,24 @@
 
 # Última actualización
 
+2026-08-13 (**SPEC-027 — LA OTRA MITAD DEL MISMO BUG: EL PANEL DEL DOCENTE NUNCA TUVO FRONTERA. DOS DOCENTES DE CURSOS DISTINTOS QUE COMPARTÍAN MATERIA SE VEÍAN —Y SE EDITABAN— EL CONTENIDO.**
+
+**EL SÍNTOMA.** Reportado por Fabrizio al día siguiente de SPEC-026: «*tanto los docentes como estudiantes pueden visualizarse actividades entre distintos cursos […] asegúrate que no se compartan en cada materia*». La mitad del estudiante ya estaba cerrada y **se comprobó que seguía cerrada** antes de tocar nada; la del docente no existía.
+
+**LA CAUSA.** El único criterio de acceso del panel era la **materia asignada** (`docente_materia`). Medido contra MySQL real con dos docentes y dos cursos: ambos listaban **las seis** actividades de prueba. Seis fugas, la primera con permiso de ESCRITURA: (1) `retoGestionable()` autorizaba por materia, así que un docente podía **editar, archivar, duplicar, mandar a la papelera y purgar** la actividad de otro; (2) el material marcado «Privado · solo tú puedes verlo» lo listaba cualquier docente de la materia; (3) `GET /api/progreso/:id` solo bloqueaba al rol estudiante — con el id de cualquier niño de la institución se leían sus notas; (4) `GET /api/ranking/completo` devolvía a **todos** los estudiantes de la escuela con nombre y apellido; (5) los contadores del Home sumaban el contenido de los colegas; (6) el Banco de Preguntas se compartía igual. Y de propina, dos huecos de SPEC-026: `POST /api/ia/adaptar` leía por id la actividad íntegra de otro docente, y las vías de IA **guardaban borradores con `curso_id` sin validarlo** (un `PATCH` de estado no revalida un curso que no cambia, así que se publicaba en el aula ajena).
+
+**LA DECISIÓN (elegida por Fabrizio entre tres opciones).** El contenido es de **su autor**, no de la materia. La materia sigue mandando: la autoría acota *dentro* de lo asignado. Se descartaron «lo que alcanza a mis cursos» y «dejarlo compartido». Esto **revierte a propósito** SPEC-026 §2.5, que había dado la biblioteca compartida por buena.
+
+**MISMO FAIL-OPEN QUE SPEC-026.** El filtro solo puede quitarle a un docente el contenido de **otro docente**, nunca vaciar una biblioteca: lo legacy sin autor y lo creado por el **admin** siguen siendo institucionales para todos, y el material privado **legacy** se sigue viendo (no se puede adivinar de quién era). El admin no pierde nada. Cero migraciones: las tres columnas de autoría ya existían.
+
+**UN EFECTO SECUNDARIO QUE HABÍA QUE ARREGLAR A LA VEZ.** `retos` **no tiene índice UNIQUE** por (materia, título) y `POST /api/retos` es un upsert por ese par: con la frontera puesta, publicar «Sumas» **sobrescribía la «Sumas» de un colega sin verla**. La unicidad de título pasa a ser **por autor** (upsert, `PATCH` y el sufijo «(copia)»), igual que el anti-duplicado del banco.
+
+**Y LOS «MUNDOS VACÍOS».** Desde SPEC-026 el estudiante veía las 6 materias de la institución con contenido en 2. `GET /api/materias` le lista ahora solo aquellas donde le alcanza una actividad jugable, le alcanza material o **ya tiene progreso** —esta última evita que una materia desaparezca con su historial si el docente archiva lo suyo—.
+
+**VERIFICADO EN LOCAL CONTRA MySQL REAL, 43/43 COMPROBACIONES**, con el backend de verdad, logins reales de dos docentes, dos estudiantes y el admin, y un docente B de prueba creado y **borrado** al terminar (la BD quedó sin restos). Cubre las dos direcciones de la biblioteca, los cinco 403 por id (detalle, estadísticas, PATCH, duplicar, DELETE), el título homónimo que ya no pisa nada, el material privado, el 403 del progreso ajeno, los tres rankings, el banco, las dos vías de IA y la vista del estudiante. **En navegador**: el estudiante de 3ro A ve **4 mundos en vez de 6**, el docente conserva su Home, su Biblioteca, su Libro de Calificaciones y su materia, y el Ranking pasa de 4 estudiantes a **los 3 suyos**, sin errores de consola. `npm run build` limpio y **lint 29 = línea base exacta**.
+
+**ALCANCE REAL (regla §6.16).** Todo **en local**; **nada probado en producción**. **Sin migración**. Se añade `database/diagnostico-frontera-curso.sql` (solo lectura) para medir en Aiven lo que el fail-open deja pasar: estudiantes sin curso, docentes sin curso, cursos sin docente e historial cruzado previo. Detalle en `docs/specifications/SPEC-027-Frontera-De-Autoria.md`.)
+
 2026-08-13 (**SPEC-026 — EL CURSO NO DELIMITABA NADA: CUALQUIER ESTUDIANTE VEÍA (Y PODÍA JUGAR) LAS ACTIVIDADES DE TODA LA INSTITUCIÓN. AHORA ES UNA FRONTERA REAL, EN LOS TRES ENDPOINTS A LA VEZ.**
 
 **EL SÍNTOMA.** Reportado por Fabrizio con su instalación de prueba (un docente y un estudiante por curso): «*se supone que entre ellos no deberían de visualizarse las actividades entre sí porque pertenecen a distintos cursos*». Correcto: el niño de 2do A entraba a Matemáticas y jugaba lo que el docente de 3ro A había preparado para su clase. Lo mismo con el material de estudio.
@@ -637,12 +655,13 @@ Fabrizio Zurita (Extun)
 | Invitaciones de estudiante | ⚪ Legacy — códigos existentes siguen funcionando; ya no se generan nuevos desde la UI |
 | Asignación de cursos a docentes (SPEC-009) | ✅ |
 | El curso como frontera de contenido (SPEC-026) | ✅ en código (2026-08-13): el estudiante solo ve/juega actividades y material de **su** curso; sin curso destino, el contenido llega a los cursos de su **autor**, y lo del admin o sin autor sigue siendo institucional. Verificado en local 35/35; **migración 015 pendiente de deploy** |
-| Material de estudio (base64 en MySQL, preview PDF/docx) | ✅ (con autor y curso desde SPEC-026) |
+| El aula del docente como frontera (SPEC-027) | ✅ en código (2026-08-13): Biblioteca, Banco de Preguntas, material y contadores muestran **solo lo que ese docente creó** (más lo institucional); editar/borrar por id ajeno da 403; `GET /api/progreso/:id` y `GET /api/ranking/completo` se acotan a su aula; el estudiante deja de ver materias vacías. Verificado en local 43/43; **sin migración** |
+| Material de estudio (base64 en MySQL, preview PDF/docx) | ✅ (con autor y curso desde SPEC-026). **El material privado es privado de verdad desde SPEC-027**: antes lo veía cualquier docente de la materia |
 | Quiz / Clasificador / Misión Narrativa | ✅ (crear con/sin IA y jugar) |
 | Memorama / Línea del tiempo / Completar espacios | ✅ (100% IA, SPEC-006) |
 | Verdadero o Falso | 🟡 SPEC-017 Fase 7 en código — prueba de la arquitectura extensible |
 | Actividad sorpresa / Adaptar con IA / Biblioteca IA (papelera, estadísticas) | ✅ |
-| XP / niveles / ranking | ✅ (transaccional, idempotente). **SPEC-025 (2026-08-12): dentro de una materia el top es de ESA materia y solo de los estudiantes del docente** (`GET /api/ranking/materia/:id`, solo lectura, sin migración); el ranking global (`/api/ranking`, `/completo`) sigue igual. Verificado en local, pendiente en producción |
+| XP / niveles / ranking | ✅ (transaccional, idempotente). **SPEC-025 (2026-08-12): dentro de una materia el top es de ESA materia y solo de los estudiantes del docente** (`GET /api/ranking/materia/:id`, solo lectura, sin migración). **SPEC-027 (2026-08-13): `/api/ranking/completo` se acota al aula del docente** (el admin sigue viendo la institución); el orden por `xp_total` con `RANK()` no cambia y `/api/ranking` sigue igual. Verificado en local, pendiente en producción |
 | Misiones (reemplaza logros de `localStorage`) | ✅ Fases 1 y 2 (SPEC-007), e2e confirmado en producción |
 | Dashboards de los 3 roles con datos 100% reales | ✅ |
 | Libro de Calificaciones | ✅ (muestra calificación /100 — mejor resultado) |

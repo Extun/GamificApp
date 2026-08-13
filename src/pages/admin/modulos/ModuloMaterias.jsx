@@ -237,7 +237,12 @@ export function ModuloMaterias({ materias, docentes = [], ejecutar }) {
 
                                 <div className="matcat-info">
                                     <strong>
-                                        <span aria-hidden="true">{m.icono}</span> {m.nombre}
+                                        {/* El icono solo se repite aquí cuando el mosaico está
+                                            ocupado por un banner subido: sin banner, el mosaico
+                                            YA es el icono y la fila lo mostraba dos veces
+                                            seguidas, que es el caso normal del catálogo. */}
+                                        {m.banner_data && <span aria-hidden="true">{m.icono} </span>}
+                                        {m.nombre}
                                         <span className="matcat-chips">
                                             <span className={`matcat-estado ${m.activa ? 'is-activa' : 'is-oculta'}`}>
                                                 {m.activa ? 'Activa' : 'Oculta'}

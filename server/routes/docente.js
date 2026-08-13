@@ -6,6 +6,7 @@ import pool from '../db.js';
 import { soloDocente } from '../middleware/auth.js';
 import { generarCodigo } from './auth.js';
 import { resetearPinADefault, sqlAulaDocente } from '../lib/estudiantes.js';
+import { sqlAutoriaDocente } from '../lib/alcanceCurso.js';
 import { registrarAuditoria } from '../lib/auditoria.js';
 
 const router = Router();
@@ -208,14 +209,22 @@ router.get('/resumen', async (req, res, next) => {
         const sinMaterias = !materiaIds.length;
 
         // Contenido creado en sus materias, por tipo y estado.
+        // SPEC-027: SUYO. Antes estos contadores sumaban también lo que
+        // publicaban los colegas de la misma materia, así que el Home le
+        // presentaba como propio un trabajo que no era suyo (y que desde esta
+        // spec ni siquiera aparece en su Biblioteca).
+        const esAdmin = req.user.rol === 'admin';
+        const filtroAutoria = esAdmin ? '' : `AND ${sqlAutoriaDocente('retos')}`;
         const [retos] = sinMaterias ? [[]] : await pool.query(
             `SELECT tipo, estado, COUNT(*) AS n FROM retos
-             WHERE materia_id IN (?) AND eliminado_en IS NULL GROUP BY tipo, estado`,
-            [materiaIds]
+             WHERE materia_id IN (?) AND eliminado_en IS NULL ${filtroAutoria}
+             GROUP BY tipo, estado`,
+            esAdmin ? [materiaIds] : [materiaIds, req.user.id]
         );
         const [[materiales]] = sinMaterias ? [[{ n: 0 }]] : await pool.query(
-            'SELECT COUNT(*) AS n FROM materiales WHERE materia_id IN (?)',
-            [materiaIds]
+            `SELECT COUNT(*) AS n FROM materiales
+             WHERE materia_id IN (?) ${esAdmin ? '' : `AND ${sqlAutoriaDocente('materiales')}`}`,
+            esAdmin ? [materiaIds] : [materiaIds, req.user.id]
         );
 
         // Su aula: criterio único de SPEC-014 (curso asignado o invitación
@@ -265,14 +274,23 @@ router.get('/resumen', async (req, res, next) => {
             throw err;
         });
 
-        const cuentaRetos = (tipo) => retos
-            .filter((r) => r.tipo === tipo && r.estado !== 'archivado')
+        const cuentaRetos = (cumple) => retos
+            .filter((r) => cumple(r.tipo) && r.estado !== 'archivado')
             .reduce((suma, r) => suma + r.n, 0);
+        // El desglose tiene que SUMAR el total. Cuando solo existían tres tipos
+        // bastaba con contar cada slug; hoy hay siete (SPEC-017), así que
+        // contar 'clasificador' a secas dejaba fuera memorama, línea del
+        // tiempo, completar y verdadero/falso: el panel mostraba «8
+        // actividades» y debajo un desglose de 2 + 1 + 0. «Juegos» es aquí lo
+        // mismo que en la pestaña del estudiante: todo lo que no es quiz ni
+        // misión, que son los dos que tienen reproductor propio.
+        const esQuiz = (tipo) => tipo === 'quiz';
+        const esMision = (tipo) => tipo === 'mision';
         res.json({
             stats: {
-                quizzes: cuentaRetos('quiz'),
-                clasificadores: cuentaRetos('clasificador'),
-                misiones: cuentaRetos('mision'),
+                quizzes: cuentaRetos(esQuiz),
+                juegos: cuentaRetos((tipo) => !esQuiz(tipo) && !esMision(tipo)),
+                misiones: cuentaRetos(esMision),
                 actividades: retos.filter((r) => r.estado !== 'archivado').reduce((s, r) => s + r.n, 0),
                 archivadas: retos.filter((r) => r.estado === 'archivado').reduce((s, r) => s + r.n, 0),
                 materiales: materiales.n,

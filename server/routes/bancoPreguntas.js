@@ -13,10 +13,16 @@ import pool from '../db.js';
 import { soloDocente, puedeGestionarMateria } from '../middleware/auth.js';
 import { registrarAuditoria } from '../lib/auditoria.js';
 import { VALIDADORES_ITEM, RESUMEN_ITEM, TIPOS_BANCO } from '../lib/juegos/registro.js';
+import { sqlAutoriaDocente, puedeGestionarContenido } from '../lib/alcanceCurso.js';
 
 const router = Router();
 
 const esIdValido = (n) => Number.isInteger(n) && n > 0;
+
+// SPEC-027 — El banco es de quien lo escribe. La columna de autoría aquí se
+// llama `creado_por` (no `docente_id`), pero la regla es la misma que en
+// actividades y material: lo propio + lo institucional (sin autor o del admin).
+const AUTOR_BANCO = 'creado_por';
 
 const DIFICULTADES = ['facil', 'media', 'dificil'];
 const ESTADOS = ['pendiente', 'aprobada', 'archivada'];
@@ -71,6 +77,10 @@ const preguntaGestionable = async (req, res, preguntaId) => {
         res.status(403).json({ error: 'No tienes asignada esta materia' });
         return null;
     }
+    if (!await puedeGestionarContenido(req.user, pregunta[AUTOR_BANCO])) {
+        res.status(403).json({ error: 'Esa pregunta la creó otro docente' });
+        return null;
+    }
     return pregunta;
 };
 
@@ -109,6 +119,9 @@ router.get('/', soloDocente, async (req, res, next) => {
         const params = [];
         if (!esAdmin) {
             condiciones.push('b.materia_id IN (SELECT materia_id FROM docente_materia WHERE docente_id = ?)');
+            params.push(req.user.id);
+            // SPEC-027: y solo sus preguntas (más las institucionales).
+            condiciones.push(sqlAutoriaDocente('b', AUTOR_BANCO));
             params.push(req.user.id);
         }
         if (req.query.materia_id !== undefined) {
@@ -195,12 +208,20 @@ router.post('/', soloDocente, async (req, res, next) => {
         // cosa — deduplicarlos por «ambos están vacíos» sería un falso positivo.
         const enunciadoNormalizado = String(datos.enunciado || '').trim();
         if (enunciadoNormalizado) {
+            //
+            // SPEC-027: «ya está en TU banco» tiene que hablar de verdad del
+            // suyo — si no, el aviso señala una pregunta de otro docente que
+            // quien publica no puede ni abrir.
+            const esAdminBanco = req.user.rol === 'admin';
             const [[duplicada]] = await pool.query(
                 `SELECT id FROM banco_preguntas
                  WHERE materia_id = ? AND tipo = ? AND estado <> 'archivada'
                    AND LOWER(TRIM(enunciado)) = LOWER(?)
+                   ${esAdminBanco ? '' : `AND ${sqlAutoriaDocente('banco_preguntas', AUTOR_BANCO)}`}
                  LIMIT 1`,
-                [datos.materiaId, datos.tipo, enunciadoNormalizado]
+                esAdminBanco
+                    ? [datos.materiaId, datos.tipo, enunciadoNormalizado]
+                    : [datos.materiaId, datos.tipo, enunciadoNormalizado, req.user.id]
             );
             if (duplicada) {
                 // 409 y no 400: no es que la petición esté mal formada, es que
@@ -330,6 +351,10 @@ router.post('/uso', soloDocente, async (req, res, next) => {
         const params = [ids];
         if (req.user.rol !== 'admin') {
             condiciones.push('materia_id IN (SELECT materia_id FROM docente_materia WHERE docente_id = ?)');
+            params.push(req.user.id);
+            // SPEC-027: los contadores de uso son de las preguntas propias; ya
+            // no se pueden insertar las de otro docente en una actividad.
+            condiciones.push(sqlAutoriaDocente('banco_preguntas', AUTOR_BANCO));
             params.push(req.user.id);
         }
         const [resultado] = await pool.query(

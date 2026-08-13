@@ -198,7 +198,7 @@ export function PerfilDocente({ stats, materias, onAviso, onError }) {
                             <StatCard Icon={TaskAltRoundedIcon} valor={stats.actividades} etiqueta="Actividades creadas" tono="primary" />
                             <StatCard Icon={AutoAwesomeRoundedIcon} valor={stats.quizzes} etiqueta="Quizzes" tono="accent" />
                             <StatCard Icon={MapRoundedIcon} valor={stats.misiones} etiqueta="Misiones" tono="primary" />
-                            <StatCard Icon={ExtensionRoundedIcon} valor={stats.clasificadores} etiqueta="Clasificadores" tono="accent" />
+                            <StatCard Icon={ExtensionRoundedIcon} valor={stats.juegos} etiqueta="Juegos" tono="accent" />
                             <StatCard Icon={DescriptionRoundedIcon} valor={stats.materiales} etiqueta="Materiales" tono="primary" />
                             <StatCard Icon={GroupsRoundedIcon} valor={stats.estudiantes} etiqueta="Estudiantes" tono="accent" />
                             <StatCard Icon={StarRoundedIcon} valor={stats.xp_entregada} etiqueta="XP generada" tono="fire" />

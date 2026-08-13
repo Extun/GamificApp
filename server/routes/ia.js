@@ -18,6 +18,7 @@ import { registrarAuditoria } from '../lib/auditoria.js';
 import { generarJSON, generarTexto } from '../lib/ia/index.js';
 import { registrarErrorIA } from '../lib/ia/errores.js';
 import { estadoDe, motivoBloqueo } from '../lib/juegos/estados.js';
+import { puedeDirigirACurso, puedeGestionarContenido } from '../lib/alcanceCurso.js';
 
 import { VALIDADORES_CONFIG } from '../lib/validadoresRetos.js';
 import {
@@ -77,7 +78,17 @@ const tituloDisponible = async (materiaId, base) => {
 };
 
 // Inserta un borrador generado por IA y registra auditoría. Devuelve la fila creada.
+//
+// SPEC-026 §2.4 / SPEC-027: `curso_id` decide QUIÉN verá la actividad, así que
+// esta vía tiene que validarlo igual que `POST /api/retos`. Antes no lo hacía:
+// un borrador nacido aquí con el curso de otro docente se publicaba después con
+// un PATCH de estado, que no revalida un `curso_id` que no cambia.
 const guardarBorradorIA = async ({ user, materiaId, cursoId, tipo, dificultad, resultado, accion, descripcionAuditoria }) => {
+    if (cursoId !== null && cursoId !== undefined && !await puedeDirigirACurso(user, cursoId)) {
+        const err = new Error('Ese curso no está asignado a tu cuenta');
+        err.status = 403;
+        throw err;
+    }
     const titulo = await tituloDisponible(materiaId, resultado.titulo);
     if (!titulo) {
         const err = new Error('Demasiadas actividades con ese título; renombra o elimina alguna.');
@@ -182,6 +193,12 @@ router.post('/sorpresa', soloDocente, async (req, res) => {
         if (!await puedeGestionarMateria(req.user, materiaId)) {
             return res.status(403).json({ error: 'No tienes asignada esta materia' });
         }
+        // El destino se valida ANTES de gastar una llamada a la IA (la barrera
+        // definitiva sigue estando en `guardarBorradorIA`, que es por donde
+        // pasan todas las vías que persisten un reto).
+        if (cursoId !== null && !await puedeDirigirACurso(req.user, cursoId)) {
+            return res.status(403).json({ error: 'Ese curso no está asignado a tu cuenta' });
+        }
         const base = await construirContexto({ materiaId, cursoId });
         if (!base) return res.status(404).json({ error: 'Materia no encontrada' });
 
@@ -239,7 +256,9 @@ router.post('/sorpresa', soloDocente, async (req, res) => {
         });
         res.status(201).json({ reto, objetivo: decision?.objetivo || null });
     } catch (err) {
-        if (err.status === 409) return res.status(409).json({ error: err.message });
+        // 409 (tipo bloqueado, títulos agotados) y 403 (curso ajeno) son
+        // decisiones NUESTRAS, no fallos del proveedor: no se disfrazan de 502.
+        if (err.status === 409 || err.status === 403) return res.status(err.status).json({ error: err.message });
         responderErrorIA(res, 'sorpresa', err);
     }
 });
@@ -279,6 +298,17 @@ router.post('/adaptar', soloDocente, async (req, res) => {
         if (!await puedeGestionarMateria(req.user, reto.materia_id) ||
             !await puedeGestionarMateria(req.user, materiaDestino)) {
             return res.status(403).json({ error: 'No tienes asignada esta materia' });
+        }
+        // SPEC-027: adaptar es leer el contenido íntegro de la actividad de
+        // origen. Si ya no aparece en su Biblioteca, tampoco por este id.
+        if (!await puedeGestionarContenido(req.user, reto.docente_id)) {
+            return res.status(403).json({ error: 'Esa actividad la creó otro docente' });
+        }
+        // Y la copia adaptada no puede aterrizar en el aula de otro (antes de
+        // gastar la llamada a la IA; `guardarBorradorIA` lo vuelve a comprobar).
+        const cursoDestino = cambios.curso_id ? Number(cambios.curso_id) : reto.curso_id;
+        if (cursoDestino && !await puedeDirigirACurso(req.user, cursoDestino)) {
+            return res.status(403).json({ error: 'Ese curso no está asignado a tu cuenta' });
         }
 
         const ctx = await construirContexto({
@@ -340,7 +370,9 @@ router.post('/adaptar', soloDocente, async (req, res) => {
         });
         res.status(201).json({ reto: creado });
     } catch (err) {
-        if (err.status === 409) return res.status(409).json({ error: err.message });
+        // 409 (tipo bloqueado, títulos agotados) y 403 (curso ajeno) son
+        // decisiones NUESTRAS, no fallos del proveedor: no se disfrazan de 502.
+        if (err.status === 409 || err.status === 403) return res.status(err.status).json({ error: err.message });
         responderErrorIA(res, 'adaptar', err);
     }
 });

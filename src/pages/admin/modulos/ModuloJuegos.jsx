@@ -14,6 +14,8 @@ import RemoveRoundedIcon from '@mui/icons-material/Remove';
 import InfoRoundedIcon from '@mui/icons-material/InfoRounded';
 import { SectionCard, EmptyState, ModalPanel } from '../../../components/dashboard/DashboardWidgets';
 import { listarJuegos, cambiarEstadoJuego } from '../../../services/juegosService';
+import { obtenerJuego } from '../../../components/juegos/registro';
+import { obtenerEditor } from '../../../components/juegos/registro/editores';
 import './moduloJuegos.css';
 
 const ETIQUETA_ESTADO = {
@@ -36,6 +38,17 @@ const INTEGRACION = [
     ['banco', 'Banco/Reutilización'],
     ['evaluacion', 'Evaluación']
 ];
+
+// El reproductor y el editor son piezas del FRONTEND (`Player` en el registro
+// de juegos y `obtenerEditor`), así que el servidor no puede saber si existen
+// y `/api/admin/juegos` no los envía. El panel los daba por ausentes y pintaba
+// "— Reproductor  — Editor" en los siete tipos, es decir, informaba al
+// administrador de que ningún juego de la aplicación se puede jugar ni editar.
+// Se resuelven aquí, que es donde viven.
+const integracionLocal = (tipo) => ({
+    reproductor: Boolean(obtenerJuego(tipo)?.Player),
+    editor: Boolean(obtenerEditor(tipo))
+});
 
 export default function ModuloJuegos() {
     const [datos, setDatos] = useState(null);
@@ -102,7 +115,10 @@ export default function ModuloJuegos() {
 
                             <div className="juego-integracion">
                                 {INTEGRACION.map(([clave, nombre]) => {
-                                    const activo = j.integracion?.[clave] ?? j.capacidades?.[clave] ?? false;
+                                    const activo = j.integracion?.[clave]
+                                        ?? j.capacidades?.[clave]
+                                        ?? integracionLocal(j.tipo)[clave]
+                                        ?? false;
                                     return (
                                         <span key={clave} className={`juego-chip ${activo ? 'is-si' : 'is-no'}`}>
                                             {activo

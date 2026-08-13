@@ -31,6 +31,11 @@ import { ModalCambiarPin } from './ModalCambiarPin';
 import { useGuardiaActividad } from '../../hooks/useGuardiaActividad';
 import { useCapasAtras } from '../../hooks/useCapasAtras';
 
+// Contador con la palabra concordada. Estos paneles los lee un niño de 6 a 9
+// años, que es justo la edad en la que se le está corrigiendo el plural en
+// clase: las etiquetas decían "1 juegos", "1 quizzes", "1 recursos".
+const contar = (n, singular, plural) => `${n} ${n === 1 ? singular : plural}`;
+
 export function DashboardEstudiante() {
     const navigate = useNavigate();
     const [pagina, setPagina] = useState("");
@@ -588,7 +593,7 @@ export function DashboardEstudiante() {
                                         {/* El contador solo se muestra cuando es un dato y no
                                             un "0" provisional mientras carga. */}
                                         {estadoMaterial === 'listo' && (
-                                            <span className="card-tag">{archivos.length} recursos</span>
+                                            <span className="card-tag">{contar(archivos.length, 'recurso', 'recursos')}</span>
                                         )}
                                     </div>
                                     {contenidoMateria({
@@ -613,7 +618,7 @@ export function DashboardEstudiante() {
                                     <div className="card-head">
                                         <h3>Quizzes disponibles</h3>
                                         {estadoRetosMateria === 'listo' && (
-                                            <span className="card-tag">{quizzes.length} quizzes</span>
+                                            <span className="card-tag">{contar(quizzes.length, 'quiz', 'quizzes')}</span>
                                         )}
                                     </div>
                                     {contenidoMateria({
@@ -668,7 +673,7 @@ export function DashboardEstudiante() {
                                     <div className="card-head">
                                         <h3>Juegos disponibles</h3>
                                         {estadoRetosMateria === 'listo' && (
-                                            <span className="card-tag">{juegos.length} juegos</span>
+                                            <span className="card-tag">{contar(juegos.length, 'juego', 'juegos')}</span>
                                         )}
                                     </div>
                                     {contenidoMateria({
@@ -711,7 +716,7 @@ export function DashboardEstudiante() {
                                     <div className="card-head">
                                         <h3>Misiones narrativas</h3>
                                         {estadoRetosMateria === 'listo' && (
-                                            <span className="card-tag">{misionesRetos.length} aventuras</span>
+                                            <span className="card-tag">{contar(misionesRetos.length, 'aventura', 'aventuras')}</span>
                                         )}
                                     </div>
                                     {contenidoMateria({

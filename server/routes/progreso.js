@@ -17,10 +17,17 @@ router.get('/:estudiante_id', async (req, res, next) => {
     if (!esIdValido(estudianteId)) {
         return res.status(400).json({ error: 'estudiante_id debe ser un entero positivo' });
     }
-    // Un estudiante solo puede consultar SU propio progreso; docente y admin
-    // pueden consultar el de cualquiera.
+    // Un estudiante solo puede consultar SU propio progreso.
     if (req.user.rol === 'estudiante' && req.user.estudiante_id !== estudianteId) {
         return res.status(403).json({ error: 'Solo puedes consultar tu propio progreso' });
+    }
+    // SPEC-027 — El docente, solo el de SU aula (mismo criterio único de
+    // SPEC-014 que ya aplicaban POST y PATCH aquí abajo). Hasta ahora esta
+    // consulta solo miraba el rol: con el id de cualquier estudiante de la
+    // institución se leían sus notas, aunque fuera de otro curso y de otro
+    // docente. El admin no tiene restricción.
+    if (req.user.rol === 'docente' && !(await esDelAulaDocente(req.user.id, estudianteId))) {
+        return res.status(403).json({ error: 'Ese estudiante no pertenece a tus grupos' });
     }
 
     try {

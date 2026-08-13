@@ -6,12 +6,21 @@ import { sqlAulaDocente } from '../lib/estudiantes.js';
 const router = Router();
 
 // GET /api/ranking/completo — vista completa para docentes/admin (SPEC-004):
-// todos los estudiantes activos con posición, curso, XP, retos completados,
-// resultados perfectos (base de las insignias con regla real) y su última
-// actividad registrada. La lógica del ranking no cambia: mismo orden por
-// estudiantes.xp_total con RANK().
-router.get('/completo', soloDocente, async (_req, res, next) => {
+// posición, curso, XP, retos completados, resultados perfectos (base de las
+// insignias con regla real) y última actividad registrada.
+//
+// SPEC-027 — El docente ve SU aula (criterio único `sqlAulaDocente`, SPEC-014
+// F6), no la institución entera: la página se titula "Mis Estudiantes" y hasta
+// ahora listaba con nombre y apellido a los niños de otros docentes y otros
+// cursos. El admin sigue viendo el total institucional.
+//
+// La lógica del ranking en sí no cambia (§9 de CONTRIBUTING): mismo orden por
+// `estudiantes.xp_total` con RANK(). Ojo con la interacción entre las dos: al
+// calcularse DESPUÉS del filtro, las posiciones son 1..N dentro del aula, que
+// es justo lo que un docente espera de su lista.
+router.get('/completo', soloDocente, async (req, res, next) => {
     try {
+        const esAdmin = req.user.rol === 'admin';
         const [filas] = await pool.query(
             `SELECT e.id,
                     CONCAT(e.nombres, ' ', e.apellidos) AS nombre,
@@ -29,7 +38,9 @@ router.get('/completo', soloDocente, async (_req, res, next) => {
                  SELECT 1 FROM usuarios u
                  WHERE u.estudiante_id = e.id AND u.eliminado_en IS NOT NULL
              )
-             ORDER BY e.xp_total DESC, e.apellidos, e.nombres`
+             ${esAdmin ? '' : `AND ${sqlAulaDocente('e.id')}`}
+             ORDER BY e.xp_total DESC, e.apellidos, e.nombres`,
+            esAdmin ? [] : [req.user.id, req.user.id]
         );
         res.json(filas);
     } catch (err) {

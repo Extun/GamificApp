@@ -47,6 +47,41 @@ export const sqlAlcanceCurso = (tabla) => `(
     ))
 )`;
 
+// SPEC-027 — Frontera de AUTORÍA: qué contenido puede ver y gestionar un
+// docente DENTRO de sus materias asignadas. Complementa a `sqlAlcanceCurso`
+// (que mira al estudiante) del otro lado del sistema: sin esto, dos docentes de
+// cursos distintos que comparten materia se editaban el contenido entre sí.
+//
+//   1. Lo creó él, o
+//   2. no tiene autor registrado (filas legacy anteriores a las migraciones
+//      005/015), o
+//   3. lo creó un administrador.
+//
+// Los puntos 2 y 3 son el MISMO fail-open deliberado de SPEC-026 §2.3: el
+// filtro solo puede quitarle a un docente el contenido de OTRO docente, nunca
+// vaciar una biblioteca que hoy tiene cosas. El admin no pasa por aquí: ve todo.
+//
+// `tabla` es la tabla o alias y `columnaAutor` la columna de autoría (ambas
+// confiables, nunca input del usuario): `retos.docente_id`,
+// `materiales.docente_id`, `banco_preguntas.creado_por`. Consume UN parámetro
+// posicional: [docenteId].
+export const sqlAutoriaDocente = (tabla, columnaAutor = 'docente_id') => `(
+    ${tabla}.${columnaAutor} = ?
+    OR ${tabla}.${columnaAutor} IS NULL
+    OR EXISTS (SELECT 1 FROM usuarios uAutor
+               WHERE uAutor.id = ${tabla}.${columnaAutor} AND uAutor.rol = 'admin')
+)`;
+
+// ¿Este usuario puede gestionar ESTA fila ya cargada? Misma regla que el
+// fragmento SQL, para los sitios que ya tienen el registro en la mano.
+export const puedeGestionarContenido = async (user, autorId) => {
+    if (user?.rol === 'admin') return true;
+    if (autorId === null || autorId === undefined) return true;
+    if (autorId === user?.id) return true;
+    const [[autor]] = await pool.query('SELECT rol FROM usuarios WHERE id = ?', [autorId]);
+    return autor?.rol === 'admin';
+};
+
 // ¿Puede este usuario dirigir contenido a este curso? El docente, solo a los
 // cursos que el admin le asignó (docente_curso); el admin, a cualquier curso
 // vivo. Se comprueba porque `curso_id` ya no es un metadato decorativo: decide
@@ -68,4 +103,7 @@ export const puedeDirigirACurso = async (user, cursoId) => {
     return filas.length > 0;
 };
 
-export default { cursoDelEstudiante, sqlAlcanceCurso, puedeDirigirACurso };
+export default {
+    cursoDelEstudiante, sqlAlcanceCurso, puedeDirigirACurso,
+    sqlAutoriaDocente, puedeGestionarContenido
+};

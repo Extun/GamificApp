@@ -4,7 +4,10 @@ import { soloDocente, puedeGestionarMateria } from '../middleware/auth.js';
 import { registrarAuditoria } from '../lib/auditoria.js';
 import { VALIDADORES_CONFIG, totalEsperado, obtenerJuego } from '../lib/juegos/registro.js';
 import { estadoDe, tiposJugables, motivoBloqueo } from '../lib/juegos/estados.js';
-import { cursoDelEstudiante, sqlAlcanceCurso, puedeDirigirACurso } from '../lib/alcanceCurso.js';
+import {
+    cursoDelEstudiante, sqlAlcanceCurso, puedeDirigirACurso,
+    sqlAutoriaDocente, puedeGestionarContenido
+} from '../lib/alcanceCurso.js';
 
 // SPEC-017 — Guardia ÚNICA de creación. Toda vía que produzca una actividad
 // nueva (crear, duplicar, publicar un borrador) pasa por aquí, de modo que
@@ -19,6 +22,9 @@ const bloqueoCreacion = async (tipo) => {
 const router = Router();
 
 const esIdValido = (n) => Number.isInteger(n) && n > 0;
+
+// El admin no tiene frontera de autoría (SPEC-027 §2.2): gestiona todo.
+const esAdminSesion = (req) => req.user?.rol === 'admin';
 
 // Un tipo de reto es un slug corto en minúsculas ('quiz', 'clasificador',
 // 'lectura', 'memoria', ...). Registrar un juego nuevo NO exige tocar la API:
@@ -97,6 +103,16 @@ router.get('/', async (req, res, next) => {
             }
         }
 
+        // SPEC-027 — Al DOCENTE, esta lista le alimenta el resumen de la
+        // materia («N actividades publicadas», «Últimas actividades»), así que
+        // tiene que decir lo mismo que su Biblioteca: lo suyo y lo
+        // institucional. Sin esto el panel seguiría contándole como propias las
+        // publicaciones de un colega de otro curso. El admin ve todo.
+        if (req.user?.rol === 'docente') {
+            condiciones.push(sqlAutoriaDocente('retos'));
+            params.push(req.user.id);
+        }
+
         const [filas] = await pool.query(
             `SELECT id, materia_id, titulo, tipo, descripcion, configuracion_json,
                     xp_recompensa, estado, creado_en
@@ -114,19 +130,25 @@ router.get('/', async (req, res, next) => {
     }
 });
 
-// GET /api/retos/gestion — Biblioteca del docente (SPEC-004): TODOS los retos
-// de sus materias asignadas, en cualquier estado (borrador/publicado/
-// archivado), con cuántos estudiantes los han jugado. Sin configuracion_json
-// (pesado y no lo necesita el listado).
-// `?papelera=1` devuelve en cambio los retos ELIMINADOS de sus materias
-// (pestaña Papelera de la Biblioteca) para restaurar o purgar.
+// GET /api/retos/gestion — Biblioteca del docente (SPEC-004): sus retos en
+// cualquier estado (borrador/publicado/archivado), con cuántos estudiantes los
+// han jugado. Sin configuracion_json (pesado y no lo necesita el listado).
+// `?papelera=1` devuelve en cambio los retos ELIMINADOS (pestaña Papelera de la
+// Biblioteca) para restaurar o purgar.
+//
+// SPEC-027 — «sus retos» son los de sus materias asignadas Y de su autoría (más
+// el contenido institucional: legacy sin autor o del admin). Antes bastaba
+// compartir materia para verse —y editarse— el contenido entre docentes de
+// cursos distintos, que es el otro lado del bug que SPEC-026 cerró para el
+// estudiante.
 router.get('/gestion', soloDocente, async (req, res, next) => {
     try {
         const esAdmin = req.user.rol === 'admin';
         const enPapelera = req.query.papelera === '1';
         const filtroDocente = esAdmin
             ? ''
-            : 'AND r.materia_id IN (SELECT materia_id FROM docente_materia WHERE docente_id = ?)';
+            : `AND r.materia_id IN (SELECT materia_id FROM docente_materia WHERE docente_id = ?)
+               AND ${sqlAutoriaDocente('r')}`;
         const [filas] = await pool.query(
             `SELECT r.id, r.materia_id, m.nombre AS materia, m.color, m.icono,
                     r.titulo, r.tipo, r.descripcion, r.xp_recompensa, r.estado,
@@ -140,7 +162,7 @@ router.get('/gestion', soloDocente, async (req, res, next) => {
              WHERE m.eliminado_en IS NULL
                AND r.eliminado_en IS ${enPapelera ? 'NOT NULL' : 'NULL'} ${filtroDocente}
              ORDER BY r.creado_en DESC, r.id DESC`,
-            esAdmin ? [] : [req.user.id]
+            esAdmin ? [] : [req.user.id, req.user.id]
         );
         res.json(filas);
     } catch (err) {
@@ -226,6 +248,14 @@ const retoGestionable = async (req, res, retoId, { incluirEliminados = false } =
         res.status(403).json({ error: 'No tienes asignada esta materia' });
         return null;
     }
+    // SPEC-027: dentro de la materia, cada docente gestiona SOLO lo suyo (y lo
+    // institucional). Esta guardia cubre de una vez el detalle, las
+    // estadísticas, editar, duplicar, archivar, la papelera y la purga: son
+    // todas puertas a la misma fila.
+    if (!await puedeGestionarContenido(req.user, reto.docente_id)) {
+        res.status(403).json({ error: 'Esa actividad la creó otro docente' });
+        return null;
+    }
     return reto;
 };
 
@@ -263,10 +293,17 @@ router.patch('/:id', soloDocente, async (req, res, next) => {
             const titulo = String(req.body.titulo).trim().slice(0, 120);
             if (!titulo) return res.status(400).json({ error: 'titulo no puede quedar vacío' });
             if (titulo !== reto.titulo) {
-                // Respeta la unicidad viva por (materia, titulo) del upsert de POST.
+                // Respeta la unicidad viva por (materia, titulo) del upsert de
+                // POST. SPEC-027: solo entre el contenido que este docente
+                // puede gestionar — bloquearlo contra la actividad de otro
+                // docente sería bloquearlo contra algo que no puede ni ver.
                 const [[ocupado]] = await pool.query(
-                    'SELECT 1 AS si FROM retos WHERE materia_id = ? AND titulo = ? AND eliminado_en IS NULL AND id <> ?',
-                    [reto.materia_id, titulo, reto.id]
+                    `SELECT 1 AS si FROM retos
+                     WHERE materia_id = ? AND titulo = ? AND eliminado_en IS NULL AND id <> ?
+                       ${esAdminSesion(req) ? '' : `AND ${sqlAutoriaDocente('retos')}`}`,
+                    esAdminSesion(req)
+                        ? [reto.materia_id, titulo, reto.id]
+                        : [reto.materia_id, titulo, reto.id, req.user.id]
                 );
                 if (ocupado) {
                     return res.status(409).json({ error: 'Ya existe otra actividad con ese título en esta materia' });
@@ -384,13 +421,17 @@ router.post('/:id/duplicar', soloDocente, async (req, res, next) => {
         if (bloqueoDup) return res.status(409).json({ error: bloqueoDup });
 
         // Título único dentro de la materia: "(copia)", "(copia 2)", ...
+        // SPEC-027: entre las suyas, como el resto de comprobaciones de título.
         const base = reto.titulo.replace(/ \(copia( \d+)?\)$/, '');
         let titulo = null;
         for (let n = 1; n <= 50; n++) {
             const candidato = `${base} (copia${n > 1 ? ` ${n}` : ''})`.slice(0, 120);
             const [[ocupado]] = await pool.query(
-                'SELECT 1 AS si FROM retos WHERE materia_id = ? AND titulo = ?',
-                [reto.materia_id, candidato]
+                `SELECT 1 AS si FROM retos WHERE materia_id = ? AND titulo = ?
+                 ${esAdminSesion(req) ? '' : `AND ${sqlAutoriaDocente('retos')}`}`,
+                esAdminSesion(req)
+                    ? [reto.materia_id, candidato]
+                    : [reto.materia_id, candidato, req.user.id]
             );
             if (!ocupado) { titulo = candidato; break; }
         }
@@ -556,9 +597,16 @@ router.post('/', soloDocente, async (req, res, next) => {
 
         // Solo se re-usa (upsert) una fila VIVA: las de la papelera no se
         // resucitan en silencio al publicar un homónimo.
+        //
+        // SPEC-027 §2.3: y solo una fila PROPIA. `retos` no tiene índice UNIQUE
+        // por (materia, título), así que sin este filtro publicar «Sumas»
+        // sobrescribía la «Sumas» que otro docente ya tenía en esa materia —
+        // contenido que quien publica ni siquiera puede ver.
         const [[existente]] = await pool.query(
-            'SELECT id FROM retos WHERE materia_id = ? AND titulo = ? AND eliminado_en IS NULL',
-            [materiaId, titulo]
+            `SELECT id FROM retos
+             WHERE materia_id = ? AND titulo = ? AND eliminado_en IS NULL
+               ${esAdminSesion(req) ? '' : `AND ${sqlAutoriaDocente('retos')}`}`,
+            esAdminSesion(req) ? [materiaId, titulo] : [materiaId, titulo, req.user.id]
         );
 
         let retoId;
