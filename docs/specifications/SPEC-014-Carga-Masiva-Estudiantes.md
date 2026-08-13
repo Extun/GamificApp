@@ -7,6 +7,9 @@
 > criterio único de aula del docente (`docente_curso` OR invitación legacy) y
 > retirada de la generación de invitaciones de la UI (backend y datos
 > intactos). Cambio de curso de un estudiante: fuera de alcance.
+> **Enmienda 2026-08-12:** retirada también la pestaña "Tengo un código de
+> invitación" de `RegistroEstudiante.jsx` — sin emisión de códigos era un
+> callejón sin salida (ver §2.13). Backend y datos siguen intactos.
 > Autor: requerimiento nº 3 del revisor de tesis; diseño acordado con Fabrizio.
 > Toca áreas restringidas (§9 de CONTRIBUTING.md): añade rutas públicas a `auth.js`
 > y modifica la consulta de localización del login de estudiante. Todo lo demás
@@ -43,7 +46,16 @@
     **no activados** del curso pedido. Nada más.
 12. La importación se integra en la **gestión de estudiantes existente**
     (admin y docente); no es un módulo aparte.
-13. El registro actual **por invitación se conserva** como vía alternativa.
+13. ~~El registro actual **por invitación se conserva** como vía alternativa.~~
+    **Revertida el 2026-08-12** (aprobado por Fabrizio). Esta misma spec retiró
+    de la interfaz la *generación* de códigos de invitación, así que la vía
+    alternativa quedó sin forma de obtener un código: la pestaña "Tengo un
+    código de invitación" llevaba a un formulario que nadie podía completar, y
+    el estado vacío del camino bueno mandaba allí al niño. Se retiró la pestaña
+    y su formulario del frontend. **El backend, la tabla
+    `invitaciones_estudiante` y el historial siguen intactos**; reactivar la vía
+    es volver a exponer la emisión de códigos y el cliente
+    `registrarEstudiante`.
 14. **Ningún username técnico ni sufijo interno se muestra jamás al
     estudiante** (resolución de homónimos: "nombre localiza, PIN decide", §6).
 
@@ -254,7 +266,7 @@ Protecciones del endpoint público:
 |----------|--------|
 | `AdminDashboard.jsx` — sección Estudiantes | Botón `[Importar desde Excel]`; columna Estado (pendiente/activado, con pista del código); acción "Regenerar código". |
 | Panel docente — estudiantes/invitaciones | Mismo modal de importación, limitado a `docente_curso`. Su lista de estudiantes incluye pendientes de activación. |
-| `RegistroEstudiante.jsx` | Segunda vía "Ya estoy en la lista de mi clase" (curso → nombre → código). La vía por invitación se conserva. |
+| `RegistroEstudiante.jsx` | Vía "Estoy en la lista de mi clase" (curso → nombre → código). Desde el 2026-08-12 es la **única**: la vía por invitación se retiró de la interfaz (§2.13). |
 | **Nuevo**: `src/components/ImportarEstudiantes.jsx` | Único componente nuevo (asistente: curso → plantilla/subida → vista previa → resumen). Reutiliza `SectionCard`, `EmptyState`. |
 
 ## 12. Endpoints

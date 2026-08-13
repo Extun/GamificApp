@@ -16,15 +16,13 @@ const pedir = async (ruta, options = {}) => {
 // Materias asignadas por el admin: definen qué ve y edita este docente.
 export const misMaterias = () => pedir('/api/docente/mis-materias');
 
-// Cursos activos del catálogo institucional (SPEC-002): alimentan el
-// selector al generar invitaciones (el admin los gestiona en su panel).
+// Cursos activos del catálogo institucional (SPEC-002): el admin los gestiona
+// en su panel y aquí alimentan los selectores de curso.
 export const listarCursos = () => pedir('/api/cursos');
 
-export const generarInvitaciones = (cantidad, cursoId) =>
-    pedir('/api/docente/invitaciones', {
-        method: 'POST',
-        body: JSON.stringify({ cantidad, curso_id: cursoId })
-    });
+// Solo LECTURA de invitaciones: la generación se retiró de la interfaz
+// (SPEC-014) y `POST /api/docente/invitaciones` ya no se llama desde ningún
+// sitio. Esto solo alimenta el listado legacy de códigos aún sin usar.
 export const listarInvitaciones = () => pedir('/api/docente/invitaciones');
 
 export const misEstudiantes = () => pedir('/api/docente/mis-estudiantes');
@@ -66,7 +64,7 @@ export const rankingCompleto = () => pedir('/api/ranking/completo');
 export const misionesResumen = () => pedir('/api/docente/misiones');
 
 export default {
-    misMaterias, listarCursos, generarInvitaciones, listarInvitaciones,
+    misMaterias, listarCursos, listarInvitaciones,
     misEstudiantes, resetearPinEstudiante,
     resumen, detalleEstudiante, crearRetroalimentacion, eliminarRetroalimentacion,
     miPerfil, actualizarPerfil, cambiarPassword, rankingCompleto, misionesResumen

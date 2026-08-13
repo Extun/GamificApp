@@ -443,30 +443,9 @@
 
 /* ---- SPEC-014: primera entrada por lista de clase (activación) ---- */
 
-/* Conmutador de camino: lista de clase vs código de invitación. */
-.registro-modos {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-bottom: 16px;
-}
-.registro-modo {
-    padding: 10px 8px;
-    font-family: var(--font-body);
-    font-size: 0.92rem;
-    font-weight: 700;
-    color: var(--color-text);
-    background: var(--color-surface-alt);
-    border: 2px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: border-color 0.2s ease, background 0.2s ease;
-}
-.registro-modo.is-activo {
-    background: var(--color-primary-soft);
-    border-color: var(--color-primary);
-    color: var(--color-primary-dark);
-}
+/* El conmutador "lista de clase / código de invitación" vivía aquí. Se retiró
+   con la segunda vía: ya no se emiten códigos de invitación, así que la
+   primera entrada tiene un único camino y no necesita pestañas. */
 
 /* El selector de curso hereda el look de los inputs del login. */
 .login-field select {

@@ -144,17 +144,11 @@ export const loginEstudiante = async (nombre, pin) => {
     return guardarSesion(data).usuario;
 };
 
-// Registro con código de invitación del docente. Devuelve además el PIN
-// inicial y el código de emergencia para que el niño los anote.
-export const registrarEstudiante = async ({ nombre, fechaNacimiento, codigo }) => {
-    const data = await postPublico('/api/auth/registro-estudiante', {
-        nombre,
-        fecha_nacimiento: fechaNacimiento,
-        codigo
-    });
-    guardarSesion(data);
-    return data;
-};
+// El registro con código de invitación se retiró de la interfaz: nadie puede
+// emitir códigos nuevos desde SPEC-014, así que el formulario llevaba a un
+// callejón sin salida. `POST /api/auth/registro-estudiante` sigue existiendo
+// en el servidor (con sus datos y su trazabilidad); si algún día se reactiva
+// la emisión de códigos, este cliente se vuelve a añadir aquí.
 
 // ---- SPEC-014: primera entrada de estudiantes importados por Excel ----
 // Cursos con estudiantes por activar (público, solo id + etiqueta).
@@ -320,7 +314,6 @@ export const renovarSesion = async () => {
 const authService = {
     login,
     loginEstudiante,
-    registrarEstudiante,
     cursosPendientes,
     estudiantesPendientes,
     activarEstudiante,

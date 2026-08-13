@@ -888,12 +888,15 @@ export function AdminDashboard() {
                             </div>
                         )}
 
-                        {/* INVITACIONES — pendientes (gestionables) vs. historial de usadas. */}
+                        {/* INVITACIONES — sistema anterior, ya cerrado: no se emiten
+                            códigos nuevos ni queda pantalla para registrarse con
+                            ellos. Se conserva el registro histórico y la posibilidad
+                            de borrar los que quedaron sueltos. */}
                         {pagina === 'invitaciones' && (
                             <div className="dash-secciones">
                                 <DashboardHeader
                                     titulo="Invitaciones"
-                                    subtitulo="Los códigos que emiten los docentes para registrar estudiantes, separados entre los que siguen disponibles y los ya utilizados."
+                                    subtitulo="Registro del sistema anterior de códigos. Ya no se emiten códigos nuevos: los estudiantes entran desde la lista de su clase con su código individual."
                                 />
 
                                 <SectionCard
@@ -939,7 +942,7 @@ export function AdminDashboard() {
                                         <EmptyState
                                             Icon={VpnKeyRoundedIcon}
                                             titulo="No hay invitaciones pendientes"
-                                            mensaje="Cuando un docente genere códigos para su curso, aparecerán aquí hasta que un estudiante los use."
+                                            mensaje="No queda ningún código suelto del sistema anterior. Ya no se emiten códigos nuevos."
                                         />
                                     )}
                                 </SectionCard>
@@ -968,8 +971,8 @@ export function AdminDashboard() {
                                     ) : (
                                         <EmptyState
                                             Icon={HistoryRoundedIcon}
-                                            titulo="Ningún código se ha utilizado todavía"
-                                            mensaje="Cuando un estudiante se registre con un código de invitación, quedará registrado en este historial."
+                                            titulo="Ningún código se llegó a utilizar"
+                                            mensaje="Aquí quedaría constancia de los estudiantes que se registraron con un código de invitación, cuando ese sistema estaba activo."
                                         />
                                     )}
                                 </SectionCard>
