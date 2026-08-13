@@ -27,6 +27,12 @@
     background: var(--color-surface, #fff);
 }
 
+/* Campo que falta por completar. Se marca desde el JSX, no siempre. */
+.imp-campo select.imp-falta {
+    border-color: var(--color-danger, #dc2626);
+    box-shadow: 0 0 0 3px var(--color-danger-soft, #fef2f2);
+}
+
 .imp-btn-plantilla { align-self: flex-start; }
 
 .imp-dropzone {
@@ -181,6 +187,22 @@ tr.fila-error td { background: var(--color-danger-soft, #fef2f2); }
     color: #fff;
 }
 .imp-btn-pri:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Motivo por el que el botón principal está apagado. Va en el pie, pegado al
+   botón que no responde, porque el paso que falta suele haber quedado fuera
+   de la vista (el curso está arriba del todo). `margin-right: auto` lo manda
+   a la izquierda sin tocar el `justify-content: flex-end` de .preview-foot. */
+.imp-bloqueo {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 auto 0 0;
+    max-width: 58%;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    text-align: left;
+    color: var(--color-danger, #dc2626);
+}
 .imp-btn-sec {
     background: var(--color-surface, #fff);
     border-color: var(--color-border, #e2e8f0);
@@ -190,6 +212,10 @@ tr.fila-error td { background: var(--color-danger-soft, #fef2f2); }
 /* Móvil: el modal ocupa casi todo y los pasos respiran menos. */
 @media (max-width: 640px) {
     .imp-modal { width: 96vw; }
+    /* El motivo pasa a una línea propia encima de los botones (acotado al
+       modal del asistente: .preview-foot es compartido). */
+    .imp-modal .preview-foot { flex-wrap: wrap; }
+    .imp-bloqueo { order: -1; width: 100%; max-width: 100%; margin: 0 0 4px; }
     .imp-resumen { flex-direction: column; gap: 4px; }
     .imp-tabla-scroll { max-height: 38vh; }
     /* En pantallas angostas cada mapeo se apila: cabecera arriba, select abajo. */

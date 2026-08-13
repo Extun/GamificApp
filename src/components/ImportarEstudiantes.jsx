@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded';
@@ -18,6 +18,11 @@ import './importarEstudiantes.css';
 // cualquier orden y con cualquier nombre; aquí se detectan, el usuario las
 // corrige si hace falta, y al backend siempre llegan filas ya normalizadas
 // ({ fila, nombres, apellidos, fecha_nacimiento }) — la API no cambia.
+
+// Espejo de LIMITE_FILAS del validador del servidor
+// (server/lib/importacionEstudiantes.js). Aquí solo sirve para avisar ANTES
+// de enviar nada; quien decide sigue siendo el servidor.
+const LIMITE_FILAS = 60;
 
 // ---- Destinos de mapeo ----
 const DESTINOS = [
@@ -121,6 +126,7 @@ export function ImportarEstudiantes({ cursos, onCerrar, onImportado }) {
     const [error, setError] = useState('');
     const [cargando, setCargando] = useState(false);
     const inputRef = useRef(null);
+    const bloqueoId = useId();
 
     const etiquetaCurso = cursos.find((c) => String(c.id) === cursoId)?.etiqueta || '';
     const problemaMapeo = cabeceras.length ? validarMapeo(mapeo) : null;
@@ -151,6 +157,32 @@ export function ImportarEstudiantes({ cursos, onCerrar, onImportado }) {
             // Filas totalmente vacías (típicas al final de la hoja) se ignoran.
             .filter((f) => f.nombres || f.apellidos || String(f.fecha_nacimiento).trim());
     }, [cuerpo, mapeo, problemaMapeo]);
+
+    // ¿Por qué NO se puede analizar todavía? El botón se apagaba en silencio y
+    // el motivo más habitual —el curso sin elegir— está arriba del todo, fuera
+    // de la vista en cuanto aparece el mapeo de columnas: el docente veía su
+    // archivo leído, "Analizar 20 filas" y un botón muerto sin explicación.
+    // Devuelve el PRIMER motivo pendiente, en el mismo orden en que el
+    // asistente pide las cosas, y `campo` marca el paso al que hay que volver.
+    const bloqueo = useMemo(() => {
+        if (!cursos.length) {
+            return { texto: 'No tienes ningún curso activo al que importar. Pídele al administrador que te asigne uno.', campo: 'curso' };
+        }
+        if (!cursoId) {
+            return { texto: 'Falta el paso 1: elige el curso al que se importarán los estudiantes.', campo: 'curso' };
+        }
+        if (!cabeceras.length) {
+            return { texto: 'Falta el paso 2: sube el archivo .xlsx con tu lista de estudiantes.', campo: 'archivo' };
+        }
+        if (problemaMapeo) return { texto: `Revisa el paso 3. ${problemaMapeo}`, campo: 'mapeo' };
+        if (!filas.length) {
+            return { texto: 'El archivo solo tiene la fila de títulos: no hay ningún estudiante debajo.', campo: 'archivo' };
+        }
+        if (filas.length > LIMITE_FILAS) {
+            return { texto: `El archivo trae ${filas.length} filas y el máximo por importación es ${LIMITE_FILAS}. Divide la lista en varios archivos.`, campo: 'archivo' };
+        }
+        return null;
+    }, [cursos.length, cursoId, cabeceras.length, problemaMapeo, filas.length]);
 
     // ---- Paso 1: plantilla y lectura del archivo (SheetJS, en el navegador) ----
 
@@ -264,18 +296,38 @@ export function ImportarEstudiantes({ cursos, onCerrar, onImportado }) {
             pie={
                 paso === 'archivo' ? (
                     <>
+                        {/* El motivo vive junto al botón: es donde se mira al
+                            descubrir que no responde. */}
+                        {bloqueo && (
+                            <p className="imp-bloqueo" id={bloqueoId} role="status">
+                                <ErrorOutlineRoundedIcon sx={{ fontSize: '1rem', flexShrink: 0 }} />
+                                <span>{bloqueo.texto}</span>
+                            </p>
+                        )}
                         <button type="button" className="imp-btn-sec" onClick={onCerrar}>Cancelar</button>
                         <button
                             type="button"
                             className="imp-btn-pri"
-                            disabled={!cursoId || !filas.length || Boolean(problemaMapeo) || cargando}
+                            disabled={Boolean(bloqueo) || cargando}
+                            aria-describedby={bloqueo ? bloqueoId : undefined}
+                            title={bloqueo?.texto || undefined}
                             onClick={analizar}
                         >
-                            {cargando ? 'Analizando…' : `Analizar ${filas.length || ''} fila${filas.length === 1 ? '' : 's'}`}
+                            {cargando
+                                ? 'Analizando…'
+                                : filas.length
+                                    ? `Analizar ${filas.length} fila${filas.length === 1 ? '' : 's'}`
+                                    : 'Analizar'}
                         </button>
                     </>
                 ) : paso === 'analisis' ? (
                     <>
+                        {!informe?.validos && (
+                            <p className="imp-bloqueo" id={bloqueoId} role="status">
+                                <ErrorOutlineRoundedIcon sx={{ fontSize: '1rem', flexShrink: 0 }} />
+                                <span>Ninguna fila se puede importar: revisa la columna «Problema» de la tabla, corrige el Excel y vuelve a subirlo.</span>
+                            </p>
+                        )}
                         <button type="button" className="imp-btn-sec" onClick={() => { setPaso('archivo'); setInforme(null); }}>
                             Volver
                         </button>
@@ -283,6 +335,7 @@ export function ImportarEstudiantes({ cursos, onCerrar, onImportado }) {
                             type="button"
                             className="imp-btn-pri"
                             disabled={!informe?.validos || cargando}
+                            aria-describedby={!informe?.validos ? bloqueoId : undefined}
                             onClick={confirmar}
                         >
                             {cargando ? 'Importando…' : `Importar ${informe?.validos || 0} estudiante${informe?.validos === 1 ? '' : 's'}`}
@@ -308,7 +361,14 @@ export function ImportarEstudiantes({ cursos, onCerrar, onImportado }) {
                 <div className="imp-paso">
                     <label className="imp-campo">
                         <span>1. Curso al que se importarán los estudiantes</span>
-                        <select value={cursoId} onChange={(e) => setCursoId(e.target.value)}>
+                        {/* Se marca en rojo solo cuando ya hay archivo: al abrir
+                            el modal vacío el curso está pendiente por definición
+                            y teñirlo de error no informaría de nada. */}
+                        <select
+                            className={bloqueo?.campo === 'curso' && cabeceras.length ? 'imp-falta' : ''}
+                            value={cursoId}
+                            onChange={(e) => setCursoId(e.target.value)}
+                        >
                             <option value="">Elige el curso…</option>
                             {cursos.map((c) => (
                                 <option key={c.id} value={c.id}>{c.etiqueta}</option>
