@@ -2,6 +2,20 @@
 
 # Última actualización
 
+2026-08-12 (**SPEC-025 — EL «TOP DE LA INSTITUCIÓN» DENTRO DE UNA MATERIA PASA A SER EL TOP DE ESA MATERIA, Y SOLO DE LOS ESTUDIANTES DEL DOCENTE.**
+
+**EL SÍNTOMA.** Reportado por Fabrizio: creó un curso y la materia «Robótica», entró en ella y el Resumen le mostró **«Top de la institución»** con tres nombres —13688, 900 y **0 pts**— de estudiantes que **no están en su curso** y en una materia **sin una sola actividad publicada**.
+
+**LA CAUSA.** El dato ya estaba bien *rotulado* (SPEC-021 P2-4 cambió «Top estudiantes» por «Top de la institución»), pero seguía siendo **el dato equivocado para ese sitio**: venía de `GET /api/ranking`, que ordena por `estudiantes.xp_total` —el XP de todas las materias **más el de las Misiones**, que no pertenece a ninguna— y **sin filtro de curso**. Al lado de «Actividades disponibles en Robótica», eso se lee como «los mejores de aquí». Y el tercer puesto era alguien con **0 XP**, lo que además impedía cualquier estado vacío honesto.
+
+**EL ARREGLO.** Nueva ruta de solo lectura **`GET /api/ranking/materia/:materia_id`** con dos filtros, y los dos son el punto: (1) el XP se suma desde `progreso_estudiante` uniendo a `retos.materia_id` —XP **ganado en esa materia**, así que el de Misiones no infla ningún top—; (2) solo compiten los estudiantes del **aula** de quien pregunta, reutilizando `sqlAulaDocente()`, el criterio único de SPEC-014 F6 que ya usan «Mis Estudiantes» y el Libro de Calificaciones, de modo que el top no puede contradecir a la lista de estudiantes del propio panel (el admin no tiene ese límite). Acceso por `puedeGestionarMateria` —la misma autoridad que para publicar contenido—, cuentas y retos en la Papelera excluidos, y `HAVING SUM(...) > 0` porque un «0 pts» no es un top. **Sirve para cualquier materia presente o futura sin tocar código**: el `materia_id` sale del catálogo dinámico y el permiso de `docente_materia`. **Sin migración de BD.** `GET /api/ranking` y `/completo` quedan **intactos** — la sección «Ranking» del panel sigue siendo la global, que es lo correcto ahí.
+
+**LA TARJETA.** Pasa a «Top de la materia», con **el curso de cada estudiante** bajo su nombre y una nota que dice de qué es el número («XP ganado en {materia} por tus estudiantes»). Cinco estados dichos por separado, siguiendo la causa raíz C1 del cierre de v1.0: cargando, con datos, vacío, **sin estudiantes en tus cursos** y error. `obtenerRankingMateria()` **propaga** el fallo (a diferencia de `obtenerRanking()`) porque devolver `[]` al caerse la red convertiría un fallo en el dato falso «nadie ha ganado XP».
+
+**VERIFICADO EN LOCAL CONTRA MySQL REAL, 27/27 COMPROBACIONES**, con backend de verdad y logins reales de docente, admin y estudiante: el top de Matemáticas (500/100) y el de Lengua (300) son distintos y no se contaminan, mientras el titular tiene 7437 de XP total (el de Misiones **no se cuela**); una estudiante de otro curso con **9999 XP** es invisible para el docente y visible para el admin; 0 XP no aparece; empate → **misma posición**; reto en Papelera → 500 baja a 200; materia ajena/inexistente → **403**, estudiante → **403**, sin token → **401**, `materia_id` inválido → **400**; y el caso reportado: «Robótica» recién creada devuelve **lista vacía**, y se puebla sola tras un intento real. **En navegador** (sobre el `dist` reconstruido): las tres frases correctas en Matemáticas, Lengua y Robótica; transición «Calculando el top de Robótica…» → mensaje vacío capturada con `MutationObserver`; con la **API apagada**, «No pudimos cargar el top de esta materia» y **sesión intacta**; quitándole el curso al docente, «Todavía no tienes estudiantes en tus cursos…». Tarjetas de igual alto (229px), sin desbordamiento a 375px, consola limpia. `npm run build` limpio y **lint 29 = línea base exacta**. La BD local quedó **byte a byte como estaba** (comparación de `mysqldump` antes/después).
+
+**ALCANCE REAL (regla §6.16).** Todo **en local**; **nada probado en producción** — el caso original de Fabrizio vive en Aiven y su comprobación queda pendiente del deploy. No hay migración que aplicar. Detalle en `docs/specifications/SPEC-025-Top-Por-Materia.md`.)
+
 2026-08-03 (**SPEC-024 — LA SESIÓN CADUCADA DEJABA UN PANEL FANTASMA. CAUSA RAÍZ ENCONTRADA, ARREGLADA Y VERIFICADA A MEDIAS: 6 DE 11 ESCENARIOS SIGUEN PENDIENTES DE UN MySQL VIVO.**
 
 **EL SÍNTOMA.** Reportado por Fabrizio: al abrir la aplicación tras un par de días, entró **al panel del rol de la última sesión pero sin datos**. (El 404 del botón Atrás que reportó en la misma frase es **otro problema, ya corregido y desplegado**: lo causaba la falta de `vercel.json`, commit `bd8a523`. No se ha vuelto a tocar.)
@@ -599,7 +613,7 @@ Fabrizio Zurita (Extun)
 | Memorama / Línea del tiempo / Completar espacios | ✅ (100% IA, SPEC-006) |
 | Verdadero o Falso | 🟡 SPEC-017 Fase 7 en código — prueba de la arquitectura extensible |
 | Actividad sorpresa / Adaptar con IA / Biblioteca IA (papelera, estadísticas) | ✅ |
-| XP / niveles / ranking | ✅ (transaccional, idempotente) |
+| XP / niveles / ranking | ✅ (transaccional, idempotente). **SPEC-025 (2026-08-12): dentro de una materia el top es de ESA materia y solo de los estudiantes del docente** (`GET /api/ranking/materia/:id`, solo lectura, sin migración); el ranking global (`/api/ranking`, `/completo`) sigue igual. Verificado en local, pendiente en producción |
 | Misiones (reemplaza logros de `localStorage`) | ✅ Fases 1 y 2 (SPEC-007), e2e confirmado en producción |
 | Dashboards de los 3 roles con datos 100% reales | ✅ |
 | Libro de Calificaciones | ✅ (muestra calificación /100 — mejor resultado) |

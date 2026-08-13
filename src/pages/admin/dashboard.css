@@ -713,8 +713,21 @@
 .widget-rank { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
 
 .widget-rank-item { display: flex; align-items: center; gap: 12px; font-size: 0.92rem; }
-.widget-rank-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* El curso va bajo el nombre (SPEC-025): en un top de la materia, saber de qué
+   curso es cada estudiante es la mitad del dato. `flex: 1` vive aquí y no en
+   `.widget-rank-name`, que ahora es hijo de una columna. */
+.widget-rank-datos { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.widget-rank-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.widget-rank-curso { font-size: 0.75rem; color: var(--color-text-muted); }
 .widget-rank-points { font-weight: 600; color: var(--color-primary); }
+
+/* Nota que explica de qué es el número (XP de esta materia, no XP total). */
+.widget-rank-nota {
+    margin: 12px 0 0;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    color: var(--color-text-muted);
+}
 
 /* Ranking todavía sin datos (SPEC-021 P3-11): antes quedaba un <ol> vacío
    bajo el encabezado, que se leía como un fallo de carga. */

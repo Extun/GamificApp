@@ -23,7 +23,7 @@ import { nombreInstitucion } from '../../services/institucionService';
 import { obtenerMaterial, subirMaterial, eliminarMaterial } from '../../services/materialesService';
 import authService from '../../services/authService';
 import docenteService from '../../services/docenteService';
-import { obtenerRanking } from '../../services/gamificationService';
+import { obtenerRankingMateria } from '../../services/gamificationService';
 import { obtenerRetosPublicados } from '../../services/retosService';
 import {
     EmptyState,
@@ -70,37 +70,66 @@ import { TIPOS_CREABLES, obtenerJuego } from '../../components/juegos/registro';
 import { obtenerEditor } from '../../components/juegos/registro/editores';
 import { SidebarLayout } from '../../components/dashboard/SidebarLayout';
 
-function WidgetsRendimiento({ materia, topEstudiantes, retosPublicados, siguientePaso, onAccion }) {
+function WidgetsRendimiento({ materia, topMateria, retosPublicados, siguientePaso, onAccion }) {
+    const { estado: estadoTop, filas: topEstudiantes } = topMateria;
     return (
         <Grid container spacing={2.5} className="widgets-rendimiento">
             <Grid size={{ xs: 12, md: 4 }}>
                 <Card elevation={0} className="widget-card">
                     <div className="widget-head">
                         <span className="widget-icon widget-icon-gold"><WorkspacePremiumRoundedIcon /></span>
-                        {/* El dato viene de obtenerRanking(): es el ranking GLOBAL de
-                            la institución, sin filtro de materia ni de curso. Bajo el
-                            título "Top estudiantes", y al lado de "Retos publicados en
-                            {materia}", el docente lo leía como "los mejores de esta
-                            materia": un dato correcto presentado de forma que lo vuelve
-                            falso (SPEC-021 P2-4). El rótulo ahora dice de qué es. */}
-                        <h4>Top de la institución</h4>
+                        {/* Antes el dato venía de obtenerRanking(): el ranking GLOBAL
+                            de la institución, sin filtro de materia ni de curso. El
+                            rótulo lo decía ("Top de la institución", SPEC-021 P2-4),
+                            pero el dato seguía sin servir de nada dentro de una
+                            materia: nombraba a estudiantes que no son de los cursos
+                            del docente y por XP que no ganaron aquí. SPEC-025: ahora
+                            es el top DE ESTA MATERIA entre SUS estudiantes. */}
+                        <h4>Top de la materia</h4>
                     </div>
-                    {topEstudiantes.length > 0 ? (
-                        <ol className="widget-rank">
-                            {topEstudiantes.slice(0, 3).map((est, i) => (
-                                <li key={i} className="widget-rank-item">
-                                    <span className={`rank-pos rank-pos-${i + 1}`}>{i + 1}</span>
-                                    <span className="widget-rank-name">{est.nombre}</span>
-                                    <span className="widget-rank-points">{est.puntos} pts</span>
-                                </li>
-                            ))}
-                        </ol>
-                    ) : (
-                        /* Sin datos quedaba un <ol> vacío bajo el encabezado, sin
-                           explicar nada (P3-11). */
+                    {estadoTop === 'listo' && topEstudiantes.length > 0 && (
+                        <>
+                            <ol className="widget-rank">
+                                {topEstudiantes.map((est, i) => (
+                                    <li key={est.id} className="widget-rank-item">
+                                        <span className={`rank-pos rank-pos-${i + 1}`}>{est.posicion}</span>
+                                        <span className="widget-rank-datos">
+                                            <span className="widget-rank-name">{est.nombre}</span>
+                                            {est.curso && <span className="widget-rank-curso">{est.curso}</span>}
+                                        </span>
+                                        <span className="widget-rank-points">{est.xp_materia} pts</span>
+                                    </li>
+                                ))}
+                            </ol>
+                            {/* El número tiene que poder explicarse: es XP de ESTA
+                                materia, no el XP total del estudiante. */}
+                            <p className="widget-rank-nota">XP ganado en {materia} por tus estudiantes.</p>
+                        </>
+                    )}
+                    {/* Cada motivo de "aquí no hay nadie" se dice por separado: una
+                        lista vacía significaba a la vez "todavía no sé", "no hay
+                        nada" y "no pude preguntarlo", y la tarjeta siempre elegía
+                        la segunda lectura (P1-1 / P3-11). */}
+                    {estadoTop === 'cargando' && (
+                        <p className="widget-vacio">Calculando el top de {materia}…</p>
+                    )}
+                    {estadoTop === 'error' && (
                         <p className="widget-vacio">
-                            Todavía nadie ha ganado XP. En cuanto tus estudiantes jueguen,
-                            aquí aparecerán los tres primeros.
+                            No pudimos cargar el top de esta materia. Vuelve a entrar en
+                            unos segundos.
+                        </p>
+                    )}
+                    {estadoTop === 'listo' && topEstudiantes.length === 0 && (
+                        <p className="widget-vacio">
+                            Todavía nadie ha ganado XP en {materia}. En cuanto tus
+                            estudiantes jueguen una actividad de esta materia, aquí
+                            aparecerán los tres primeros.
+                        </p>
+                    )}
+                    {estadoTop === 'sin-estudiantes' && (
+                        <p className="widget-vacio">
+                            Todavía no tienes estudiantes en tus cursos: el top aparecerá
+                            cuando los registres y jueguen una actividad de {materia}.
                         </p>
                     )}
                 </Card>
@@ -377,12 +406,39 @@ export function Dashboard() {
         navigate('/');
     };
 
-    const [ranking, setRanking] = useState([]);
+    // Top 3 de la materia abierta (SPEC-025). Se guarda POR MATERIA, no en un
+    // solo estado: así la ausencia de entrada significa "todavía cargando" sin
+    // necesidad de un set-state dentro del efecto, y volver a una materia ya
+    // consultada no vuelve a mostrar "Calculando…" mientras se refresca.
+    const [rankingPorMateria, setRankingPorMateria] = useState({});
     useEffect(() => {
-        obtenerRanking(3).then((filas) =>
-            setRanking(filas.map((f) => ({ nombre: f.nombre, puntos: f.xp_total })))
-        );
-    }, []);
+        if (!materiaSeleccionada) return;
+        const materiaId = materiaIdPorNombre(materiaSeleccionada);
+        // El catálogo de materias todavía no llegó (idPorNombre lee su caché):
+        // no se marca error, el efecto se repite cuando `materias` cambie.
+        if (!materiaId) return;
+        let vigente = true;
+        const guardar = (valor) => {
+            if (vigente) setRankingPorMateria((prev) => ({ ...prev, [materiaSeleccionada]: valor }));
+        };
+        obtenerRankingMateria(materiaId, 3)
+            .then((filas) => guardar({ estado: 'listo', filas }))
+            .catch(() => guardar({ estado: 'error', filas: [] }));
+        return () => { vigente = false; };
+    }, [materiaSeleccionada, materias, intentoInicio]);
+
+    // Estado que consume el widget. El caso "no tienes estudiantes" se decide
+    // aquí porque es donde se conoce el aula: sin él, un docente recién creado
+    // leería "nadie ha ganado XP" cuando lo que pasa es que aún no hay a quién.
+    const topMateria = useMemo(() => {
+        const entrada = rankingPorMateria[materiaSeleccionada];
+        if (!entrada) return { estado: 'cargando', filas: [] };
+        const aulaVacia = estadoEstudiantes === 'listo' && misEstudiantes.length === 0;
+        if (entrada.estado === 'listo' && !entrada.filas.length && aulaVacia) {
+            return { estado: 'sin-estudiantes', filas: [] };
+        }
+        return entrada;
+    }, [rankingPorMateria, materiaSeleccionada, estadoEstudiantes, misEstudiantes]);
 
     const [resumen, setResumen] = useState(null);
     useEffect(() => {
@@ -877,7 +933,7 @@ export function Dashboard() {
                             <>
                                 <WidgetsRendimiento
                                     materia={materiaSeleccionada}
-                                    topEstudiantes={ranking}
+                                    topMateria={topMateria}
                                     retosPublicados={retosMateria.length}
                                     // El texto y el botón tienen que llevar al MISMO
                                     // sitio (SPEC-021 P3-3): sin material, la tarjeta

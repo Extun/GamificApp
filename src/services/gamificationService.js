@@ -178,6 +178,19 @@ export const obtenerRanking = async (limite = 10) => {
     }
 };
 
+// GET /api/ranking/materia/:id — Top N de UNA materia (SPEC-025): XP ganado
+// en esa materia, y solo entre los estudiantes del aula de quien pregunta.
+//
+// A diferencia de `obtenerRanking`, este SÍ propaga el error: el widget que lo
+// consume distingue «todavía nadie ha ganado XP» de «no pude preguntarlo», y
+// devolver [] al fallar convertiría un fallo de red en un dato falso.
+export const obtenerRankingMateria = async (materiaId, limite = 3) => {
+    const res = await authFetch(`${API_URL}/api/ranking/materia/${materiaId}?limite=${limite}`);
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+    return data;
+};
+
 // Snapshot de XP/nivel para los dashboards (caché alineada con el servidor).
 export const getResumen = () => getProgresoNivel();
 
@@ -192,6 +205,7 @@ const gamificationService = {
     guardarProgreso,
     completarReto,
     obtenerRanking,
+    obtenerRankingMateria,
     obtenerProgreso,
     getResumen
 };
