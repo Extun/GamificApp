@@ -1176,6 +1176,13 @@
     box-shadow: var(--shadow-sm);
 }
 
+/* Misma píldora, en rojo: una página concreta falló pero ya hay otra a la vista. */
+.pdf-loading-error {
+    color: #b91c1c;
+    border-color: #fecaca;
+    background: rgba(254, 242, 242, 0.96);
+}
+
 /* Navegación de páginas minimalista */
 .pdf-nav {
     display: flex;
@@ -1302,6 +1309,10 @@
 
 .office-hero-icon svg { font-size: 3.4rem; }
 
+/* `file-pdf` faltaba: los PDF nunca caían en esta tarjeta porque su único
+   estado alternativo era el esqueleto de carga infinito. Ahora sí la usan
+   cuando la vista previa no se puede generar. */
+.office-hero.file-pdf .office-hero-icon { background: #fee2e2; color: #dc2626; }
 .office-hero.file-word .office-hero-icon { background: #dbeafe; color: #2563eb; }
 .office-hero.file-excel .office-hero-icon { background: #dcfce7; color: #16a34a; }
 .office-hero.file-ppt .office-hero-icon { background: #ffedd5; color: #ea580c; }
@@ -1317,6 +1328,9 @@
 .office-hero-label { margin: 0; font-size: 0.85rem; color: var(--color-text-muted); }
 
 .office-hero .doc-preview-meta { width: 100%; margin-top: 14px; }
+
+/* Botón de reintento dentro de la tarjeta de error. */
+.office-hero .pdf-nav-btn { margin-top: 6px; }
 
 .office-hero-note {
     margin: 4px 0 0;

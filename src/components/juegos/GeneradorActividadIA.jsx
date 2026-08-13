@@ -29,6 +29,7 @@ import { seleccionarParaAnexar, anexarItems } from './anexarItems';
 import { SelectorBanco } from './SelectorBanco';
 import { CampoTema } from './CampoTema';
 import { DIFICULTADES_UI } from './metadatosActividad';
+import { OpcionesCurso } from './CamposActividad';
 import { PreviewJuegoModal } from './PreviewJuegoModal';
 import { useHistorialRetos, HistorialActividades } from './HistorialActividades';
 import { useConfirmacion } from '../../hooks/useConfirmacion';
@@ -526,8 +527,7 @@ export function GeneradorActividadIA({ materia, tipo }) {
                 <label className="quiz-field">
                     <span>Curso (opcional)</span>
                     <select value={cursoId} onChange={(e) => setCursoId(e.target.value)}>
-                        <option value="">Todos los cursos</option>
-                        {cursos.map((c) => <option key={c.id} value={c.id}>{c.etiqueta}</option>)}
+                        <OpcionesCurso cursos={cursos} />
                     </select>
                 </label>
                 <button type="submit" className="quiz-generar-btn" disabled={cargando || !tema.trim()}>
@@ -742,8 +742,7 @@ export function GeneradorActividadIA({ materia, tipo }) {
                             <label className="quiz-config-opcion quiz-config-select">
                                 <span>Curso</span>
                                 <select value={cursoId} onChange={(e) => setCursoId(e.target.value)}>
-                                    <option value="">Todos los cursos</option>
-                                    {cursos.map((c) => <option key={c.id} value={c.id}>{c.etiqueta}</option>)}
+                                    <OpcionesCurso cursos={cursos} />
                                 </select>
                             </label>
                             <p className="quiz-config-ayuda">

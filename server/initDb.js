@@ -52,6 +52,7 @@ export const inicializarEsquema = async () => {
         await migrarCalificacionAcademica(conn);
         await migrarConfiguracionIA(conn);
         await migrarTiposJuego(conn);
+        await migrarFronteraCurso(conn);
         console.log('✅ Esquema verificado/creado en la base de datos.');
         await asegurarAdmin(conn);
         await asegurarAdminPrincipal(conn);
@@ -647,6 +648,44 @@ const migrarTiposJuego = async (conn) => {
         actualizado_por INT UNSIGNED NULL,
         PRIMARY KEY (tipo)
     ) ENGINE = InnoDB`);
+};
+
+// SPEC-026 (migración 015) — el curso como frontera de contenido.
+//
+// `materiales` no sabía QUIÉN subió cada archivo, así que el material no podía
+// acotarse a un aula. Se le añaden las dos columnas que `retos` ya tiene, para
+// que la misma regla de alcance (server/lib/alcanceCurso.js) sirva para ambas.
+//
+// ADITIVA: las filas existentes quedan con docente_id/curso_id en NULL, es
+// decir, institucionales y visibles para todos. Desplegar esto NO le quita a
+// ningún estudiante material que hoy ve.
+const migrarFronteraCurso = async (conn) => {
+    if (await faltaColumna(conn, 'materiales', 'docente_id')) {
+        await conn.query(`ALTER TABLE materiales
+            ADD COLUMN docente_id INT UNSIGNED NULL,
+            ADD COLUMN curso_id   INT UNSIGNED NULL`);
+        console.log('✅ Migración: docente_id/curso_id agregados a materiales.');
+    }
+    // Las FK aparte (mismo patrón que fk_retos_docente): en una BD recién
+    // creada el script del esquema ya trae las columnas con sus constraints,
+    // así que solo se añaden donde falten.
+    const claves = [
+        ['fk_materiales_docente', 'docente_id', 'usuarios'],
+        ['fk_materiales_curso', 'curso_id', 'cursos']
+    ];
+    for (const [nombre, columna, tabla] of claves) {
+        const [[fk]] = await conn.query(
+            `SELECT COUNT(*) AS n FROM information_schema.table_constraints
+             WHERE table_schema = DATABASE() AND table_name = 'materiales'
+               AND constraint_name = ?`,
+            [nombre]
+        );
+        if (fk.n) continue;
+        await conn.query(`ALTER TABLE materiales
+            ADD CONSTRAINT ${nombre} FOREIGN KEY (${columna})
+                REFERENCES ${tabla} (id) ON UPDATE CASCADE ON DELETE SET NULL`);
+        console.log(`✅ Migración: FK ${nombre} agregada a materiales.`);
+    }
 };
 
 // Invariante del sistema: SIEMPRE existe al menos un Administrador Principal

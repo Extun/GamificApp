@@ -4,6 +4,7 @@ import { soloDocente, puedeGestionarMateria } from '../middleware/auth.js';
 import { registrarAuditoria } from '../lib/auditoria.js';
 import { VALIDADORES_CONFIG, totalEsperado, obtenerJuego } from '../lib/juegos/registro.js';
 import { estadoDe, tiposJugables, motivoBloqueo } from '../lib/juegos/estados.js';
+import { cursoDelEstudiante, sqlAlcanceCurso, puedeDirigirACurso } from '../lib/alcanceCurso.js';
 
 // SPEC-017 — Guardia ÚNICA de creación. Toda vía que produzca una actividad
 // nueva (crear, duplicar, publicar un borrador) pasa por aquí, de modo que
@@ -80,6 +81,20 @@ router.get('/', async (req, res, next) => {
             if (!jugables.length) return res.json([]);
             condiciones.push(`tipo IN (${jugables.map(() => '?').join(', ')})`);
             params.push(...jugables);
+
+            // SPEC-026 — El curso es una frontera: el estudiante solo ve las
+            // actividades dirigidas a SU curso (explícitamente, o por ser de un
+            // docente que da clase en él). Antes veía TODAS las publicadas de la
+            // institución, así que un niño de 2do A jugaba lo que el docente de
+            // 3ro A preparó para su clase.
+            // Sin curso registrado en su ficha no hay nada con qué acotarlo, así
+            // que no se filtra (comportamiento previo): se arregla asignándole
+            // curso desde el panel del admin, no vaciándole el panel.
+            const cursoId = await cursoDelEstudiante(req.user.estudiante_id);
+            if (cursoId !== null) {
+                condiciones.push(sqlAlcanceCurso('retos'));
+                params.push(cursoId, cursoId);
+            }
         }
 
         const [filas] = await pool.query(
@@ -326,6 +341,12 @@ router.patch('/:id', soloDocente, async (req, res, next) => {
             if (cursoId !== null && !esIdValido(cursoId)) {
                 return res.status(400).json({ error: 'curso_id debe ser un entero positivo o null' });
             }
+            // SPEC-026 §2.4: `curso_id` ya no es un metadato decorativo, decide
+            // quién ve la actividad; apuntar al curso de otro docente sería
+            // publicar dentro de su aula.
+            if (cursoId !== null && !await puedeDirigirACurso(req.user, cursoId)) {
+                return res.status(403).json({ error: 'Ese curso no está asignado a tu cuenta' });
+            }
             cambios.push('curso_id = ?');
             params.push(cursoId);
         }
@@ -522,6 +543,11 @@ router.post('/', soloDocente, async (req, res, next) => {
         // El docente solo publica retos en las materias que tiene asignadas.
         if (!await puedeGestionarMateria(req.user, materiaId)) {
             return res.status(403).json({ error: 'No tienes asignada esta materia' });
+        }
+        // SPEC-026 §2.4: dirigir la actividad a un curso ajeno es publicar en el
+        // aula de otro docente, así que el destino se valida en el servidor.
+        if (cursoId !== null && !await puedeDirigirACurso(req.user, cursoId)) {
+            return res.status(403).json({ error: 'Ese curso no está asignado a tu cuenta' });
         }
         // SPEC-017: bloqueo de creación en el SERVIDOR, no solo en la UI.
         const bloqueo = await bloqueoCreacion(tipo);

@@ -10,6 +10,7 @@ import { authFetch } from '../../services/authService';
 import { idPorNombre } from '../../services/materiasService';
 import docenteService from '../../services/docenteService';
 import { DIFICULTADES_UI } from '../../components/juegos/GeneradorActividadIA';
+import { OpcionesCurso } from '../../components/juegos/CamposActividad';
 import { useHistorialRetos, HistorialActividades } from '../../components/juegos/HistorialActividades';
 import { PreviewJuegoModal } from '../../components/juegos/PreviewJuegoModal';
 import { BarraAccionesEditor } from '../../components/juegos/BarraAccionesEditor';
@@ -388,8 +389,7 @@ export function GeneradorMision({ materia = 'la materia' }) {
                 <label className="quiz-field">
                     <span>Curso (opcional)</span>
                     <select value={cursoId} onChange={(e) => setCursoId(e.target.value)}>
-                        <option value="">Todos los cursos</option>
-                        {cursos.map((c) => <option key={c.id} value={c.id}>{c.etiqueta}</option>)}
+                        <OpcionesCurso cursos={cursos} />
                     </select>
                 </label>
 
@@ -616,8 +616,7 @@ export function GeneradorMision({ materia = 'la materia' }) {
                             <label className="quiz-config-opcion quiz-config-select">
                                 <span>Curso</span>
                                 <select value={cursoId} onChange={(e) => setCursoId(e.target.value)}>
-                                    <option value="">Todos los cursos</option>
-                                    {cursos.map((c) => <option key={c.id} value={c.id}>{c.etiqueta}</option>)}
+                                    <OpcionesCurso cursos={cursos} />
                                 </select>
                             </label>
                         </ModalConfigActividad>

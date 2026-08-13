@@ -9,6 +9,7 @@ import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import ChevronLeftRoundedIcon from '@mui/icons-material/ChevronLeftRounded';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
+import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
 import { extraerTextoWord } from '../../services/officeService';
 import { cargarDocumentoPdf, renderPaginaPdf } from '../../services/pdfService';
 
@@ -35,6 +36,23 @@ export const kindMeta = {
     ppt: { label: "Presentación PowerPoint", Icon: SlideshowRoundedIcon, className: "file-ppt" },
     other: { label: "Documento", Icon: InsertDriveFileRoundedIcon, className: "file-other" }
 };
+
+// Metadatos de un `kind`, con respaldo genérico SIEMPRE.
+//
+// `kindMeta[archivo.kind]` a secas era una bomba de relojería: la columna
+// `materiales.kind` es un VARCHAR(20) con DEFAULT 'file' —una clave que este
+// mapa no conoce— y el servidor acepta cualquier cadena de hasta 20
+// caracteres. Con una sola fila así, desestructurar `undefined` lanzaba
+// "Cannot destructure property 'Icon'" y tumbaba la PANTALLA ENTERA del
+// estudiante y del docente, no solo esa tarjeta. Hoy el frontend siempre
+// calcula el kind con `getKind()` antes de subir, así que no se dispara por el
+// camino normal; el respaldo cubre el valor por defecto de la propia base y
+// cualquier tipo futuro que llegue de un cliente más nuevo.
+//
+// Sin `export` a propósito: los dos únicos usos viven en este archivo, y
+// exportarla añadiría un error más de `react-refresh/only-export-components`
+// a los que este archivo ya arrastra.
+const metaDeKind = (kind) => kindMeta[kind] || kindMeta.other;
 
 // Convierte el dataURL persistido en un Blob para generar un enlace de descarga.
 const dataURLtoBlob = (dataUrl) => {
@@ -64,7 +82,7 @@ export function descargarArchivo(archivo) {
 // Tarjeta minimalista: solo icono de tipo, nombre (truncado) y tamaño. Toda la
 // interacción (descargar / eliminar / previsualizar) ocurre al abrir el modal.
 export function FileChip({ archivo, onClick }) {
-    const { Icon, className } = kindMeta[archivo.kind];
+    const { Icon, className } = metaDeKind(archivo.kind);
     return (
         <button className={`file-chip ${className}`} onClick={onClick}>
             <span className="file-chip-icon"><Icon /></span>
@@ -140,6 +158,13 @@ function PdfViewer({ archivo }) {
     const [pagina, setPagina] = useState(1);
     const [src, setSrc] = useState(archivo.thumbnail || null);
     const [cargando, setCargando] = useState(false);
+    // Antes NINGÚN fallo llegaba a la interfaz: el `.catch` de la carga estaba
+    // vacío, `mostrarPagina` no tenía `catch` y la salida por documento ausente
+    // era un `return` mudo. Cualquiera de los tres dejaba el esqueleto de carga
+    // puesto para siempre, sin mensaje ni rastro en consola: imposible saber si
+    // el PDF tardaba o si estaba roto. `error` es el canal que faltaba.
+    const [error, setError] = useState(null);
+    const [intento, setIntento] = useState(0);   // reintento manual desde la tarjeta de error
 
     // Inserta en la caché y expulsa la entrada menos usada si se supera el límite.
     const guardarEnCache = useCallback((n, dataUrl) => {
@@ -162,14 +187,25 @@ function PdfViewer({ archivo }) {
             return;
         }
         const pdf = pdfRef.current;
-        if (!pdf) return;
+        if (!pdf) {
+            setCargando(false);
+            setError('El documento no llegó a cargarse.');
+            return;
+        }
         const id = ++peticionRef.current;
         setCargando(true);
-        const dataUrl = await renderPaginaPdf(pdf, n, 2.5);
-        if (id !== peticionRef.current) return; // llegó una navegación más nueva
-        guardarEnCache(n, dataUrl);
-        setSrc(dataUrl);
-        setCargando(false);
+        setError(null);
+        try {
+            const dataUrl = await renderPaginaPdf(pdf, n, 2.5);
+            if (id !== peticionRef.current) return; // llegó una navegación más nueva
+            guardarEnCache(n, dataUrl);
+            setSrc(dataUrl);
+        } catch (err) {
+            if (id !== peticionRef.current) return;
+            setError(err?.message || 'No se pudo dibujar la página.');
+        } finally {
+            if (id === peticionRef.current) setCargando(false);
+        }
     }, [guardarEnCache]);
 
     // Carga el documento UNA vez por archivo y prepara la página 1.
@@ -180,8 +216,16 @@ function PdfViewer({ archivo }) {
         setPagina(1);
         setSrc(archivo.thumbnail || null);
         setTotal(archivo.pageCount || 0);
+        setError(null);
 
-        if (!archivo.dataUrl) return; // archivo legacy sin bytes: solo miniatura
+        if (!archivo.dataUrl) {
+            // Archivo legacy sin bytes: con miniatura aún se ve algo; sin ella
+            // no hay absolutamente nada que dibujar y hay que decirlo.
+            if (!archivo.thumbnail) {
+                setError('Este archivo se guardó sin su contenido, así que no hay nada que previsualizar.');
+            }
+            return;
+        }
 
         cargarDocumentoPdf(archivo.dataUrl).then((pdf) => {
             if (!activo) { pdf.destroy?.(); return; }
@@ -190,7 +234,12 @@ function PdfViewer({ archivo }) {
             // La miniatura ya es la página 1 en alta resolución: siembra la caché.
             if (archivo.thumbnail) guardarEnCache(1, archivo.thumbnail);
             mostrarPagina(1);
-        }).catch(() => { /* PDF ilegible: se mantiene la miniatura si existe */ });
+        }).catch((err) => {
+            // PDF ilegible: se mantiene la miniatura si existe, pero el motivo
+            // se muestra en vez de desaparecer.
+            if (!activo) return;
+            setError(err?.message || 'No se pudo abrir el PDF.');
+        });
 
         return () => {
             activo = false;
@@ -198,13 +247,39 @@ function PdfViewer({ archivo }) {
             pdfRef.current = null;
             pdf?.destroy?.();
         };
-    }, [archivo, guardarEnCache, mostrarPagina]);
+    }, [archivo, intento, guardarEnCache, mostrarPagina]);
 
     const irA = (n) => {
         if (n < 1 || (total && n > total)) return;
         setPagina(n);
         mostrarPagina(n);
     };
+
+    const reintentar = () => setIntento((n) => n + 1);
+
+    // Sin nada dibujado y con un fallo detrás, el esqueleto miente: parece que
+    // sigue trabajando. Se cambia por la misma tarjeta de respaldo que ya usan
+    // los archivos de Office, con el motivo real y la descarga como salida.
+    if (error && !src) {
+        return (
+            <div className="office-hero file-pdf">
+                <span className="office-hero-icon"><PictureAsPdfRoundedIcon /></span>
+                <h4 className="office-hero-name">{archivo.name}</h4>
+                <p className="office-hero-label">No se pudo mostrar la vista previa</p>
+                <div className="doc-preview-meta">
+                    <div><span>Tipo</span><strong>Documento PDF</strong></div>
+                    <div><span>Tamaño</span><strong>{archivo.sizeLabel}</strong></div>
+                    <div><span>Páginas</span><strong>{total || '—'}</strong></div>
+                </div>
+                <p className="office-hero-note">
+                    {error} Puedes descargarlo e intentar abrirlo en tu lector de PDF habitual.
+                </p>
+                <button className="pdf-nav-btn" onClick={reintentar}>
+                    <RefreshRoundedIcon /> Reintentar
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div className="pdf-viewer">
@@ -224,6 +299,13 @@ function PdfViewer({ archivo }) {
                     </div>
                 )}
                 {cargando && <span className="pdf-loading">Renderizando…</span>}
+                {/* Ya hay una página a la vista y ha fallado OTRA: se avisa sin
+                    tirar lo que el usuario ya estaba mirando. */}
+                {error && src && !cargando && (
+                    <span className="pdf-loading pdf-loading-error" role="status">
+                        No se pudo dibujar la página {pagina}
+                    </span>
+                )}
             </div>
 
             {total > 1 && (
@@ -253,7 +335,7 @@ function PdfViewer({ archivo }) {
 
 export function FilePreviewModal({ archivo, onClose, onDownload, onDelete }) {
     if (!archivo) return null;
-    const { label, Icon, className } = kindMeta[archivo.kind];
+    const { label, Icon, className } = metaDeKind(archivo.kind);
     const esPdf = archivo.kind === "pdf";
     const descargaLabel = esPdf ? "Descargar" : "Descargar para editar";
 

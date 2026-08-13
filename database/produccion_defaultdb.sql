@@ -190,11 +190,23 @@ CREATE TABLE IF NOT EXISTS materiales (
     page_count  INT UNSIGNED     NULL,
     thumbnail   MEDIUMTEXT       NULL,
     data_url    LONGTEXT         NULL,
+    -- Frontera de curso (SPEC-026, migración 015). `docente_id` es el autor:
+    -- sin él, el material no puede acotarse a un aula. `curso_id` es el destino
+    -- explícito y hoy siempre es NULL (no hay selector al subir): NULL =
+    -- "todos los cursos del autor", o institucional si el autor no tiene.
+    docente_id  INT UNSIGNED     NULL,
+    curso_id    INT UNSIGNED     NULL,
     creado_en   TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     CONSTRAINT fk_materiales_materia
         FOREIGN KEY (materia_id) REFERENCES materias (id)
         ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_materiales_docente
+        FOREIGN KEY (docente_id) REFERENCES usuarios (id)
+        ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT fk_materiales_curso
+        FOREIGN KEY (curso_id) REFERENCES cursos (id)
+        ON UPDATE CASCADE ON DELETE SET NULL,
     INDEX idx_materiales_materia (materia_id)
 ) ENGINE = InnoDB;
 

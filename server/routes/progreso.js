@@ -3,6 +3,7 @@ import pool from '../db.js';
 import { registrarAuditoria } from '../lib/auditoria.js';
 import { actualizarRacha, evaluarMisiones } from '../lib/misiones.js';
 import { esDelAulaDocente } from '../lib/estudiantes.js';
+import { cursoDelEstudiante, sqlAlcanceCurso } from '../lib/alcanceCurso.js';
 import { totalEsperado, verboAuditoria } from '../lib/juegos/registro.js';
 
 const router = Router();
@@ -156,9 +157,14 @@ router.post('/', async (req, res, next) => {
             // (B) Un estudiante solo registra progreso sobre lo que legítimamente
             // puede jugar. Se aplica EXACTAMENTE el mismo criterio que usa
             // GET /api/retos para listarle actividades (publicado + materia viva
-            // y activa), para que no exista nada visible que no sea enviable ni
-            // viceversa. Ojo: hoy `curso_id` NO delimita el acceso en GET, así
-            // que tampoco se usa aquí — ver SPEC-015 §Modelo de confianza.
+            // y activa + frontera de curso), para que no exista nada visible que
+            // no sea enviable ni viceversa.
+            //
+            // SPEC-026 cerró aquí lo que SPEC-015 §Modelo de confianza dejó
+            // anotado como pendiente: `curso_id` SÍ delimita el acceso, en los
+            // dos endpoints a la vez. Sin esta comprobación, ocultar la
+            // actividad en el listado no serviría de nada — bastaba un POST con
+            // el `reto_id` de otro curso para jugarla y cobrar su XP.
             if (reto && esEstudiante) {
                 const [[accesible]] = await conn.query(
                     `SELECT 1 AS si FROM materias
@@ -168,6 +174,19 @@ router.post('/', async (req, res, next) => {
                 if (reto.estado !== 'publicado' || !accesible) {
                     await conn.rollback();
                     return res.status(403).json({ error: 'Esa actividad no está disponible para ti' });
+                }
+                // Misma salvedad que en el listado: sin curso en su ficha no hay
+                // con qué acotarlo y se mantiene el comportamiento previo.
+                const cursoId = await cursoDelEstudiante(estudianteId, conn);
+                if (cursoId !== null) {
+                    const [[deSuCurso]] = await conn.query(
+                        `SELECT 1 AS si FROM retos WHERE id = ? AND ${sqlAlcanceCurso('retos')}`,
+                        [reto.id, cursoId, cursoId]
+                    );
+                    if (!deSuCurso) {
+                        await conn.rollback();
+                        return res.status(403).json({ error: 'Esa actividad no está disponible para ti' });
+                    }
                 }
             }
         } else {

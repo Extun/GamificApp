@@ -2,6 +2,22 @@
 
 # Última actualización
 
+2026-08-13 (**SPEC-026 — EL CURSO NO DELIMITABA NADA: CUALQUIER ESTUDIANTE VEÍA (Y PODÍA JUGAR) LAS ACTIVIDADES DE TODA LA INSTITUCIÓN. AHORA ES UNA FRONTERA REAL, EN LOS TRES ENDPOINTS A LA VEZ.**
+
+**EL SÍNTOMA.** Reportado por Fabrizio con su instalación de prueba (un docente y un estudiante por curso): «*se supone que entre ellos no deberían de visualizarse las actividades entre sí porque pertenecen a distintos cursos*». Correcto: el niño de 2do A entraba a Matemáticas y jugaba lo que el docente de 3ro A había preparado para su clase. Lo mismo con el material de estudio.
+
+**LA CAUSA, YA ANOTADA EN EL CÓDIGO.** `retos.curso_id` existía desde la migración 008 pero era **un metadato de organización, nunca un control de acceso**: `GET /api/retos` filtraba por estado, papelera y materia activa, y jamás por curso. No era un descubrimiento: `server/routes/progreso.js` llevaba escrito *«Ojo: hoy `curso_id` NO delimita el acceso en GET, así que tampoco se usa aquí»* y **SPEC-015 §Modelo de confianza punto 3** lo dejó como *«decisión de producto pendiente que debe cambiar ambos endpoints a la vez»*. `materiales` estaba peor: no sabía siquiera **quién** había subido cada archivo.
+
+**LA DECISIÓN (acordada con Fabrizio antes de escribir código).** «Todos los cursos» —el valor por defecto del editor— pasa a significar **«todos MIS cursos»**: la actividad sin curso llega a los estudiantes de los cursos asignados a **su autor**. Es la lectura fiel de la interfaz que ya existía (el selector solo lista los cursos del propio docente) y la única que **arregla el caso sin retocar ni una actividad ya publicada**; la alternativa —curso obligatorio— habría exigido re-etiquetar todo a mano y dejaba la fuga abierta mientras tanto. Se incluyó también el **material de estudio**, que necesitaba migración.
+
+**FAIL-OPEN DELIBERADO, para no romper producción.** El filtro solo puede QUITAR contenido a quien tiene un curso distinto, **nunca vaciar un panel que hoy tiene cosas**: lo creado por el **admin**, lo legacy con `docente_id` NULL y lo de un **docente sin cursos asignados** siguen siendo institucionales y visibles para todos (SPEC-009 §5 ya avisó de que tras aquel deploy quedaron docentes sin curso); un **estudiante sin `curso_id`** no se puede acotar, así que ve todo, como hasta hoy; y el **historial ya jugado no se toca** —`GET /api/progreso` no se filtra— porque borrarlo dejaría el XP total sin explicación.
+
+**EL ARREGLO.** La regla vive en **un solo sitio**, `server/lib/alcanceCurso.js`, al estilo de `sqlAulaDocente()`, y la consumen los tres endpoints para que no exista nada listable que no sea jugable ni viceversa: `GET /api/retos`, `POST /api/progreso` (403, sin tocar el `FOR UPDATE` ni la fórmula del XP) y `GET /api/materias/:id/material`. Migración **015** (aditiva): `materiales` gana `docente_id` —lo que hace posible acotarlo— y `curso_id`, reservado. Y como `curso_id` **ya decide acceso**, `POST`/`PATCH /api/retos` validan que el curso esté asignado al docente: sin eso, esta misma spec habría permitido a un docente **inyectar contenido en el aula de otro**. En la interfaz, el selector pasa de «Todos los cursos» a **«Todos mis cursos»** en los cinco sitios donde se elige destino (texto compartido, `OpcionesCurso`), y sigue diciendo «Todos los cursos» cuando el docente no tiene ninguno, que es la verdad en ese caso.
+
+**VERIFICADO EN LOCAL CONTRA MySQL REAL, 35/35 COMPROBACIONES**, con el backend de verdad y logins reales de dos estudiantes, dos docentes y el admin, sobre el escenario exacto de Fabrizio: cada estudiante ve **solo** lo de su docente y **deja de ver** lo del otro (en las dos direcciones); las 7 actividades preexistentes de 3ro A desaparecen para 4to B; forzar `?materia_id=` o `?tipo=` no salta el filtro; jugar por `reto_id` una actividad de otro curso da **403** y **no otorga XP ni deja fila de progreso**, mientras la propia sigue dando sus 100 XP; el material queda separado igual; publicar apuntando al curso ajeno da **403** (el admin sí puede); y **nada cambia** para el docente (su Biblioteca sigue siendo por materia) ni para el admin. **En navegador** sobre el `dist` reconstruido: el estudiante de 4to B ve 5 quizzes y 2 materiales —los suyos y los institucionales—, el de 3ro A ve los suyos, y el editor muestra «Todos mis cursos» con solo el curso propio. `npm run build` limpio y **lint 29 = línea base exacta**. La BD local quedó con **cero diferencias de datos** (comparación de `mysqldump` antes/después).
+
+**ALCANCE REAL (regla §6.16).** Todo **en local**; **nada probado en producción**. El deploy **sí lleva migración** (015, aditiva y sin pérdida: las filas existentes quedan institucionales). Detalle en `docs/specifications/SPEC-026-Frontera-De-Curso.md`.)
+
 2026-08-12 (**LA PRIMERA PANTALLA DEL PRODUCTO OFRECÍA DOS CAMINOS Y UNO NO LLEVABA A NINGUNA PARTE: SE RETIRA «TENGO UN CÓDIGO DE INVITACIÓN».**
 
 **EL SÍNTOMA.** Preguntado por Fabrizio: en «Entrar por primera vez», ¿el segundo botón todavía sirve para algo?
@@ -620,7 +636,8 @@ Fabrizio Zurita (Extun)
 | Gestión de estudiantes (alta manual + carga masiva Excel + activación por código) | ✅ SPEC-014 completa, e2e confirmado en producción |
 | Invitaciones de estudiante | ⚪ Legacy — códigos existentes siguen funcionando; ya no se generan nuevos desde la UI |
 | Asignación de cursos a docentes (SPEC-009) | ✅ |
-| Material de estudio (base64 en MySQL, preview PDF/docx) | ✅ |
+| El curso como frontera de contenido (SPEC-026) | ✅ en código (2026-08-13): el estudiante solo ve/juega actividades y material de **su** curso; sin curso destino, el contenido llega a los cursos de su **autor**, y lo del admin o sin autor sigue siendo institucional. Verificado en local 35/35; **migración 015 pendiente de deploy** |
+| Material de estudio (base64 en MySQL, preview PDF/docx) | ✅ (con autor y curso desde SPEC-026) |
 | Quiz / Clasificador / Misión Narrativa | ✅ (crear con/sin IA y jugar) |
 | Memorama / Línea del tiempo / Completar espacios | ✅ (100% IA, SPEC-006) |
 | Verdadero o Falso | 🟡 SPEC-017 Fase 7 en código — prueba de la arquitectura extensible |

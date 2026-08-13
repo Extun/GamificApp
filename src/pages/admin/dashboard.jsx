@@ -563,21 +563,39 @@ export function Dashboard() {
             dataUrl: null
         };
 
+        // El archivo se sube aunque falle su análisis —perder el documento por
+        // no poder dibujarlo sería mucho peor—, pero el fallo YA NO se traga:
+        // antes el docente acababa con un PDF que abría un modal cargando para
+        // siempre, sin haber visto un solo aviso de que algo había ido mal.
+        const avisos = [];
         try {
             archivo.dataUrl = await leerComoDataUrl(file);
-        } catch { /* archivo ilegible: se sube sin previsualización */ }
-        if (kind === "pdf") {
+        } catch (err) {
+            avisos.push(`no se pudo leer su contenido (${err?.message || 'error desconocido'})`);
+        }
+        if (kind === "pdf" && archivo.dataUrl) {
             try {
-                const { pageCount, thumbnail } = await procesarPdf(file);
+                const { pageCount, thumbnail, motivoSinMiniatura } = await procesarPdf(file);
                 archivo.pageCount = pageCount;
                 archivo.thumbnail = thumbnail;
-            } catch { /* PDF sin miniatura: se sube igual */ }
+                if (motivoSinMiniatura) {
+                    avisos.push(`no se pudo generar su miniatura (${motivoSinMiniatura})`);
+                }
+            } catch (err) {
+                avisos.push(`no se pudo analizar el PDF (${err?.message || 'error desconocido'})`);
+            }
         }
 
         try {
             setErrorMaterial('');
             await subirMaterial(materiaIdPorNombre(materia), archivo);
             await refrescarMaterial(materia);
+            if (avisos.length) {
+                setErrorMaterial(
+                    `"${file.name}" se subió correctamente, pero ${avisos.join(' y ')}. ` +
+                    `La vista previa puede no estar disponible; la descarga sí funciona.`
+                );
+            }
         } catch (err) {
             setErrorMaterial(`No se pudo subir "${file.name}": ${err.message}`);
         }
